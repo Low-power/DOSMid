@@ -1,0 +1,175 @@
+/*
+ * User interface routines of DOSMid.
+ * Copyright (C) Mateusz Viste
+ */
+
+#include <dos.h>
+#include <stdlib.h>  /* ultoaf() */
+#include <stdio.h>   /* sprintf() */
+#include <string.h>  /* strlen() */
+
+#include "ui.h"  /* include self for control */
+
+/* color scheme 0xBF00 (Background/Foreground/0/0) */
+#define COLOR_TUI       0x1700u
+#define COLOR_NOTES     0x1E00u
+#define COLOR_TEXT      0x1700u
+#define COLOR_TEMPO     0x1300u
+#define COLOR_CHANS     0x1200u
+#define COLOR_CHANS_DIS 0x1800u
+#define COLOR_PROGRESS1 0x2000u /* elapsed time */
+#define COLOR_PROGRESS2 0x4000u /* not yet elapsed */
+
+/* prints a character on screen, at position [x,y]. charbyte is a 16bit
+   value where higher 8 bits contain the attributes (colors) and lower
+   8bits contain the actual character to draw. */
+static void ui_printchar(int y, int x, unsigned short charbyte) {
+  unsigned short far *screenptr = MK_FP(0xB800, 0);
+  screenptr[(y << 6) + (y << 4) + x] = charbyte;
+}
+
+static void ui_printstr(int y, int x, char *string, int staticlen, unsigned short attrib) {
+  int xs;
+  /* print out the string first */
+  for (xs = 0; string[xs] != 0; xs++) ui_printchar(y, x++, string[xs] | attrib);
+  /* if staticlen is provided, fill the rest with spaces */
+  for (; xs < staticlen; xs++) ui_printchar(y, x++, ' ' | attrib);
+}
+
+void ui_init(void) {
+  union REGS regs;
+  /* set text mode 80x25 */
+  regs.h.ah = 0x00;  /* set video mode */
+  regs.h.al = 0x03;  /* 80x25 */
+  int86(0x10, &regs, &regs);
+}
+
+void ui_hidecursor(void) {
+  union REGS regs;
+  regs.h.ah = 0x01;
+  regs.h.ch = 0x1F;
+  regs.h.cl = 0x0E;
+  int86(0x10, &regs, &regs);
+}
+
+/* draws the UI screen */
+void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver) {
+  #include "gm.h"  /* GM instruments names */
+  int x, y;
+  /* draw ascii graphic frames, etc */
+  if (*refreshflags & UI_REFRESH_TUI) {
+    char tempstr[32];
+    *refreshflags ^= UI_REFRESH_TUI;
+    for (x = 0; x < 80; x++) {
+      ui_printchar(0, x, 205 | COLOR_TUI);
+      ui_printchar(17, x, 205 | COLOR_TUI);
+      ui_printchar(24, x, 205 | COLOR_TUI);
+    }
+    for (y = 1; y < 17; y++) ui_printchar(y, 15, 179 | COLOR_TUI);
+    for (y = 18; y < 24; y++) {
+      ui_printchar(y, 0, 186 | COLOR_TUI);
+      ui_printchar(y, 79, 186 | COLOR_TUI);
+    }
+    ui_printchar(0, 15, 209 | COLOR_TUI);
+    ui_printchar(17, 15, 207 | COLOR_TUI);
+    ui_printchar(17, 0, 201 | COLOR_TUI);
+    ui_printchar(17, 79, 187 | COLOR_TUI);
+    ui_printchar(24, 0, 200 | COLOR_TUI);
+    ui_printchar(24, 79, 188 | COLOR_TUI);
+    sprintf(tempstr, "[ DOSMid v%s ]", pver);
+    ui_printstr(24, 78 - strlen(tempstr), tempstr, -1, COLOR_TUI);
+  }
+  /* print notes states on every channel */
+  if (*refreshflags & UI_REFRESH_NOTES) {
+    *refreshflags ^= UI_REFRESH_NOTES;
+    for (y = 0; y < 16; y++) {
+      for (x = 0; x < 64; x++) {
+        int noteflag = 0;
+        if (trackinfo->notestates[x << 1] & (1 << y)) noteflag = 2;
+        if (trackinfo->notestates[1 + (x << 1)] & (1 << y)) noteflag |= 1;
+        switch (noteflag) {
+          case 0:
+            ui_printchar(1 + y, 16 + x, ' ' | COLOR_NOTES);
+            break;
+          case 1:
+            ui_printchar(1 + y, 16 + x, 0xde | COLOR_NOTES);
+            break;
+          case 2:
+            ui_printchar(1 + y, 16 + x, 0xdd | COLOR_NOTES);
+            break;
+          case 3:
+            ui_printchar(1 + y, 16 + x, 0xdb | COLOR_NOTES);
+            break;
+        }
+      }
+    }
+  }
+  /* tempo */
+  if (*refreshflags & UI_REFRESH_TEMPO) {
+    char tempstr[16];
+    unsigned long miditempo;
+    *refreshflags ^= UI_REFRESH_TEMPO;
+    /* print filename */
+    ui_printstr(18, 1, trackinfo->filename, 16, COLOR_TEMPO);
+    /* print format */
+    itoa(trackinfo->midiformat, tempstr, 10);
+    ui_printstr(18, 17, "Format:", 8, COLOR_TEMPO);
+    ui_printstr(18, 25, tempstr, 4, COLOR_TEMPO);
+    /* print tempo */
+    miditempo = 60000000lu/trackinfo->tempo;
+    ultoa(miditempo, tempstr, 10);
+    strcat(tempstr, " bpm");
+    ui_printstr(18, 29, "Tempo:", 7, COLOR_TEMPO);
+    ui_printstr(18, 36, tempstr, 43, COLOR_TEMPO);
+  }
+  /* title and copyright notice */
+  if (*refreshflags & UI_REFRESH_TITLECOPYR) {
+    *refreshflags ^= UI_REFRESH_TITLECOPYR;
+    ui_printstr(19, 1, trackinfo->title[0], 78, COLOR_TEXT);
+    ui_printstr(20, 1, trackinfo->title[1], 78, COLOR_TEXT);
+    ui_printstr(21, 1, trackinfo->title[2], 78, COLOR_TEXT);
+    ui_printstr(22, 1, trackinfo->copyright, 78, COLOR_TEXT);
+  }
+  /* programs (patches) names */
+  if (*refreshflags & UI_REFRESH_PROGS) {
+    unsigned int color;
+    *refreshflags ^= UI_REFRESH_PROGS;
+    for (y = 0; y < 16; y++) {
+      color = COLOR_CHANS_DIS;
+      if (trackinfo->channelsusage & (1 << y)) color = COLOR_CHANS;
+      if (y == 9) {
+          ui_printstr(y + 1, 0, "Percussion", 15, color);
+        } else {
+          ui_printstr(y + 1, 0, gmset[trackinfo->chanprogs[y]], 15, color);
+      }
+    }
+  }
+  /* elapsed/total time */
+  if (*refreshflags & UI_REFRESH_TIME) {
+    char tempstr1[24];
+    char tempstr2[16];
+    unsigned long perc;
+    unsigned int curcol;
+    int rpos;
+    *refreshflags ^= UI_REFRESH_TIME;
+    sprintf(tempstr1, " %lu:%02lu (%lu%%)     ", trackinfo->elapsedsec / 60, trackinfo->elapsedsec % 60, (trackinfo->elapsedsec  * 100) / (trackinfo->totlen + 1));
+    sprintf(tempstr2, "%lu:%02lu ", trackinfo->totlen / 60, trackinfo->totlen % 60);
+    /* draw the progress bar */
+    perc = (trackinfo->elapsedsec * 78) / trackinfo->totlen;
+    rpos = 78 - strlen(tempstr2);
+    for (x = 0; x < 78; x++) {
+      if (x < perc) {
+          curcol = COLOR_PROGRESS1;
+        } else {
+          curcol = COLOR_PROGRESS2;
+      }
+      if (x < 15) {
+          ui_printchar(23, 1 + x, tempstr1[x] | curcol);
+        } else if (x >= rpos) {
+          ui_printchar(23, 1 + x, tempstr2[x - rpos] | curcol);
+        } else {
+          ui_printchar(23, 1 + x, ' ' | curcol);
+      }
+    }
+  }
+}

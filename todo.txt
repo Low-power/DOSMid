@@ -1,0 +1,9 @@
+
+ TODO
+
+ - add volume / forward / backward controls
+ - make sure I detect properly out of memory situations
+ - find out why tempo is misinterpretated sometimes (one.mid)
+ - speed up loading (avoid pushing/pulling xms blocks twice)
+ - implement playlists
+ - lyrics
