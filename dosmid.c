@@ -1,7 +1,7 @@
 /*
    DOSMID - a low-requirement MIDI player for DOS
 
-   Copyright (c) 2014, Mateusz Viste
+   Copyright (c) 2014,2015, Mateusz Viste
    All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -40,12 +40,21 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "timer.h"
 #include "ui.h"
 
-#define PVER "0.5"
-#define PDATE "2014"
+#define PVER "0.6"
+#define PDATE "2014-2015"
 
 #define MAXTRACKS 64
 #define EVENTSCACHESIZE 64 /* *must* be a power of 2 !!! */
 #define EVENTSCACHEMASK 63 /* used by the circular events buffer */
+
+
+struct clioptions {
+  int memmode;      /* type of memory to use: MEM_XMS or MEM_MALLOC */
+  int workmem;      /* amount of work memory to allocate, in KiBs */
+  int nodelay;
+  int mpuport;
+  char *midifile;   /* MIDI filename to play */
+};
 
 
 /* copies the base name of a file (ie without directory path) into a string */
@@ -68,6 +77,27 @@ static void filename2basename(char *fromname, char *tobasename, int maxlen) {
   }
   tobasename[x2] = 0;
 }
+
+
+/* checks whether str starts with start or not. returns 0 if so, non-zero otherwise */
+static int stringstartswith(char *str, char *start) {
+  if ((str == NULL) || (start == NULL)) return(-1);
+  while (*start != 0) {
+    if (*start != *str) return(-1);
+    str++;
+    start++;
+  }
+  return(0);
+}
+
+
+static int hexchar2int(char c) {
+  if ((c >= '0') && (c <= '9')) return(c - '0');
+  if ((c >= 'a') && (c <= 'f')) return(c - 'a');
+  if ((c >= 'A') && (c <= 'F')) return(c - 'A');
+  return(-1);
+}
+
 
 static void noteon(int mpuport, int chan, int n, int velocity) {
   mpu401_waitwrite(mpuport);      /* Wait for port ready */
@@ -131,39 +161,52 @@ static void udelayabs(unsigned long us) {
   }
 }
 
-struct clioptions {
-  int memmode;      /* type of memory to use: MEM_XMS or MEM_MALLOC */
-  int workmem;      /* amount of work memory to allocate, in KiBs */
-  int nodelay;
-  char *midifile;   /* MIDI filename to play */
-};
 
 /* parse command line params and fills the params struct accordingly. returns
-   0 on sucess, non-zero otherwise. */
-static int parseargv(int argc, char **argv, struct clioptions *params) {
+   NULL on sucess, or a pointer to an error string otherwise. */
+static char *parseargv(int argc, char **argv, struct clioptions *params) {
   int i;
   /* first load defaults */
   params->midifile = NULL;
   params->memmode = MEM_XMS;
   params->workmem = 16384;  /* try to use 16M of XMS memory by default */
   params->nodelay = 0;
+  /* if no params at all, don't waste time */
+  if (argc == 0) return("");
   /* now read params */
   for (i = 1; i < argc; i++) {
     if (strcmp(argv[i], "/noxms") == 0) {
-        params->memmode = MEM_MALLOC;
-        params->workmem = 63; /* using 'normal' malloc, fallback to 63K */
-      } else if (strcmp(argv[i], "/nodelay") == 0) {
-        params->nodelay = 1;
-      } else if ((argv[i][0] != '/') && (params->midifile == NULL)) {
-        params->midifile = argv[i];
-      } else {
-        return(-1);
+      params->memmode = MEM_MALLOC;
+      params->workmem = 63; /* using 'normal' malloc, fallback to 63K */
+    } else if (strcmp(argv[i], "/nodelay") == 0) {
+      params->nodelay = 1;
+    } else if (stringstartswith(argv[i], "/mpu=") == 0) {
+      char *hexstr;
+      hexstr = argv[i] + 5;
+      params->mpuport = 0;
+      while (*hexstr != 0) {
+        int c;
+        c = hexchar2int(*hexstr);
+        if (c < 0) return("Invalid MPU port provided. Example: /mpu=330");
+        params->mpuport <<= 4;
+        params->mpuport |= c;
+        hexstr++;
+      }
+      if (params->mpuport < 1) return("Invalid MPU port provided. Example: /mpu=330");
+    } else if ((strcmp(argv[i], "/?") == 0) || (strcmp(argv[i], "/h") == 0) || (strcmp(argv[i], "/help") == 0)) {
+      return("");
+    } else if ((argv[i][0] != '/') && (params->midifile == NULL)) {
+      params->midifile = argv[i];
+    } else {
+      return("Unknown option.");
     }
   }
   /* check if at least a MIDI filename have been provided */
-  if (params->midifile == NULL) return(-1);
+  if (params->midifile == NULL) {
+    return("You have to provide the path to a MIDI file to play.");
+  }
   /* all good */
-  return(0);
+  return(NULL);
 }
 
 static void setchanprog(int mpuport, unsigned char chan, unsigned char prog) {
@@ -246,28 +289,76 @@ static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscac
   return(res);
 }
 
+
+/* reads the BLASTER variable for MPU port. If not found, fallbacks to 0x330 */
+static int preloadmpuport(void) {
+  char *blaster;
+  /* check if a blaster variable is present */
+  blaster = getenv("BLASTER");
+  /* if so, read it looking for a 'P' parameter */
+  if (blaster != NULL) {
+    while ((*blaster != 'P') && (*blaster != 0)) {
+      blaster++;
+    }
+    /* have we found a 'P' param? */
+    if (*blaster == 'P') {
+      int p = 0;
+      /* read the P param into a variable */
+      blaster++;
+      while ((*blaster != 0) && (*blaster != ' ')) {
+        int c = hexchar2int(*blaster);
+        blaster++;
+        if (c < 0) {
+          p = -1;
+          break;
+        }
+        p <<= 4;
+        p |= c;
+      }
+      /* if what we have read looks sane, return it */
+      if (p > 0) return(p);
+    }
+  }
+  /* if nothing else worked, fallback to 0x330 */
+  return(0x330);
+}
+
+
 int main(int argc, char **argv) {
   int midiformat, miditracks;
   unsigned int miditimeunitdiv;
-  int mpuport = 0x330;
   int i;
   int refreshflags = 0xFF;
   struct midi_chunkmap_t *chunkmap;
   FILE *fd;
   long newtrack, trackpos = -1;
   unsigned long midiplaybackstart;
+  char *errstr;
   struct midi_event_t *curevent, *eventscache;
   struct clioptions params;
   struct trackinfodata *trackinfo;
 
-  if (parseargv(argc, argv, &params) != 0) {
-    puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste\n"
-         "\n"
-         "Usage: dosmid [/noxms] [/nodelay] file.mid\n"
-         "\n"
-         " /noxms    use conventional memory instead of XMS\n"
-         " /nodelay  don't wait after writing to MPU\n"
-    );
+  /* preload the mpu port to be used (might be forced later via **argv) */
+  params.mpuport = preloadmpuport();
+
+  errstr = parseargv(argc, argv, &params);
+  if (errstr != NULL) {
+    if (*errstr != 0) {
+      printf("Error: %s\nRun DOSMID /? for some help", errstr);
+    } else {
+      puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste\n"
+           "\n"
+           "DOSMid is a MIDI player that reads *.MID or *.RMI files and drives a MPU401"
+           "synthesizer.\n"
+           "\n"
+           "Usage: dosmid [/noxms] [/nodelay] [/mpu=XXX] file.mid\n"
+           "\n"
+           " /noxms    use conventional memory instead of XMS\n"
+           " /nodelay  don't wait after writing to MPU\n"
+           " /mpu:XXX  use MPU port 0xXXX (by default it follows the BLASTER\n"
+           "           environment variable, and if not found, uses 0x330)\n"
+      );
+    }
     return(1);
   }
 
@@ -357,10 +448,10 @@ int main(int argc, char **argv) {
 
 
   puts("RESET MPU-401");
-  mpu401_rst(mpuport);
+  mpu401_rst(params.mpuport);
 
   puts("SET UART MODE");
-  mpu401_uart(mpuport);
+  mpu401_uart(params.mpuport);
 
   /* initialize the high resolution timer */
   timer_init();
@@ -378,7 +469,7 @@ int main(int argc, char **argv) {
     curevent = getnexteventfromcache(eventscache, trackpos, params.nodelay);
 
     /* puts("flush MPU"); */
-    mpu401_flush(mpuport);
+    mpu401_flush(params.mpuport);
     /* printf("Action: %d / Note: %d / Vel: %d / t=%lu / next->%ld\n", curevent->type, curevent->data.note.note, curevent->data.note.velocity, curevent->deltatime, curevent->next); */
     if (curevent->deltatime > 0) {
       if (compute_elapsed_time(midiplaybackstart, &(trackinfo->elapsedsec)) != 0) refreshflags |= UI_REFRESH_TIME;
@@ -388,13 +479,13 @@ int main(int argc, char **argv) {
     switch (curevent->type) {
       case EVENT_NOTEON:
         /* puts("NOTE ON"); */
-        noteon(mpuport, curevent->data.note.chan, curevent->data.note.note, curevent->data.note.velocity);
+        noteon(params.mpuport, curevent->data.note.chan, curevent->data.note.note, curevent->data.note.velocity);
         trackinfo->notestates[curevent->data.note.note] |= (1 << curevent->data.note.chan);
         refreshflags |= UI_REFRESH_NOTES;
         break;
       case EVENT_NOTEOFF:
         /* puts("NOTE OFF"); */
-        noteoff(mpuport, curevent->data.note.chan, curevent->data.note.note);
+        noteoff(params.mpuport, curevent->data.note.chan, curevent->data.note.note);
         trackinfo->notestates[curevent->data.note.note] &= (0xFFFF ^ (1 << curevent->data.note.chan));
         refreshflags |= UI_REFRESH_NOTES;
         break;
@@ -404,13 +495,13 @@ int main(int argc, char **argv) {
         break;
       case EVENT_PROGCHAN:
         trackinfo->chanprogs[curevent->data.prog.chan] = curevent->data.prog.prog;
-        setchanprog(mpuport, curevent->data.prog.chan, curevent->data.prog.prog);
+        setchanprog(params.mpuport, curevent->data.prog.chan, curevent->data.prog.prog);
         refreshflags |= UI_REFRESH_PROGS;
         break;
       default: /* probably a raw event - bit 7 should be set (>127) */
         if (curevent->type & 128) {
           /* puts("RAW EVENT"); */
-          rawevent(mpuport, curevent->data.raw, curevent->type & 127);
+          rawevent(params.mpuport, curevent->data.raw, curevent->type & 127);
           break;
         }
     }
@@ -432,7 +523,7 @@ int main(int argc, char **argv) {
       for (c = 0; c < 16; c++) {
         if (trackinfo->notestates[i] & (1 << c)) {
           /* printf("note #%d is still playing on channel %d\n", i, c); */
-          noteoff(mpuport, c, i);
+          noteoff(params.mpuport, c, i);
         }
       }
     }
@@ -441,7 +532,7 @@ int main(int argc, char **argv) {
   puts("Reset MPU...");
 
   /* reset the MPU back into intelligent mode */
-  mpu401_rst(mpuport);
+  mpu401_rst(params.mpuport);
 
   puts("Free memory...");
   mem_close();

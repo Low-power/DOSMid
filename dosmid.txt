@@ -13,33 +13,37 @@ provide such interface, although some need an additional 'wavetable' chip to
 produce actual MIDI sound.
 
 Minimal requirements:
- - a MPU-401 compatible card
+ - a MPU-401 compatible sound card with a wavetable
  - an 8086 CPU or better
  - a video card able to display an 80x25 text mode (ie. CGA or better)
 
 Highly recommended:
  - an 80286 CPU
+ - VGA
  - 256K of available XMS memory
 
 
 *** USAGE ***
 
-DOSMID [/noxms] [/nodelay] file.mid
+DOSMID [/noxms] [/nodelay] [/mpu=XXX] file.mid
 
- /noxms    use conventional memory instead of XM. This obviously useful only
+ /noxms    Use conventional memory instead of XM. This obviously useful only
            if you don't have have XMS, don't use this option otherwise. Note
            that without XMS you won't be able to play MIDI files bigger than
            a few dozen of KiBs.
- /nodelay  don't wait after writing to MPU. By default, DOSMid waits 2ms
+ /nodelay  Don't wait after writing to MPU. By default, DOSMid waits 2ms
            after every sequence of MPU writes. Without such wait, some MIDI
            drivers might show unexpected behavior (specifically, the AWEUTIL
            driver used on SoundBlaster AWE 32/64 cards crashes without such
            delays.
+ /mpu=XXX  Force dosmid to use MPU-401 on port XXX. If not forced, DOSMID
+           scans the BLASTER environment variable for the MPU port, and if not
+           found, it fallbacks to port 330h.
 
 
 *** LICENSE ***
 
-Copyright (C) 2014, Mateusz Viste
+Copyright (C) 2014,2015, Mateusz Viste
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without

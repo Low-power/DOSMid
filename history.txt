@@ -1,0 +1,10 @@
+
+* DOSMid history file *
+
+
+DOSMid v0.6 [xx xxx xxxx]
+ - configurable MPU port (via the BLASTER variable or /mpu=XXX),
+ - ...
+
+DOSMid v0.5 [10 Aug 2014]
+ - first public release.

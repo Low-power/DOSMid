@@ -1,13 +1,13 @@
 Begin3
 Title:           DOSMid
-Version:         0.5
+Version:         0.6
 Entered-date:    10 Aug 2014
 Description:     a real mode midi player for MPU-401 devices
 Keywords:        midi,player
 Author:          Mateusz Viste
-Maintained-by:   
-Primary-site:    
-Alternate-site:  
+Maintained-by:
+Primary-site:
+Alternate-site:
 Original-site:   http://dosmid.sourceforge.net/
 Platforms:       DOS
 Copying-policy:  BSD
