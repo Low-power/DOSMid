@@ -8,8 +8,6 @@
  - implement playlists
  - lyrics
  - nicer fonts (vga)
- - graphical shades on notes
  - hide the blinking cursor
  - is nodelay really bad?
- - configurable MPU port
  - resetting MPU doesn't always work (sometimes it gets stuck) - probably related to waitwrite() waiting indefinetely

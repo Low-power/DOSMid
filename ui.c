@@ -47,13 +47,13 @@ void ui_init(void) {
 void ui_hidecursor(void) {
   union REGS regs;
   regs.h.ah = 0x01;
-  regs.h.ch = 0x1F;
+  regs.h.ch = 0x0F;
   regs.h.cl = 0x0E;
   int86(0x10, &regs, &regs);
 }
 
 /* draws the UI screen */
-void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver) {
+void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int mpuport) {
   #include "gm.h"  /* GM instruments names */
   int x, y;
   /* draw ascii graphic frames, etc */
@@ -78,6 +78,8 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver) {
     ui_printchar(24, 79, 188 | COLOR_TUI);
     sprintf(tempstr, "[ DOSMid v%s ]", pver);
     ui_printstr(24, 78 - strlen(tempstr), tempstr, -1, COLOR_TUI);
+    sprintf(tempstr, "MPU port: %03Xh", mpuport);
+    ui_printstr(18, 79 - strlen(tempstr), tempstr, -1, COLOR_TEMPO);
   }
   /* print notes states on every channel */
   if (*refreshflags & UI_REFRESH_NOTES) {
@@ -89,16 +91,16 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver) {
         if (trackinfo->notestates[1 + (x << 1)] & (1 << y)) noteflag |= 1;
         switch (noteflag) {
           case 0:
-            ui_printchar(1 + y, 16 + x, ' ' | COLOR_NOTES);
+            ui_printchar(1 + y, 16 + x, ' ' | COLOR_NOTES | ((~x << 13) & 0x8000u));
             break;
           case 1:
-            ui_printchar(1 + y, 16 + x, 0xde | COLOR_NOTES);
+            ui_printchar(1 + y, 16 + x, 0xde | COLOR_NOTES | ((~x << 13) & 0x8000u));
             break;
           case 2:
-            ui_printchar(1 + y, 16 + x, 0xdd | COLOR_NOTES);
+            ui_printchar(1 + y, 16 + x, 0xdd | COLOR_NOTES | ((~x << 13) & 0x8000u));
             break;
           case 3:
-            ui_printchar(1 + y, 16 + x, 0xdb | COLOR_NOTES);
+            ui_printchar(1 + y, 16 + x, 0xdb | COLOR_NOTES | ((~x << 13) & 0x8000u));
             break;
         }
       }
@@ -120,7 +122,7 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver) {
     ultoa(miditempo, tempstr, 10);
     strcat(tempstr, " bpm");
     ui_printstr(18, 29, "Tempo:", 7, COLOR_TEMPO);
-    ui_printstr(18, 36, tempstr, 43, COLOR_TEMPO);
+    ui_printstr(18, 36, tempstr, 29, COLOR_TEMPO);
   }
   /* title and copyright notice */
   if (*refreshflags & UI_REFRESH_TITLECOPYR) {

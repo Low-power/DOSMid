@@ -473,7 +473,7 @@ int main(int argc, char **argv) {
     /* printf("Action: %d / Note: %d / Vel: %d / t=%lu / next->%ld\n", curevent->type, curevent->data.note.note, curevent->data.note.velocity, curevent->deltatime, curevent->next); */
     if (curevent->deltatime > 0) {
       if (compute_elapsed_time(midiplaybackstart, &(trackinfo->elapsedsec)) != 0) refreshflags |= UI_REFRESH_TIME;
-      ui_draw(trackinfo, &refreshflags, PVER); /* draw the UI only between non-zero gaps */
+      ui_draw(trackinfo, &refreshflags, PVER, params.mpuport); /* draw the UI only between non-zero gaps */
       udelay(curevent->deltatime * trackinfo->tempo / miditimeunitdiv);
     }
     switch (curevent->type) {

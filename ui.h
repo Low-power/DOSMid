@@ -40,6 +40,6 @@ void ui_init(void);
 void ui_hidecursor(void);
 
 /* draws the UI screen */
-void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver);
+void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int mpuport);
 
 #endif
