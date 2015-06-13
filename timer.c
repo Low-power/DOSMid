@@ -43,7 +43,7 @@ static void interrupt handle_clock(void) {
 
   /* Increment the callmod */
   callmod++;
-  callmod %= 64;
+  callmod &= 63;
 
   /* If this is the 64th call, then call handler */
   if (callmod == 0) {
