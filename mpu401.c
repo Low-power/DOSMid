@@ -1,7 +1,7 @@
 /*
    Library to access MPU-401 hardware
 
-   Copyright (c) 2014, Mateusz Viste
+   Copyright (c) 2014,2015, Mateusz Viste
    All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -34,13 +34,16 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include "mpu401.h"  /* include self for control */
 
+
 #define MPU_DATA mpuport
 #define MPU_STAT mpuport+1
+
 
 /* flush everything from the MPU port (if anything) */
 void mpu401_flush(int mpuport) {
   while (mpu401_poll(mpuport) != 0) inp(MPU_DATA);
 }
+
 
 /* wait until it's okay for us to write to the MPU */
 void mpu401_waitwrite(int mpuport) {
@@ -51,6 +54,21 @@ void mpu401_waitwrite(int mpuport) {
   }
 }
 
+
+/* wait until it's okay for us to write to the MPU - but no longer than
+ * timeout seconds. returns 0 on success, non-zero otherwise. */
+static int mpu401_waitwrite_timeout(int mpuport, int timeout) {
+  int buff;
+  time_t notafter;
+  notafter = time(NULL) + timeout;
+  for (;;) {
+    buff = inp(MPU_STAT);
+    if ((buff & 0x40) == 0) return(0);
+    if (time(NULL) >= notafter) return(-1);
+  }
+}
+
+
 /* polls the midi interface - returns 0 if nothing is available to be read, non-zero otherwise.
    note that this should be checked as often as possible - whenever UART have some bytes for you, you MUST read them out */
 int mpu401_poll(int mpuport) {
@@ -60,17 +78,20 @@ int mpu401_poll(int mpuport) {
   return(0);
 }
 
+
 void mpu401_waitread(int mpuport) {
   while (mpu401_poll(mpuport) == 0);
 }
 
-void mpu401_rst(int mpuport) {
+
+/* resets the MPU-401. returns 0 on success, non-zero otherwise. */
+int mpu401_rst(int mpuport) {
   time_t timeout;
-  timeout = time(NULL) + 2; /* timeout is 1-2s */
-  mpu401_waitwrite(mpuport);     /* wait for the MPU to accept bytes from us */
+  if (mpu401_waitwrite_timeout(mpuport, 2) != 0) return(-1);  /* wait for the MPU to accept bytes from us */
   outp(MPU_STAT, 0xFF); /* Send MPU-401 RESET Command */
   /* note that some cards do not ACK on 0xFF ! that's why I should wait for a timeout here, and skip waiting if no answer after 1 or 2s */
   /* puts("wait ack"); */
+  timeout = time(NULL) + 2; /* timeout is 1-2s */
   while (time(NULL) < timeout) {
     /* wait for the MPU to hand a byte to us (we are waiting for an ACK) */
     if (mpu401_poll(mpuport) != 0) {
@@ -78,6 +99,7 @@ void mpu401_rst(int mpuport) {
     }
   }
   mpu401_flush(mpuport);
+  return(0);
 }
 
 void mpu401_uart(int mpuport) {

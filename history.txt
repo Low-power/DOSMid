@@ -4,6 +4,7 @@
 
 DOSMid v0.6 [xx xxx xxxx]
  - configurable MPU port (via the BLASTER variable or /mpu=XXX),
+ - DOSMid fails gracefully when no MPU401 is present (instead of freezing),
  - ...
 
 DOSMid v0.5 [10 Aug 2014]

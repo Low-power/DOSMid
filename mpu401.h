@@ -1,7 +1,7 @@
 /*
    Library to access MPU-401 hardware
 
-   Copyright (c) 2014, Mateusz Viste
+   Copyright (c) 2014,2015, Mateusz Viste
    All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -42,7 +42,8 @@ void mpu401_waitread(int mpuport);
 /* flush everything from the MPU port (if anything) */
 void mpu401_flush(int mpuport);
 
-void mpu401_rst(int mpuport);
+/* resets the MPU-401. returns 0 on success, non-zero otherwise. */
+int mpu401_rst(int mpuport);
 
 void mpu401_uart(int mpuport);
 

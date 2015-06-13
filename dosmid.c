@@ -447,10 +447,14 @@ int main(int argc, char **argv) {
   }
 
 
-  puts("RESET MPU-401");
-  mpu401_rst(params.mpuport);
+  puts("RESET MPU-401...");
+  if (mpu401_rst(params.mpuport) != 0) {
+    printf("Error: failed to reset the MPU-401 synthesizer via port %03Xh\n", params.mpuport);
+    mem_close();
+    return(1);
+  }
 
-  puts("SET UART MODE");
+  puts("SET UART MODE..");
   mpu401_uart(params.mpuport);
 
   /* initialize the high resolution timer */
