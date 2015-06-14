@@ -521,10 +521,12 @@ int main(int argc, char **argv) {
       case '+':  /* volume up */
         trackinfo->volume += 5;
         if (trackinfo->volume > 100) trackinfo->volume = 100;
+        refreshflags |= UI_REFRESH_VOLUME;
         break;
       case '-':  /* volume down */
         trackinfo->volume -= 5;
         if (trackinfo->volume < 0) trackinfo->volume = 0;
+        refreshflags |= UI_REFRESH_VOLUME;
         break;
     }
 

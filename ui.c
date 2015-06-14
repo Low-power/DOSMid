@@ -65,7 +65,6 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int
   /* draw ascii graphic frames, etc */
   if (*refreshflags & UI_REFRESH_TUI) {
     char tempstr[32];
-    *refreshflags ^= UI_REFRESH_TUI;
     for (x = 0; x < 80; x++) {
       ui_printchar(0, x, 205 | COLOR_TUI);
       ui_printchar(17, x, 205 | COLOR_TUI);
@@ -89,7 +88,6 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int
   }
   /* print notes states on every channel */
   if (*refreshflags & UI_REFRESH_NOTES) {
-    *refreshflags ^= UI_REFRESH_NOTES;
     for (y = 0; y < 16; y++) {
       for (x = 0; x < 64; x++) {
         int noteflag = 0;
@@ -116,7 +114,6 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int
   if (*refreshflags & UI_REFRESH_TEMPO) {
     char tempstr[16];
     unsigned long miditempo;
-    *refreshflags ^= UI_REFRESH_TEMPO;
     /* print filename */
     ui_printstr(18, 1, trackinfo->filename, 16, COLOR_TEMPO);
     /* print format */
@@ -138,7 +135,6 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int
   }
   /* title and copyright notice */
   if (*refreshflags & UI_REFRESH_TITLECOPYR) {
-    *refreshflags ^= UI_REFRESH_TITLECOPYR;
     ui_printstr(19, 1, trackinfo->title[0], 78, COLOR_TEXT);
     ui_printstr(20, 1, trackinfo->title[1], 78, COLOR_TEXT);
     ui_printstr(21, 1, trackinfo->title[2], 78, COLOR_TEXT);
@@ -147,7 +143,6 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int
   /* programs (patches) names */
   if (*refreshflags & UI_REFRESH_PROGS) {
     unsigned int color;
-    *refreshflags ^= UI_REFRESH_PROGS;
     for (y = 0; y < 16; y++) {
       color = COLOR_CHANS_DIS;
       if (trackinfo->channelsusage & (1 << y)) color = COLOR_CHANS;
@@ -165,7 +160,6 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int
     unsigned long perc;
     unsigned int curcol;
     int rpos;
-    *refreshflags ^= UI_REFRESH_TIME;
     sprintf(tempstr1, " %lu:%02lu (%lu%%)     ", trackinfo->elapsedsec / 60, trackinfo->elapsedsec % 60, (trackinfo->elapsedsec  * 100) / (trackinfo->totlen + 1));
     sprintf(tempstr2, "%lu:%02lu ", trackinfo->totlen / 60, trackinfo->totlen % 60);
     /* draw the progress bar */
@@ -186,6 +180,8 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int
       }
     }
   }
+  /* all refreshed now */
+  *refreshflags = 0;
 }
 
 
