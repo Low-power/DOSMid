@@ -42,13 +42,19 @@ void ui_init(void) {
   regs.h.ah = 0x00;  /* set video mode */
   regs.h.al = 0x03;  /* 80x25 */
   int86(0x10, &regs, &regs);
+  /* disable blinking effect (enables the use of high-intensity backgrounds).
+   * This doesn't change anything on DOSemu nor VBox, but DOSbox is unable to
+   * display high intensity backgrounds otherwise. */
+  regs.x.ax = 0x1003;  /* toggle intensity/blinking */
+  regs.h.bl = 0;       /* enable intensive colors (1 would enable blinking) */
+  regs.h.bh = 0;       /* to avoid problems on some adapters */
+  int86(0x10, &regs, &regs);
 }
 
 void ui_hidecursor(void) {
   union REGS regs;
   regs.h.ah = 0x01;
-  regs.h.ch = 0x0F;
-  regs.h.cl = 0x0E;
+  regs.x.cx = 0x2000;
   int86(0x10, &regs, &regs);
 }
 
@@ -122,7 +128,13 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int
     ultoa(miditempo, tempstr, 10);
     strcat(tempstr, " bpm");
     ui_printstr(18, 29, "Tempo:", 7, COLOR_TEMPO);
-    ui_printstr(18, 36, tempstr, 29, COLOR_TEMPO);
+    ui_printstr(18, 36, tempstr, 9, COLOR_TEMPO);
+  }
+  /* volume */
+  if (*refreshflags & UI_REFRESH_VOLUME) {
+    char tempstr[16];
+    sprintf(tempstr, "Volume: %d%%", trackinfo->volume);
+    ui_printstr(18, 45, tempstr, 20, COLOR_TEMPO);
   }
   /* title and copyright notice */
   if (*refreshflags & UI_REFRESH_TITLECOPYR) {
@@ -173,5 +185,35 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int
           ui_printchar(23, 1 + x, ' ' | curcol);
       }
     }
+  }
+}
+
+
+/* waits for a keypress and return it. Returns 0 for extended keystroke, then
+   function must be called again to return scan code. */
+int getkey(void) {
+  union REGS regs;
+  int res;
+  regs.h.ah = 0x08;
+  int86(0x21, &regs, &regs);
+  res = regs.h.al;
+  if (res == 0) { /* extended key - poll again */
+    regs.h.ah = 0x08;
+    int86(0x21, &regs, &regs);
+    res = regs.h.al | 0x100;
+  }
+  return(res);
+}
+
+
+/* poll the keyboard, and return the next input key if any, or -1 */
+int getkey_ifany(void) {
+  union REGS regs;
+  regs.h.ah = 0x0B;
+  int86(0x21, &regs, &regs);
+  if (regs.h.al == 0xFF) {
+      return(getkey());
+    } else {
+      return(-1);
   }
 }

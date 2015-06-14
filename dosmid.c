@@ -411,6 +411,7 @@ int main(int argc, char **argv) {
   /* set default params for trackinfo variables */
   trackinfo->midiformat = midiformat;
   trackinfo->tempo = 500000l;
+  trackinfo->volume = 100;
   for (i = 0; i < 16; i++) trackinfo->chanprogs[i] = i;
   for (i = 0; i < UI_TITLENODES; i++) trackinfo->title[i] = trackinfo->titledat[i];
   filename2basename(params.midifile, trackinfo->filename, UI_FILENAMEMAXLEN);
@@ -483,7 +484,7 @@ int main(int argc, char **argv) {
     switch (curevent->type) {
       case EVENT_NOTEON:
         /* puts("NOTE ON"); */
-        noteon(params.mpuport, curevent->data.note.chan, curevent->data.note.note, curevent->data.note.velocity);
+        noteon(params.mpuport, curevent->data.note.chan, curevent->data.note.note, (trackinfo->volume * curevent->data.note.velocity) / 100);
         trackinfo->notestates[curevent->data.note.note] |= (1 << curevent->data.note.chan);
         refreshflags |= UI_REFRESH_NOTES;
         break;
@@ -512,7 +513,21 @@ int main(int argc, char **argv) {
 
     trackpos = curevent->next;
 
-    if (kbhit()) break;
+    /* read keypresses */
+    switch (getkey_ifany()) {
+      case 0x1B: /* escape */
+        trackpos = -1;
+        break;
+      case '+':  /* volume up */
+        trackinfo->volume += 5;
+        if (trackinfo->volume > 100) trackinfo->volume = 100;
+        break;
+      case '-':  /* volume down */
+        trackinfo->volume -= 5;
+        if (trackinfo->volume < 0) trackinfo->volume = 0;
+        break;
+    }
+
   }
 
   /* reset screen */

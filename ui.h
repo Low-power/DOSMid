@@ -12,6 +12,7 @@
 #define UI_REFRESH_TITLECOPYR 8
 #define UI_REFRESH_PROGS     16
 #define UI_REFRESH_TIME      32
+#define UI_REFRESH_VOLUME    64
 
 #define UI_TITLEMAXLEN 63
 #define UI_TITLENODES 3
@@ -27,6 +28,7 @@ struct trackinfodata {
   unsigned char chanprogs[16];
   int titlescount;
   int midiformat;
+  int volume;
   char titledat[UI_TITLENODES][UI_TITLEMAXLEN + 1];
   char *title[UI_TITLENODES];
   char copyright[UI_COPYRIGHTMAXLEN + 1];
@@ -41,5 +43,12 @@ void ui_hidecursor(void);
 
 /* draws the UI screen */
 void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int mpuport);
+
+/* waits for a keypress and return it. Returns 0 for extended keystroke, then
+   function must be called again to return scan code. */
+int getkey(void);
+
+/* poll the keyboard, and return the next input key if any, or -1 */
+int getkey_ifany(void);
 
 #endif
