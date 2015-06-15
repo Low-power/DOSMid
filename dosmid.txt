@@ -8,9 +8,9 @@
 DOSMid is a MIDI player for DOS. It's a real mode application designed to run
 on very modest hardware configurations. It plays both MIDI and RMID files.
 DOSMid is not a software MIDI emulator, thus it requires a MIDI-capable
-hardware available via the standard MPU-401 interface. Many sound cards
-provide such interface, although some need an additional 'wavetable' chip to
-produce actual MIDI sound.
+hardware available via the standard MPU-401 interface. Some sound cards
+provide such interface natively, although many need an additional 'wavetable'
+daughterboard to produce actual MIDI sound.
 
 Minimal requirements:
  - a MPU-401 compatible sound card with a wavetable
@@ -25,17 +25,16 @@ Highly recommended:
 
 *** USAGE ***
 
-DOSMID [/noxms] [/nodelay] [/mpu=XXX] file.mid
+DOSMID [/noxms] [/delay] [/mpu=XXX] file.mid
 
- /noxms    Use conventional memory instead of XM. This obviously useful only
-           if you don't have have XMS, don't use this option otherwise. Note
-           that without XMS you won't be able to play MIDI files bigger than
-           a few dozen of KiBs.
- /nodelay  Don't wait after writing to MPU. By default, DOSMid waits 2ms
-           after every sequence of MPU writes. Without such wait, some MIDI
-           drivers might show unexpected behavior (specifically, the AWEUTIL
-           driver used on SoundBlaster AWE 32/64 cards crashes without such
-           delays.
+ /noxms    Use conventional memory instead of XMS. This is obviously useful
+           only if you don't have have XMS. Don't use this option otherwise.
+           Note, that without XMS you won't be able to play MIDI files bigger
+           than a few dozen KiBs.
+ /delay    Wait 2ms after each MPU write. This is sometimes required when the
+           MPU controller is emulated by a TSR driver (specifically, the
+           AWEUTIL driver used on SoundBlaster AWE 32/64 cards crashes on some
+           computers if MPU writes are not slightly delayed).
  /mpu=XXX  Force dosmid to use MPU-401 on port XXX. If not forced, DOSMID
            scans the BLASTER environment variable for the MPU port, and if not
            found, it fallbacks to port 330h.

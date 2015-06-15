@@ -51,7 +51,7 @@ POSSIBILITY OF SUCH DAMAGE.
 struct clioptions {
   int memmode;      /* type of memory to use: MEM_XMS or MEM_MALLOC */
   int workmem;      /* amount of work memory to allocate, in KiBs */
-  int nodelay;
+  int delay;
   int mpuport;
   char *midifile;   /* MIDI filename to play */
 };
@@ -121,6 +121,15 @@ static void noteoff(int mpuport, int chan, int n) {
   outp(mpuport, 64);              /* Send velocity */
 }
 
+static void noteoff_all(int mpuport) {
+  mpu401_waitwrite(mpuport);      /* Wait for port ready */
+  outp(mpuport, 0x78);            /* Send "all notes off" */
+
+  mpu401_waitwrite(mpuport);      /* Wait for port ready */
+  outp(mpuport, 0);               /* The value byte is not used and defaults to zero */
+}
+
+
 static void rawevent(int mpuport, unsigned char far *rawdata, int rawlen) {
   int i;
   for (i = 0; i < rawlen; i++) {
@@ -128,6 +137,26 @@ static void rawevent(int mpuport, unsigned char far *rawdata, int rawlen) {
     outp(mpuport, rawdata[i]);     /* Send the raw byte over the wire */
   }
 }
+
+
+static void setvolume(int mpuport, int vol) {
+  /* 0xF0  SysEx
+     0x7F  Realtime
+     0x7F  The SysEx channel. Could be from 0x00 to 0x7F.
+           Here we set it to "disregard channel".
+     0x04  Sub-ID -- Device Control
+     0x01  Sub-ID2 -- Master Volume
+     0xLL  Bits 0 to 6 of a 14-bit volume
+     0xMM  Bits 7 to 13 of a 14-bit volume
+     0xF7  End of SysEx */
+  unsigned char far msg[8] = {0xF0,0x7F,0x7F,0x04,0x01,0x00,0x00,0xF7};
+  int vol7b = (127 * vol) / 100;
+  msg[5] = 0;     /* low 0 to 6 bits of a 14-bit volume */
+  msg[6] = vol7b; /* bits 7 to 13 of a 14-bit volume */
+  /* send the data out to the controller */
+  rawevent(mpuport, msg, 8);
+}
+
 
 /* high resolution sleeping routing. sleeps for us microseconds.
    this function remembers the time slept, and automatically adjusts next
@@ -170,7 +199,7 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
   params->midifile = NULL;
   params->memmode = MEM_XMS;
   params->workmem = 16384;  /* try to use 16M of XMS memory by default */
-  params->nodelay = 0;
+  params->delay = 0;
   /* if no params at all, don't waste time */
   if (argc == 0) return("");
   /* now read params */
@@ -178,8 +207,8 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
     if (strcmp(argv[i], "/noxms") == 0) {
       params->memmode = MEM_MALLOC;
       params->workmem = 63; /* using 'normal' malloc, fallback to 63K */
-    } else if (strcmp(argv[i], "/nodelay") == 0) {
-      params->nodelay = 1;
+    } else if (strcmp(argv[i], "/delay") == 0) {
+      params->delay = 1;
     } else if (stringstartswith(argv[i], "/mpu=") == 0) {
       char *hexstr;
       hexstr = argv[i] + 5;
@@ -233,7 +262,7 @@ static int compute_elapsed_time(unsigned long starttime, unsigned long *elapsed)
 }
 
 /* check the event cache for a given event */
-static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscache, long trackpos, int nodelay) {
+static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscache, long trackpos, int delay) {
   static unsigned int itemsincache = 0;
   static unsigned int curcachepos = 0;
   struct midi_event_t *res = NULL;
@@ -250,7 +279,7 @@ static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscac
         /* sleep 2ms after a MIDI OUT write, and before accessing XMS.
            This is especially important for SoundBlaster "AWE" cards with the
            AWEUTIL TSR midi emulation enabled, without this AWEUTIL crashes. */
-        if (nodelay == 0) udelayabs(2000);
+        if (delay != 0) udelayabs(2000);
         nextslot = curcachepos + itemsincache;
         nextevent = eventscache[nextslot & EVENTSCACHEMASK].next;
         while ((itemsincache < EVENTSCACHESIZE - 1) && (nextevent >= 0)) {
@@ -270,7 +299,7 @@ static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscac
       /* sleep 2ms after a MIDI OUT write, and before accessing XMS.
          this is especially important for SoundBlaster "AWE" cards with the
          AWEUTIL TSR midi emulation enabled, without this AWEUTIL crashes. */
-      if (nodelay == 0) udelayabs(2000);
+      if (delay != 0) udelayabs(2000);
       nextevent = trackpos;
       curcachepos = 0;
       for (refillcount = 0; refillcount < EVENTSCACHESIZE; refillcount++) {
@@ -348,13 +377,13 @@ int main(int argc, char **argv) {
     } else {
       puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste\n"
            "\n"
-           "DOSMid is a MIDI player that reads *.MID or *.RMI files and drives a MPU401"
+           "DOSMid is a MIDI player that reads *.MID or *.RMI files and drives a MPU401\n"
            "synthesizer.\n"
            "\n"
            "Usage: dosmid [/noxms] [/nodelay] [/mpu=XXX] file.mid\n"
            "\n"
            " /noxms    use conventional memory instead of XMS\n"
-           " /nodelay  don't wait after writing to MPU\n"
+           " /delay    wait 2ms after each write to MPU (required on some buggy boards)\n"
            " /mpu:XXX  use MPU port 0xXXX (by default it follows the BLASTER\n"
            "           environment variable, and if not found, uses 0x330)\n"
       );
@@ -471,7 +500,7 @@ int main(int argc, char **argv) {
   while (trackpos >= 0) {
 
     /* fetch next event */
-    curevent = getnexteventfromcache(eventscache, trackpos, params.nodelay);
+    curevent = getnexteventfromcache(eventscache, trackpos, params.delay);
 
     /* puts("flush MPU"); */
     mpu401_flush(params.mpuport);
@@ -484,7 +513,8 @@ int main(int argc, char **argv) {
     switch (curevent->type) {
       case EVENT_NOTEON:
         /* puts("NOTE ON"); */
-        noteon(params.mpuport, curevent->data.note.chan, curevent->data.note.note, (trackinfo->volume * curevent->data.note.velocity) / 100);
+        /*noteon(params.mpuport, curevent->data.note.chan, curevent->data.note.note, (trackinfo->volume * curevent->data.note.velocity) / 100);*/
+        noteon(params.mpuport, curevent->data.note.chan, curevent->data.note.note, curevent->data.note.velocity);
         trackinfo->notestates[curevent->data.note.note] |= (1 << curevent->data.note.chan);
         refreshflags |= UI_REFRESH_NOTES;
         break;
@@ -522,11 +552,13 @@ int main(int argc, char **argv) {
         trackinfo->volume += 5;
         if (trackinfo->volume > 100) trackinfo->volume = 100;
         refreshflags |= UI_REFRESH_VOLUME;
+        setvolume(params.mpuport, trackinfo->volume);
         break;
       case '-':  /* volume down */
         trackinfo->volume -= 5;
         if (trackinfo->volume < 0) trackinfo->volume = 0;
         refreshflags |= UI_REFRESH_VOLUME;
+        setvolume(params.mpuport, trackinfo->volume);
         break;
     }
 
@@ -549,6 +581,8 @@ int main(int argc, char **argv) {
       }
     }
   }
+  /* send a "all sound off event" - most devices implement it */
+  noteoff_all(params.mpuport);
 
   puts("Reset MPU...");
 
