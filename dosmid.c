@@ -110,6 +110,7 @@ static void noteon(int mpuport, int chan, int n, int velocity) {
   outp(mpuport, velocity);    /* Send velocity */
 }
 
+
 static void noteoff(int mpuport, int chan, int n) {
   mpu401_waitwrite(mpuport);      /* Wait for port ready */
   outp(mpuport, 0x80 | chan);     /* Send note OFF code on selected channel */
@@ -121,14 +122,6 @@ static void noteoff(int mpuport, int chan, int n) {
   outp(mpuport, 64);              /* Send velocity */
 }
 
-static void noteoff_all(int mpuport) {
-  mpu401_waitwrite(mpuport);      /* Wait for port ready */
-  outp(mpuport, 0x78);            /* Send "all notes off" */
-
-  mpu401_waitwrite(mpuport);      /* Wait for port ready */
-  outp(mpuport, 0);               /* The value byte is not used and defaults to zero */
-}
-
 
 static void rawevent(int mpuport, unsigned char far *rawdata, int rawlen) {
   int i;
@@ -136,6 +129,19 @@ static void rawevent(int mpuport, unsigned char far *rawdata, int rawlen) {
     mpu401_waitwrite(mpuport);     /* Wait for port ready */
     outp(mpuport, rawdata[i]);     /* Send the raw byte over the wire */
   }
+}
+
+
+static void midi_reinit(int mpuport) {
+  unsigned char far buff[2] = {0, 0};
+  /* "all notes off" */
+  buff[0] = 0x7B;  /* Send "all notes off" (second byte is zero) */
+  rawevent(mpuport, buff, 2);
+  /* "all sounds off" */
+  buff[0] = 0x78;  /* Send "all sounds off" (second byte is zero) */
+  /* "all controllers off" */
+  buff[0] = 0x79;  /* Send "all controllers off" (second byte is zero) */
+  rawevent(mpuport, buff, 2);
 }
 
 
@@ -447,6 +453,8 @@ int main(int argc, char **argv) {
     return(1);
   }
 
+  midi_reinit(params.mpuport); /* reinit the device */
+
   puts("SET UART MODE..");
   mpu401_uart(params.mpuport);
 
@@ -549,13 +557,10 @@ int main(int argc, char **argv) {
       }
     }
   }
-  /* send a "all sound off event" - some devices implement it */
-  noteoff_all(params.mpuport);
 
   puts("Reset MPU...");
-
-  /* reset the MPU back into intelligent mode */
-  mpu401_rst(params.mpuport);
+  midi_reinit(params.mpuport); /* reinit the device */
+  mpu401_rst(params.mpuport);  /* reset the MPU back into intelligent mode */
 
   puts("Free memory...");
   mem_close();
