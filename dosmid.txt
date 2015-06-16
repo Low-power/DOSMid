@@ -13,7 +13,7 @@ provide such interface natively, although many need an additional 'wavetable'
 daughterboard to produce actual MIDI sound.
 
 Minimal requirements:
- - a MPU-401 compatible sound card with a wavetable
+ - a MPU-401 compatible sound card with a synthesizer (wavetable or external)
  - an 8086 CPU or better
  - a video card able to display an 80x25 text mode (ie. CGA or better)
 
@@ -48,8 +48,8 @@ All rights reserved.
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
 
-1. Redistributions of source code must retain the above copyright notice,
-   this list of conditions and the following disclaimer.
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
 
 2. Redistributions in binary form must reproduce the above copyright notice,
    this list of conditions and the following disclaimer in the documentation

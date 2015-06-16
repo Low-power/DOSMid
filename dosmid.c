@@ -139,45 +139,8 @@ static void rawevent(int mpuport, unsigned char far *rawdata, int rawlen) {
 }
 
 
-static void setvolume(int mpuport, int vol) {
-  /* 0xF0  SysEx
-     0x7F  Realtime
-     0x7F  The SysEx channel. Could be from 0x00 to 0x7F.
-           Here we set it to "disregard channel".
-     0x04  Sub-ID -- Device Control
-     0x01  Sub-ID2 -- Master Volume
-     0xLL  Bits 0 to 6 of a 14-bit volume
-     0xMM  Bits 7 to 13 of a 14-bit volume
-     0xF7  End of SysEx */
-  unsigned char far msg[8] = {0xF0,0x7F,0x7F,0x04,0x01,0x00,0x00,0xF7};
-  int vol7b = (127 * vol) / 100;
-  msg[5] = 0;     /* low 0 to 6 bits of a 14-bit volume */
-  msg[6] = vol7b; /* bits 7 to 13 of a 14-bit volume */
-  /* send the data out to the controller */
-  rawevent(mpuport, msg, 8);
-}
-
-
-/* high resolution sleeping routing. sleeps for us microseconds.
-   this function remembers the time slept, and automatically adjusts next
-   sleeps. If you want absolute sleeping, use udelayabs() */
-static void udelay(unsigned long us) {
-  static unsigned long last = 0;
-  unsigned long t;
-  for (;;) {
-    timer_read(&t);
-    if (t < last) { /* detect timer wraparound */
-        last = t;
-        break;
-      } else if (t - last >= us) {
-        last += us;
-        break;
-    }
-  }
-}
-
 /* high resolution sleeping routine */
-static void udelayabs(unsigned long us) {
+static void udelay(unsigned long us) {
   unsigned long t1, t2;
   timer_read(&t1);
   for (;;) {
@@ -199,7 +162,7 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
   params->midifile = NULL;
   params->memmode = MEM_XMS;
   params->workmem = 16384;  /* try to use 16M of XMS memory by default */
-  params->delay = 0;
+  params->delay = 1;
   /* if no params at all, don't waste time */
   if (argc == 0) return("");
   /* now read params */
@@ -207,8 +170,8 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
     if (strcmp(argv[i], "/noxms") == 0) {
       params->memmode = MEM_MALLOC;
       params->workmem = 63; /* using 'normal' malloc, fallback to 63K */
-    } else if (strcmp(argv[i], "/delay") == 0) {
-      params->delay = 1;
+    } else if (strcmp(argv[i], "/nodelay") == 0) {
+      params->delay = 0;
     } else if (stringstartswith(argv[i], "/mpu=") == 0) {
       char *hexstr;
       hexstr = argv[i] + 5;
@@ -279,7 +242,7 @@ static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscac
         /* sleep 2ms after a MIDI OUT write, and before accessing XMS.
            This is especially important for SoundBlaster "AWE" cards with the
            AWEUTIL TSR midi emulation enabled, without this AWEUTIL crashes. */
-        if (delay != 0) udelayabs(2000);
+        if (delay != 0) udelay(2000);
         nextslot = curcachepos + itemsincache;
         nextevent = eventscache[nextslot & EVENTSCACHEMASK].next;
         while ((itemsincache < EVENTSCACHESIZE - 1) && (nextevent >= 0)) {
@@ -299,7 +262,7 @@ static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscac
       /* sleep 2ms after a MIDI OUT write, and before accessing XMS.
          this is especially important for SoundBlaster "AWE" cards with the
          AWEUTIL TSR midi emulation enabled, without this AWEUTIL crashes. */
-      if (delay != 0) udelayabs(2000);
+      if (delay != 0) udelay(2000);
       nextevent = trackpos;
       curcachepos = 0;
       for (refillcount = 0; refillcount < EVENTSCACHESIZE; refillcount++) {
@@ -357,6 +320,7 @@ int main(int argc, char **argv) {
   int midiformat, miditracks;
   unsigned int miditimeunitdiv;
   int i;
+  unsigned long nexteventtime;
   int refreshflags = 0xFF;
   struct midi_chunkmap_t *chunkmap;
   FILE *fd;
@@ -383,8 +347,8 @@ int main(int argc, char **argv) {
            "Usage: dosmid [/noxms] [/nodelay] [/mpu=XXX] file.mid\n"
            "\n"
            " /noxms    use conventional memory instead of XMS\n"
-           " /delay    wait 2ms after each write to MPU (required on some buggy boards)\n"
-           " /mpu:XXX  use MPU port 0xXXX (by default it follows the BLASTER\n"
+           " /nodelay  do not wait 2ms before accessing XMS memory (required by AWEUTIL)\n"
+           " /mpu=XXX  use MPU port 0xXXX (by default it follows the BLASTER\n"
            "           environment variable, and if not found, uses 0x330)\n"
       );
     }
@@ -476,7 +440,6 @@ int main(int argc, char **argv) {
     return(1);
   }
 
-
   puts("RESET MPU-401...");
   if (mpu401_rst(params.mpuport) != 0) {
     printf("Error: failed to reset the MPU-401 synthesizer via port %03Xh\n", params.mpuport);
@@ -496,6 +459,7 @@ int main(int argc, char **argv) {
 
   /* save start time so we can compute elapsed time later */
   timer_read(&midiplaybackstart);
+  nexteventtime = midiplaybackstart;
 
   while (trackpos >= 0) {
 
@@ -506,15 +470,37 @@ int main(int argc, char **argv) {
     mpu401_flush(params.mpuport);
     /* printf("Action: %d / Note: %d / Vel: %d / t=%lu / next->%ld\n", curevent->type, curevent->data.note.note, curevent->data.note.velocity, curevent->deltatime, curevent->next); */
     if (curevent->deltatime > 0) {
-      if (compute_elapsed_time(midiplaybackstart, &(trackinfo->elapsedsec)) != 0) refreshflags |= UI_REFRESH_TIME;
-      ui_draw(trackinfo, &refreshflags, PVER, params.mpuport); /* draw the UI only between non-zero gaps */
-      udelay(curevent->deltatime * trackinfo->tempo / miditimeunitdiv);
+      nexteventtime += (curevent->deltatime * trackinfo->tempo / miditimeunitdiv);
+      for (;;) {
+        unsigned long t;
+        if (compute_elapsed_time(midiplaybackstart, &(trackinfo->elapsedsec)) != 0) refreshflags |= UI_REFRESH_TIME;
+        /* read keypresses */
+        switch (getkey_ifany()) {
+          case 0x1B: /* escape */
+            trackpos = -1;
+            break;
+          case '+':  /* volume up */
+            trackinfo->volume += 5;                               /* note about volume: I could also use a MIDI    */
+            if (trackinfo->volume > 100) trackinfo->volume = 100; /* command to adjust the MPU's global volume     */
+            refreshflags |= UI_REFRESH_VOLUME;                    /* but this is messy because the MIDI file might */
+            break;                                                /* already use such message. Besides, some MPUs  */
+          case '-':  /* volume down */                            /* do not support volume controls (eg. my SB64)  */
+            trackinfo->volume -= 5;
+            if (trackinfo->volume < 0) trackinfo->volume = 0;
+            refreshflags |= UI_REFRESH_VOLUME;
+            break;
+        }
+        /* check whether it's time to play the next event */
+        timer_read(&t);
+        /* TODO handle wraparound of the timer counter */
+        if (t >= nexteventtime) break;
+        ui_draw(trackinfo, &refreshflags, PVER, params.mpuport); /* draw the UI only between non-zero gaps */
+      }
     }
     switch (curevent->type) {
       case EVENT_NOTEON:
         /* puts("NOTE ON"); */
-        /*noteon(params.mpuport, curevent->data.note.chan, curevent->data.note.note, (trackinfo->volume * curevent->data.note.velocity) / 100);*/
-        noteon(params.mpuport, curevent->data.note.chan, curevent->data.note.note, curevent->data.note.velocity);
+        noteon(params.mpuport, curevent->data.note.chan, curevent->data.note.note, (trackinfo->volume * curevent->data.note.velocity) / 100);
         trackinfo->notestates[curevent->data.note.note] |= (1 << curevent->data.note.chan);
         refreshflags |= UI_REFRESH_NOTES;
         break;
@@ -541,26 +527,8 @@ int main(int argc, char **argv) {
         }
     }
 
+    if (trackpos < 0) break;
     trackpos = curevent->next;
-
-    /* read keypresses */
-    switch (getkey_ifany()) {
-      case 0x1B: /* escape */
-        trackpos = -1;
-        break;
-      case '+':  /* volume up */
-        trackinfo->volume += 5;
-        if (trackinfo->volume > 100) trackinfo->volume = 100;
-        refreshflags |= UI_REFRESH_VOLUME;
-        setvolume(params.mpuport, trackinfo->volume);
-        break;
-      case '-':  /* volume down */
-        trackinfo->volume -= 5;
-        if (trackinfo->volume < 0) trackinfo->volume = 0;
-        refreshflags |= UI_REFRESH_VOLUME;
-        setvolume(params.mpuport, trackinfo->volume);
-        break;
-    }
 
   }
 
@@ -581,7 +549,7 @@ int main(int argc, char **argv) {
       }
     }
   }
-  /* send a "all sound off event" - most devices implement it */
+  /* send a "all sound off event" - some devices implement it */
   noteoff_all(params.mpuport);
 
   puts("Reset MPU...");

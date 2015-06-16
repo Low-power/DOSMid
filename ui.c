@@ -20,6 +20,7 @@
 #define COLOR_PROGRESS1 0x2000u /* elapsed time */
 #define COLOR_PROGRESS2 0x4000u /* not yet elapsed */
 
+
 /* prints a character on screen, at position [x,y]. charbyte is a 16bit
    value where higher 8 bits contain the attributes (colors) and lower
    8bits contain the actual character to draw. */
