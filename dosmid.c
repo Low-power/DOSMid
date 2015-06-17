@@ -347,6 +347,7 @@ int main(int argc, char **argv) {
   struct midi_event_t *curevent, *eventscache;
   struct clioptions params;
   struct trackinfodata *trackinfo;
+  unsigned long elticks = 0;
 
   /* preload the mpu port to be used (might be forced later via **argv) */
   params.mpuport = preloadmpuport();
@@ -493,6 +494,7 @@ int main(int argc, char **argv) {
     /* printf("Action: %d / Note: %d / Vel: %d / t=%lu / next->%ld\n", curevent->type, curevent->data.note.note, curevent->data.note.velocity, curevent->deltatime, curevent->next); */
     if (curevent->deltatime > 0) {
       nexteventtime += (curevent->deltatime * trackinfo->tempo / miditimeunitdiv);
+      elticks += curevent->deltatime;
       for (;;) {
         unsigned long t;
         if (compute_elapsed_time(midiplaybackstart, &(trackinfo->elapsedsec)) != 0) refreshflags |= UI_REFRESH_TIME;
@@ -533,7 +535,7 @@ int main(int argc, char **argv) {
         refreshflags |= UI_REFRESH_NOTES;
         break;
       case EVENT_TEMPO:
-        if (params.logfd != NULL) fprintf(params.logfd, "%lu: TEMPO change from %lu to %lu\n", trackinfo->elapsedsec, trackinfo->tempo, curevent->data.tempoval);
+        if (params.logfd != NULL) fprintf(params.logfd, "%lu (%lu): TEMPO change from %lu to %lu\n", trackinfo->elapsedsec, elticks, trackinfo->tempo, curevent->data.tempoval);
         trackinfo->tempo = curevent->data.tempoval;
         refreshflags |= UI_REFRESH_TEMPO;
         break;
