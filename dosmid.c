@@ -392,6 +392,8 @@ int main(int argc, char **argv) {
     return(1);
   }
 
+  if (params.logfd != NULL) fprintf(params.logfd, "LOADED FILE '%s': format=%d tracks=%d timeunitdiv=%u\n", params.midifile, midiformat, miditracks, miditimeunitdiv);
+
   if ((midiformat != 0) && (midiformat != 1)) {
     printf("Unsupported MIDI format, sorry. So far only formats #0 and #1 are supported. Detected format: %d\n", midiformat);
     fclose(fd);
@@ -437,14 +439,14 @@ int main(int argc, char **argv) {
       free(trackinfo);
       return(1);
     }
-    /*printf("Track %d starts at offset 0x%04X\n", i, chunkmap[i].offset);*/
+    if (params.logfd != NULL) fprintf(params.logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, chunkmap[i].offset);
     fseek(fd, chunkmap[i].offset, SEEK_SET);
     if (i == 0) {
-        newtrack = midi_track2events(fd, trackinfo->title, UI_TITLENODES, UI_TITLEMAXLEN, trackinfo->copyright, UI_COPYRIGHTMAXLEN, &(trackinfo->channelsusage));
+        newtrack = midi_track2events(fd, trackinfo->title, UI_TITLENODES, UI_TITLEMAXLEN, trackinfo->copyright, UI_COPYRIGHTMAXLEN, &(trackinfo->channelsusage), params.logfd);
       } else {
-        newtrack = midi_track2events(fd, NULL, 0, UI_TITLEMAXLEN, NULL, 0, &(trackinfo->channelsusage));
+        newtrack = midi_track2events(fd, NULL, 0, UI_TITLEMAXLEN, NULL, 0, &(trackinfo->channelsusage), params.logfd);
     }
-    /* printf("merging track #%d (%ld)\n", i, track[i]); */
+    if (params.logfd != NULL) fprintf(params.logfd, "TRACK %d LOADED -> MERGING NOW\n", i);
     trackpos = midi_mergetrack(trackpos, newtrack, &(trackinfo->totlen), miditimeunitdiv);
     /* printf("merged track starts with %ld\n", trackpos); */
   }

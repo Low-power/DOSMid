@@ -162,22 +162,24 @@ int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned int *timeunitdiv, 
 
 /* parse a track object and returns the id of the first events in the linked
  * list. channelsusage contains 16 flags indicating what channels are used. */
-long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, char *copyright, int copyrightmaxlen, unsigned short *channelsusage) {
+long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, char *copyright, int copyrightmaxlen, unsigned short *channelsusage, FILE *logfd) {
   unsigned long deltatime;
   unsigned char statusbyte = 0, tmp;
   struct midi_event_t event;
   long result = -1, lastnode = -1, newnode;
+  unsigned long tracklen = 0;
 
   for (;;) {
     /* read the delta time first - variable length */
     midi_fetch_variablelen_fromfile(fd, &deltatime);
+    tracklen += deltatime;
     /* check the type of the event */
     /* if it's a byte with MSB set, we are dealing with running status (so it's same status as last time */
     tmp = fgetc(fd);
     if ((tmp & 128) != 0) {
-        statusbyte = tmp;
-      } else { /* get back one byte */
-        fseek(fd, -1, SEEK_CUR);
+      statusbyte = tmp;
+    } else { /* get back one byte */
+      fseek(fd, -1, SEEK_CUR);
     }
     event.data.raw[0] = statusbyte;
     event.type = EVENT_NONE;
@@ -227,57 +229,66 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
           case 4: /* instrument name */
           case 5: /* lyric */
             fseek(fd, metalen, SEEK_CUR);
+            if (logfd != NULL) fprintf(logfd, "%lu: LYRIC EVENT (ignored)\n", tracklen);
             break;
           case 0x21:  /* MIDI port -- no support for multi-MIDI files, I just ignore it */
             fseek(fd, metalen, SEEK_CUR);
+            if (logfd != NULL) fprintf(logfd, "%lu: MIDI PORT EVENT (ignored)\n", tracklen);
             break;
           case 0x2F: /* end of track */
+            if (logfd != NULL) fprintf(logfd, "%lu: END OF TRACK\n", tracklen);
             endoftrack = 1;
             break;
           case 0x51:  /* set tempo */
             if (metalen != 3) {
-                puts("TEMPO ERROR");
-              } else {
-                event.type = EVENT_TEMPO;
-                event.data.tempoval = fgetc(fd);
-                event.data.tempoval <<= 8;
-                event.data.tempoval |= fgetc(fd);
-                event.data.tempoval <<= 8;
-                event.data.tempoval |= fgetc(fd);
+              if (logfd != NULL) fprintf(logfd, "%lu: TEMPO ERROR\n", tracklen);
+            } else {
+              event.type = EVENT_TEMPO;
+              event.data.tempoval = fgetc(fd);
+              event.data.tempoval <<= 8;
+              event.data.tempoval |= fgetc(fd);
+              event.data.tempoval <<= 8;
+              event.data.tempoval |= fgetc(fd);
+              if (logfd != NULL) fprintf(logfd, "%lu: TEMPO -> %lu\n", tracklen, event.data.tempoval);
             }
             break;
           case 0x54:  /* SMPTE offset -> since I expect only format 0/1 files, I ignore this because I want to start playing asap anyway */
             fseek(fd, metalen, SEEK_CUR);
+            if (logfd != NULL) fprintf(logfd, "%lu: SMPTE OFFSET (ignored)\n", tracklen);
             break;
           case 0x58:  /* Time signature */
             if (metalen != 4) {
-                puts("INVALID TIME SIGNATURE");
-              } else {
-                fseek(fd, metalen, SEEK_CUR);
+              if (logfd != NULL) fprintf(logfd, "%lu: INVALID TIME SIGNATURE!\n", tracklen);
+            } else {
+              fseek(fd, metalen, SEEK_CUR);
+              if (logfd != NULL) fprintf(logfd, "%lu: TIME SIGNATURE (ignored)\n", tracklen);
             }
             break;
           case 0x59:  /* key signature */
             if (metalen != 2) {
-                puts("INVALID KEY SIGNATURE!");
-              } else {
-                event.type = 128 | 3; /* 128 to mark it as a 'raw event', then its length */
-                event.data.raw[1] = fgetc(fd);
-                event.data.raw[2] = fgetc(fd);
+              if (logfd != NULL) fprintf(logfd, "%lu: INVALID KEY SIGNATURE!\n", tracklen);
+            } else {
+              /* event.type = 128 | 3; */ /* 128 to mark it as a 'raw event', then its length */
+              /* event.data.raw[1] = fgetc(fd);
+              event.data.raw[2] = fgetc(fd);*/
+              fseek(fd, metalen, SEEK_CUR);
+              if (logfd != NULL) fprintf(logfd, "%lu: KEY SIGNATURE (ignored)\n", tracklen);
             }
             break;
           case 0x7F:  /* proprietary event -> this is non-standard stuff, I ignore it */
             fseek(fd, metalen, SEEK_CUR);
+            if (logfd != NULL) fprintf(logfd, "%lu: PROPRIETARY EVENT (ignored)\n", tracklen);
             break;
           default:
-            printf("Unhandled meta event [0x%02X]\n", subtype);
             fseek(fd, metalen, SEEK_CUR);  /* skip the meta data */
+            if (logfd != NULL) fprintf(logfd, "%lu: UNHANDLED META EVENT [0x%02X] (ignored)\n", tracklen, subtype);
             break;
         }
         if (endoftrack) break;
       } else if ((statusbyte >= 0xF0) && (statusbyte <= 0xF7)) { /* SYSEX event */
         unsigned long sysexlen;
         midi_fetch_variablelen_fromfile(fd, &sysexlen); /* get length */
-        /* printf("got SYSEX of %ld bytes\n", sysexlen); */
+        if (logfd != NULL) fprintf(logfd, "%lu: SYSEX EVENT OF %ld BYTES (ignored)\n", tracklen, sysexlen);
         fseek(fd, sysexlen, SEEK_CUR);
       } else if ((statusbyte >= 0x80) && (statusbyte <= 0xEF)) { /* else it's a note-related command */
         event.data.note.chan = statusbyte & 0x0F;

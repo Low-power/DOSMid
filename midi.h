@@ -81,7 +81,7 @@ struct midi_chunk_t *midi_readchunk(FILE *fd);
 int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned int *timeunitdiv, struct midi_chunkmap_t *chunklist, int maxchunks);
 
 /* parse a track object and returns the id of the first events in the linked list */
-long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, char *copyright, int copyrightmaxlen, unsigned short *channelsusage);
+long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, char *copyright, int copyrightmaxlen, unsigned short *channelsusage, FILE *logfd);
 
 /* merge two MIDI tracks into a single (serialized) one. returns a "pointer"
  * to the unique track. I take care here to not allocate/free memory here.
