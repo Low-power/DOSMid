@@ -1,7 +1,7 @@
 /*
    XMS driver for DOSMid
 
-   Copyright (c) 2014, Mateusz Viste
+   Copyright (c) 2014,2015 Mateusz Viste
    All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -162,21 +162,3 @@ int xms_pull(struct xms_struct *xms, long xmsoffset, void far *dst, unsigned int
   res = xms_move(ptr);
   return(res);
 }
-
-/*
-int main(void) {
-  char srcbuff[16] = "Hello, World!";
-  char dstbuff[16] = "DEADBEEF";
-  int res;
-  struct xms_struct xms;
-  res = xms_init(&xms, 4096);
-  printf("xms_init() -> allocated %d KiB\n", res);
-  res = xms_push(&xms, srcbuff, 16, 0);
-  printf("xms_push() -> 0x%02X (%s)\n", res, res == 0 ? "OK" : "ERROR");
-  res = xms_pull(&xms, 0, dstbuff, 16);
-  printf("xms_pull() -> 0x%02X (%s)\n", res, res == 0 ? "OK" : "ERROR");
-  xms_close(&xms);
-  printf("srcbuff = '%s'\ndstbuff = '%s'\n", srcbuff, dstbuff);
-  return(0);
-}
-*/

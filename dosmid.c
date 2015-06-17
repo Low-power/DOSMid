@@ -54,6 +54,7 @@ struct clioptions {
   int delay;
   int mpuport;
   char *midifile;   /* MIDI filename to play */
+  FILE *logfd;      /* an open file descriptor to the debug log file */
 };
 
 
@@ -101,13 +102,13 @@ static int hexchar2int(char c) {
 
 static void noteon(int mpuport, int chan, int n, int velocity) {
   mpu401_waitwrite(mpuport);      /* Wait for port ready */
-  outp(mpuport, 0x90 | chan); /* Send note ON code on selected channel */
+  outp(mpuport, 0x90 | chan);     /* Send note ON code on selected channel */
 
   mpu401_waitwrite(mpuport);      /* Wait for port ready */
-  outp(mpuport, n);           /* Send note Number to turn ON */
+  outp(mpuport, n);               /* Send note Number to turn ON */
 
   mpu401_waitwrite(mpuport);      /* Wait for port ready */
-  outp(mpuport, velocity);    /* Send velocity */
+  outp(mpuport, velocity);        /* Send velocity */
 }
 
 
@@ -133,15 +134,19 @@ static void rawevent(int mpuport, unsigned char far *rawdata, int rawlen) {
 
 
 static void midi_reinit(int mpuport) {
-  unsigned char far buff[2] = {0, 0};
-  /* "all notes off" */
-  buff[0] = 0x7B;  /* Send "all notes off" (second byte is zero) */
-  rawevent(mpuport, buff, 2);
-  /* "all sounds off" */
-  buff[0] = 0x78;  /* Send "all sounds off" (second byte is zero) */
-  /* "all controllers off" */
-  buff[0] = 0x79;  /* Send "all controllers off" (second byte is zero) */
-  rawevent(mpuport, buff, 2);
+  unsigned char far buff[4] = {0, 0, 0, 0};
+  /* iterate on MIDI channels and send messages */
+  for (buff[0] = 0xB0; buff[0] < 16; buff[0] += 1) {
+    /* Send "all notes off" (second byte is zero) */
+    buff[1] = 0x7B;
+    rawevent(mpuport, buff, 3);
+    /* Send "all sounds off" (second byte is zero) */
+    buff[1] = 0x78;
+    rawevent(mpuport, buff, 3);
+    /* "all controllers off" */
+    buff[1] = 0x79;
+    rawevent(mpuport, buff, 3);
+  }
 }
 
 
@@ -169,6 +174,7 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
   params->memmode = MEM_XMS;
   params->workmem = 16384;  /* try to use 16M of XMS memory by default */
   params->delay = 1;
+  params->logfd = NULL;
   /* if no params at all, don't waste time */
   if (argc == 0) return("");
   /* now read params */
@@ -191,6 +197,11 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
         hexstr++;
       }
       if (params->mpuport < 1) return("Invalid MPU port provided. Example: /mpu=330");
+    } else if (stringstartswith(argv[i], "/log=") == 0) {
+      params->logfd = fopen(argv[i] + 5, "wb");
+      if (params->logfd == NULL) {
+        return("Failed to open the debug log file.");
+      }
     } else if ((strcmp(argv[i], "/?") == 0) || (strcmp(argv[i], "/h") == 0) || (strcmp(argv[i], "/help") == 0)) {
       return("");
     } else if ((argv[i][0] != '/') && (params->midifile == NULL)) {
@@ -207,7 +218,7 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
   return(NULL);
 }
 
-static void setchanprog(int mpuport, unsigned char chan, unsigned char prog) {
+static void setchanprog(int mpuport, int chan, int prog) {
   mpu401_waitwrite(mpuport);   /* Wait for port ready */
   outp(mpuport, 0xC0 | chan);  /* Send channel */
   mpu401_waitwrite(mpuport);   /* Wait for port ready */
@@ -353,9 +364,10 @@ int main(int argc, char **argv) {
            "Usage: dosmid [/noxms] [/nodelay] [/mpu=XXX] file.mid\n"
            "\n"
            " /noxms    use conventional memory instead of XMS\n"
-           " /nodelay  do not wait 2ms before accessing XMS memory (required by AWEUTIL)\n"
+           " /nodelay  do not wait 2ms before accessing XMS memory (makes AWEUTIL crash)\n"
            " /mpu=XXX  use MPU port 0xXXX (by default it follows the BLASTER\n"
            "           environment variable, and if not found, uses 0x330)\n"
+           " /log=FILE logs highly verbose logs about DOSMid's activity to FILE\n"
       );
     }
     return(1);
@@ -453,10 +465,10 @@ int main(int argc, char **argv) {
     return(1);
   }
 
-  midi_reinit(params.mpuport); /* reinit the device */
-
   puts("SET UART MODE..");
   mpu401_uart(params.mpuport);
+
+  midi_reinit(params.mpuport); /* reinit the device */
 
   /* initialize the high resolution timer */
   timer_init();
@@ -507,31 +519,39 @@ int main(int argc, char **argv) {
     }
     switch (curevent->type) {
       case EVENT_NOTEON:
-        /* puts("NOTE ON"); */
+        if (params.logfd != NULL) fprintf(params.logfd, "%lu: NOTE ON chan: %d / note: %d / vel: %d\n", trackinfo->elapsedsec, curevent->data.note.chan, curevent->data.note.note, curevent->data.note.velocity);
         noteon(params.mpuport, curevent->data.note.chan, curevent->data.note.note, (trackinfo->volume * curevent->data.note.velocity) / 100);
         trackinfo->notestates[curevent->data.note.note] |= (1 << curevent->data.note.chan);
         refreshflags |= UI_REFRESH_NOTES;
         break;
       case EVENT_NOTEOFF:
-        /* puts("NOTE OFF"); */
+        if (params.logfd != NULL) fprintf(params.logfd, "%lu: NOTE OFF chan: %d / note: %d\n", trackinfo->elapsedsec, curevent->data.note.chan, curevent->data.note.note);
         noteoff(params.mpuport, curevent->data.note.chan, curevent->data.note.note);
         trackinfo->notestates[curevent->data.note.note] &= (0xFFFF ^ (1 << curevent->data.note.chan));
         refreshflags |= UI_REFRESH_NOTES;
         break;
       case EVENT_TEMPO:
+        if (params.logfd != NULL) fprintf(params.logfd, "%lu: TEMPO change from %lu to %lu\n", trackinfo->elapsedsec, trackinfo->tempo, curevent->data.tempoval);
         trackinfo->tempo = curevent->data.tempoval;
         refreshflags |= UI_REFRESH_TEMPO;
         break;
       case EVENT_PROGCHAN:
+        if (params.logfd != NULL) fprintf(params.logfd, "%lu: CHANNEL #%d PROG: %d\n", trackinfo->elapsedsec, curevent->data.prog.chan, curevent->data.prog.prog);
         trackinfo->chanprogs[curevent->data.prog.chan] = curevent->data.prog.prog;
         setchanprog(params.mpuport, curevent->data.prog.chan, curevent->data.prog.prog);
         refreshflags |= UI_REFRESH_PROGS;
         break;
       default: /* probably a raw event - bit 7 should be set (>127) */
         if (curevent->type & 128) {
-          /* puts("RAW EVENT"); */
+          if (params.logfd != NULL) {
+            fprintf(params.logfd, "%lu: RAW EVENT TYPE OF LEN %d: [0x%02X 0x%02X 0x%02X]\n", trackinfo->elapsedsec, curevent->type & 127, curevent->data.raw[0], curevent->data.raw[1], curevent->data.raw[2]);
+          }
           rawevent(params.mpuport, curevent->data.raw, curevent->type & 127);
           break;
+        } else {
+          if (params.logfd != NULL) {
+            fprintf(params.logfd, "%lu: ILLEGAL COMMAND: 0x%02X\n", trackinfo->elapsedsec, curevent->type);
+          }
         }
     }
 
@@ -561,6 +581,12 @@ int main(int argc, char **argv) {
   puts("Reset MPU...");
   midi_reinit(params.mpuport); /* reinit the device */
   mpu401_rst(params.mpuport);  /* reset the MPU back into intelligent mode */
+
+  /* if a verbose log file was used, close it now */
+  if (params.logfd != NULL) {
+    fputs("closing the log file", params.logfd);
+    fclose(params.logfd);
+  }
 
   puts("Free memory...");
   mem_close();

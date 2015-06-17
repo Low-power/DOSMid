@@ -18,7 +18,7 @@
 #define COLOR_CHANS     0x1200u
 #define COLOR_CHANS_DIS 0x1800u
 #define COLOR_PROGRESS1 0x2000u /* elapsed time */
-#define COLOR_PROGRESS2 0x4000u /* not yet elapsed */
+#define COLOR_PROGRESS2 0x8000u /* not yet elapsed */
 
 
 /* prints a character on screen, at position [x,y]. charbyte is a 16bit
