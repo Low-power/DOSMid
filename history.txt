@@ -12,6 +12,7 @@ DOSMid v0.6 [xx Jun 2015]
  - interface fitted with a sexier color scheme,
  - using CPU-friendly calls when DOSMid is idle (disabled with /fullcpu),
  - added a verbose mode for debugging needs (/log=FILE),
+ - support for reading M3U playlists,
  - ...
 
 DOSMid v0.5 [10 Aug 2014]

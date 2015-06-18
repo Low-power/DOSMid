@@ -31,8 +31,9 @@
 #include <conio.h>  /* kbhit() */
 #include <stdio.h>  /* printf(), puts(), fopen()... */
 #include <limits.h> /* ULONG_MAX */
-#include <stdlib.h> /* malloc(), free() */
+#include <stdlib.h> /* malloc(), free(), rand() */
 #include <string.h> /* strcmp() */
+#include <time.h>
 
 #include "mem.h"
 #include "midi.h"
@@ -375,6 +376,39 @@ static int preloadmpuport(void) {
 }
 
 
+/* reads a position from an M3U file and returns a ptr to it from a static mem */
+static char *getnextm3uitem(char *playlist) {
+  static char fnamebuf[256];
+  long fsize;
+  long pos;
+  char *ptr;
+  FILE *fd;
+  /* open the playlist and read its size */
+  fd = fopen(playlist, "rb");
+  if (fd == NULL) return(NULL);
+  fseek(fd, 0, SEEK_END);
+  fsize = ftell(fd);
+  /* go to a random position */
+  pos = rand() % fsize;
+  fseek(fd, pos, SEEK_SET);
+  /* rewind back to nearest \n or 0 position */
+  while ((pos > 0) && (fgetc(fd) != '\n')) {
+    fseek(fd, -2, SEEK_CUR);
+    pos--;
+  }
+  /* read the string into fnamebuf */
+  fread(fnamebuf, 1, sizeof(fnamebuf), fd);
+  fnamebuf[sizeof(fnamebuf) - 1] = 0;
+  /* close the file descriptor */
+  fclose(fd);
+  /* trim out the first line */
+  for (ptr = fnamebuf; *ptr != '\r' && *ptr != '\n' && *ptr != 0; ptr++);
+  *ptr = 0;
+  /* return the result */
+  return(fnamebuf);
+}
+
+
 int main(int argc, char **argv) {
   int midiformat, miditracks;
   unsigned int miditimeunitdiv;
@@ -418,9 +452,18 @@ int main(int argc, char **argv) {
     return(1);
   }
 
+  /* inti random numbers */
+  srand((unsigned int)time(NULL));
+
+  /* initialize the high resolution timer */
+  timer_init();
+
   if (params.playlist != NULL) {
-    puts("Error: Playlists aren't supported yet, sorry.");
-    return(1);
+    params.midifile = getnextm3uitem(params.playlist);
+    if (params.midifile == NULL) {
+      puts("Error: Failed to fetch an entry from the playlist");
+      return(1);
+    }
   }
 
   fd = fopen(params.midifile, "rb");
@@ -521,9 +564,6 @@ int main(int argc, char **argv) {
   mpu401_uart(params.mpuport);
 
   midi_reinit(params.mpuport); /* reinit the device */
-
-  /* initialize the high resolution timer */
-  timer_init();
 
   /* init ui and hide the blinking cursor */
   ui_init();
