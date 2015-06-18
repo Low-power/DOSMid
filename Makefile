@@ -24,7 +24,4 @@ pkg: dosmid.exe
 	copy Makefile source\dosmid
 	copy dosmid.lsm source\dosmid
 	copy dosmid.lsm appinfo
-	zip -r -9 dosmid.zip progs source appinfo
-	deltree /y progs
-	deltree /y source
-	deltree /y appinfo
+	zip -m -q -k -r -9 dosmid.zip progs source appinfo
