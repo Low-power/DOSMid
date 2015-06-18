@@ -1,31 +1,31 @@
 /*
-   DOSMID - a low-requirement MIDI player for DOS
-
-   Copyright (c) 2014,2015, Mateusz Viste
-   All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice,
-   this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-POSSIBILITY OF SUCH DAMAGE.
-*/
+ * DOSMID - a low-requirement MIDI player for DOS
+ *
+ * Copyright (c) 2014,2015, Mateusz Viste
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
 
 #include <dos.h>
 #include <conio.h>  /* kbhit() */
@@ -53,6 +53,7 @@ struct clioptions {
   int workmem;      /* amount of work memory to allocate, in KiBs */
   int delay;
   int mpuport;
+  int nopowersave;
   char *midifile;   /* MIDI filename to play */
   FILE *logfd;      /* an open file descriptor to the debug log file */
 };
@@ -134,18 +135,20 @@ static void rawevent(int mpuport, unsigned char far *rawdata, int rawlen) {
 
 
 static void midi_reinit(int mpuport) {
-  unsigned char far buff[4] = {0, 0, 0, 0};
+  unsigned char buff[4] = {0, 0, 0, 0};
+  unsigned char far *buffptr;
+  buffptr = buff;
   /* iterate on MIDI channels and send messages */
-  for (buff[0] = 0xB0; buff[0] < 16; buff[0] += 1) {
+  for (buff[0] = 0xB0; buff[0] <= 0xBF; buff[0] += 1) {
     /* Send "all notes off" (second byte is zero) */
     buff[1] = 0x7B;
-    rawevent(mpuport, buff, 3);
+    rawevent(mpuport, buffptr, 3);
     /* Send "all sounds off" (second byte is zero) */
     buff[1] = 0x78;
-    rawevent(mpuport, buff, 3);
+    rawevent(mpuport, buffptr, 3);
     /* "all controllers off" */
     buff[1] = 0x79;
-    rawevent(mpuport, buff, 3);
+    rawevent(mpuport, buffptr, 3);
   }
 }
 
@@ -175,6 +178,7 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
   params->workmem = 16384;  /* try to use 16M of XMS memory by default */
   params->delay = 1;
   params->logfd = NULL;
+  params->nopowersave = 0;
   /* if no params at all, don't waste time */
   if (argc == 0) return("");
   /* now read params */
@@ -184,6 +188,8 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       params->workmem = 63; /* using 'normal' malloc, fallback to 63K */
     } else if (strcmp(argv[i], "/nodelay") == 0) {
       params->delay = 0;
+    } else if (strcmp(argv[i], "/fullcpu") == 0) {
+      params->nopowersave = 1;
     } else if (stringstartswith(argv[i], "/mpu=") == 0) {
       char *hexstr;
       hexstr = argv[i] + 5;
@@ -369,6 +375,7 @@ int main(int argc, char **argv) {
            " /mpu=XXX  use MPU port 0xXXX (by default it follows the BLASTER\n"
            "           environment variable, and if not found, uses 0x330)\n"
            " /log=FILE logs highly verbose logs about DOSMid's activity to FILE\n"
+           " /fullcpu  do not let DOSMid trying to be CPU-friendly\n"
       );
     }
     return(1);
@@ -497,6 +504,11 @@ int main(int argc, char **argv) {
       elticks += curevent->deltatime;
       for (;;) {
         unsigned long t;
+        /* is time for next envent yet? */
+        timer_read(&t);
+        /* TODO handle wraparound of the timer counter */
+        if (t >= nexteventtime) break;
+        /* if next event not due yet, do some keyboard/screen processing */
         if (compute_elapsed_time(midiplaybackstart, &(trackinfo->elapsedsec)) != 0) refreshflags |= UI_REFRESH_TIME;
         /* read keypresses */
         switch (getkey_ifany()) {
@@ -514,11 +526,13 @@ int main(int argc, char **argv) {
             refreshflags |= UI_REFRESH_VOLUME;
             break;
         }
-        /* check whether it's time to play the next event */
-        timer_read(&t);
-        /* TODO handle wraparound of the timer counter */
-        if (t >= nexteventtime) break;
-        ui_draw(trackinfo, &refreshflags, PVER, params.mpuport); /* draw the UI only between non-zero gaps */
+        /* do I need to refresh the screen now? if not, just call INT28h */
+        if (refreshflags != 0) {
+          ui_draw(trackinfo, &refreshflags, PVER, params.mpuport); /* draw the UI between non-zero gaps only */
+        } else if (params.nopowersave == 0) { /* if no screen refresh is     */
+          union REGS regs;                    /* needed, and power saver not */
+          int86(0x28, &regs, &regs);          /* disabled, then call INT 28h */
+        }                                     /* for some power saving       */
       }
     }
     switch (curevent->type) {

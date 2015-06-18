@@ -49,7 +49,8 @@ void mpu401_flush(int mpuport) {
 void mpu401_waitwrite(int mpuport) {
   int buff;
   for (;;) {
-    buff = inp(MPU_STAT);
+    mpu401_flush(mpuport); /* make sure to flush first, in case the MPU */
+    buff = inp(MPU_STAT);  /* tries to talk to us */
     if ((buff & 0x40) == 0) break;
   }
 }

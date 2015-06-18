@@ -25,6 +25,12 @@ Highly recommended:
 
 *** USAGE ***
 
+During runtime, DOSMid can be controlled with the keyboard:
+ ESC       Quits to DOS
+ +/-       Volume up/down
+
+At the command-line, DOSMid accepts several options, as listed below:
+
 DOSMID [/noxms] [/delay] [/mpu=XXX] file.mid
 
  /noxms    Use conventional memory instead of XMS. This is obviously useful
@@ -43,6 +49,9 @@ DOSMID [/noxms] [/delay] [/mpu=XXX] file.mid
  /log=FILE Logs all DOSMid activity to FILE. This is clearly a debugging
            option that you shouldn't be interested in. Beware, the log file
            can be pretty big (much bigger than the MIDI file you are playing).
+ /fullcpu  Do not let DOSMid being CPU-friendly. By default DOSMid issues an
+           INT 28h when idle, to let the system be gentler on the CPU, but on
+           some hardware this might lead to degraded sound performance.
 
 
 *** LICENSE ***
