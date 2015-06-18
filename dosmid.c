@@ -55,6 +55,7 @@ struct clioptions {
   int mpuport;
   int nopowersave;
   char *midifile;   /* MIDI filename to play */
+  char *playlist;   /* the playlist to read files from */
   FILE *logfd;      /* an open file descriptor to the debug log file */
 };
 
@@ -168,12 +169,41 @@ static void udelay(unsigned long us) {
 }
 
 
+/* loads the file's extension into ext (limited to limit characters) */
+static void getfileext(char *ext, char *filename, int limit) {
+  int x;
+  char *extptr = NULL;
+  ext[0] = 0;
+  /* find the last dot first */
+  while (*filename != 0) {
+    if (*filename == '.') {
+      extptr = filename + 1;
+    }
+    filename++;
+  }
+  if (extptr == NULL) return;
+  /* copy the extension to ext, up to limit bytes */
+  limit--; /* make room for the null char */
+  for (x = 0; extptr[x] != 0; x++) {
+    if (x >= limit) break;
+    /* make sure the extension is all-lowercase */
+    if ((extptr[x] >= 'A') && (extptr[x] <= 'Z')) {
+      ext[x] = extptr[x] + 32;
+    } else {
+      ext[x] = extptr[x];
+    }
+  }
+  ext[x] = 0; /* terminate the ext string */
+}
+
+
 /* parse command line params and fills the params struct accordingly. returns
    NULL on sucess, or a pointer to an error string otherwise. */
 static char *parseargv(int argc, char **argv, struct clioptions *params) {
   int i;
   /* first load defaults */
   params->midifile = NULL;
+  params->playlist = NULL;
   params->memmode = MEM_XMS;
   params->workmem = 16384;  /* try to use 16M of XMS memory by default */
   params->delay = 1;
@@ -210,15 +240,21 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       }
     } else if ((strcmp(argv[i], "/?") == 0) || (strcmp(argv[i], "/h") == 0) || (strcmp(argv[i], "/help") == 0)) {
       return("");
-    } else if ((argv[i][0] != '/') && (params->midifile == NULL)) {
-      params->midifile = argv[i];
+    } else if ((argv[i][0] != '/') && (params->midifile == NULL) && (params->playlist == NULL)) {
+      char ext[4];
+      getfileext(ext, argv[i], 4);
+      if (strcmp(ext, "m3u") == 0) {
+        params->playlist = argv[i];
+      } else {
+        params->midifile = argv[i];
+      }
     } else {
       return("Unknown option.");
     }
   }
   /* check if at least a MIDI filename have been provided */
-  if (params->midifile == NULL) {
-    return("You have to provide the path to a MIDI file to play.");
+  if ((params->midifile == NULL) && (params->playlist == NULL)) {
+    return("You have to provide the path to a MIDI file or a playlist to play.");
   }
   /* all good */
   return(NULL);
@@ -368,8 +404,9 @@ int main(int argc, char **argv) {
            "DOSMid is a MIDI player that reads *.MID or *.RMI files and drives a MPU401\n"
            "synthesizer.\n"
            "\n"
-           "Usage: dosmid [/noxms] [/nodelay] [/mpu=XXX] file.mid\n"
+           "Usage: dosmid [options] file.mid|playlist.m3u\n"
            "\n"
+           "options:\n"
            " /noxms    use conventional memory instead of XMS\n"
            " /nodelay  do not wait 2ms before accessing XMS memory (makes AWEUTIL crash)\n"
            " /mpu=XXX  use MPU port 0xXXX (by default it follows the BLASTER\n"
@@ -378,6 +415,11 @@ int main(int argc, char **argv) {
            " /fullcpu  do not let DOSMid trying to be CPU-friendly\n"
       );
     }
+    return(1);
+  }
+
+  if (params.playlist != NULL) {
+    puts("Error: Playlists aren't supported yet, sorry.");
     return(1);
   }
 
