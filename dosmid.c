@@ -504,10 +504,11 @@ int main(int argc, char **argv) {
       elticks += curevent->deltatime;
       for (;;) {
         unsigned long t;
-        /* is time for next envent yet? */
+        /* is time for next event yet? */
         timer_read(&t);
-        /* TODO handle wraparound of the timer counter */
         if (t >= nexteventtime) break;
+        /* detect wraparound of the timer counter */
+        if (nexteventtime - t > ULONG_MAX / 2) break;
         /* if next event not due yet, do some keyboard/screen processing */
         if (compute_elapsed_time(midiplaybackstart, &(trackinfo->elapsedsec)) != 0) refreshflags |= UI_REFRESH_TIME;
         /* read keypresses */
