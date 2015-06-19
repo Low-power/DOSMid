@@ -48,6 +48,14 @@
 #define EVENTSCACHESIZE 64 /* *must* be a power of 2 !!! */
 #define EVENTSCACHEMASK 63 /* used by the circular events buffer */
 
+enum playactions {
+  ACTION_NONE = 0,
+  ACTION_NEXT = 1,
+  ACTION_PREV = 2,
+  ACTION_ERR_SOFT = 3,
+  ACTION_ERR_HARD = 4,
+  ACTION_EXIT = 64
+};
 
 struct clioptions {
   int memmode;      /* type of memory to use: MEM_XMS or MEM_MALLOC */
@@ -62,24 +70,36 @@ struct clioptions {
 
 
 /* copies the base name of a file (ie without directory path) into a string */
-static void filename2basename(char *fromname, char *tobasename, int maxlen) {
+static void filename2basename(char *fromname, char *tobasename, char *todirname, int maxlen) {
   int x, x2, firstchar = 0;
   /* find the first character of the base name */
   for (x = 0; fromname[x] != 0; x++) {
     switch (fromname[x]) {
       case '/':
       case '\\':
+      case ':':
         firstchar = x + 1;
         break;
     }
   }
-  /* copy the basename into tobasename */
-  x2 = 0;
-  for (x = firstchar; fromname[x] != 0; x++) {
-    if ((fromname[x] == 0) || (x2 >= maxlen)) break;
-    tobasename[x2++] = fromname[x];
+  /* copy basename to tobasename */
+  if (tobasename != NULL) {
+    x2 = 0;
+    for (x = firstchar; fromname[x] != 0; x++) {
+      if ((fromname[x] == 0) || (x2 >= maxlen)) break;
+      tobasename[x2++] = fromname[x];
+    }
+    tobasename[x2] = 0;
   }
-  tobasename[x2] = 0;
+  /* copy dirname to todirname */
+  if (todirname != NULL) {
+    x2 = 0;
+    for (x = 0; x < firstchar; x++) {
+      if ((fromname[x] == 0) || (x2 >= maxlen)) break;
+      todirname[x2++] = fromname[x];
+    }
+    todirname[x2] = 0;
+  }
 }
 
 
@@ -379,8 +399,10 @@ static int preloadmpuport(void) {
 /* reads a position from an M3U file and returns a ptr to it from a static mem */
 static char *getnextm3uitem(char *playlist) {
   static char fnamebuf[256];
+  char tempstr[256];
   long fsize;
   long pos;
+  int slen;
   char *ptr;
   FILE *fd;
   /* open the playlist and read its size */
@@ -389,7 +411,7 @@ static char *getnextm3uitem(char *playlist) {
   fseek(fd, 0, SEEK_END);
   fsize = ftell(fd);
   /* go to a random position */
-  pos = rand() % fsize;
+  pos = rand() % (fsize - 2);
   fseek(fd, pos, SEEK_SET);
   /* rewind back to nearest \n or 0 position */
   while ((pos > 0) && (fgetc(fd) != '\n')) {
@@ -397,33 +419,267 @@ static char *getnextm3uitem(char *playlist) {
     pos--;
   }
   /* read the string into fnamebuf */
-  fread(fnamebuf, 1, sizeof(fnamebuf), fd);
-  fnamebuf[sizeof(fnamebuf) - 1] = 0;
+  slen = fread(fnamebuf, 1, sizeof(fnamebuf), fd);
+  if (slen > 0) {
+    fnamebuf[slen - 1] = 0;
+  } else {
+    fnamebuf[0] = 0;
+  }
   /* close the file descriptor */
   fclose(fd);
   /* trim out the first line */
   for (ptr = fnamebuf; *ptr != '\r' && *ptr != '\n' && *ptr != 0; ptr++);
   *ptr = 0;
+  /* if the file is a relative path, then prepend it with the path of the playlist */
+  if ((fnamebuf[0] == 0) || (fnamebuf[1] != ':')) {
+    strcpy(tempstr, fnamebuf);
+    filename2basename(playlist, NULL, fnamebuf, sizeof(fnamebuf) - 1);
+    strncat(fnamebuf, tempstr, sizeof(fnamebuf) - 1);
+  }
   /* return the result */
   return(fnamebuf);
 }
 
 
-int main(int argc, char **argv) {
+/* plays a file. returns 0 on success, non-zero if the program must exit */
+static enum playactions playfile(struct clioptions *params) {
+  static int volume = 100; /* volume is static because it needs to be retained between songs */
   int midiformat, miditracks;
   unsigned int miditimeunitdiv;
   int i;
+  enum playactions exitaction = ACTION_NONE;
   unsigned long nexteventtime;
   int refreshflags = 0xFF;
   struct midi_chunkmap_t *chunkmap;
   FILE *fd;
   long newtrack, trackpos = -1;
   unsigned long midiplaybackstart;
-  char *errstr;
   struct midi_event_t *curevent, *eventscache;
-  struct clioptions params;
   struct trackinfodata *trackinfo;
   unsigned long elticks = 0;
+
+  if (params->playlist != NULL) {
+    params->midifile = getnextm3uitem(params->playlist);
+    if (params->midifile == NULL) {
+      puts("Error: Failed to fetch an entry from the playlist");
+      return(ACTION_ERR_SOFT);
+    }
+  }
+
+  fd = fopen(params->midifile, "rb");
+  if (fd == NULL) {
+    puts("Error: Failed to open the midi file");
+    return(ACTION_ERR_SOFT);
+  }
+
+  chunkmap = malloc(sizeof(struct midi_chunkmap_t) * MAXTRACKS);
+  if (chunkmap == NULL) {
+    puts("Error: Out of memory");
+    return(ACTION_ERR_HARD);
+  }
+
+  if (midi_readhdr(fd, &midiformat, &miditracks, &miditimeunitdiv, chunkmap, MAXTRACKS) != 0) {
+    puts("Invalid MIDI format file");
+    fclose(fd);
+    free(chunkmap);
+    return(ACTION_ERR_SOFT);
+  }
+
+  if (params->logfd != NULL) fprintf(params->logfd, "LOADED FILE '%s': format=%d tracks=%d timeunitdiv=%u\n", params->midifile, midiformat, miditracks, miditimeunitdiv);
+
+  if ((midiformat != 0) && (midiformat != 1)) {
+    printf("Unsupported MIDI format, sorry. So far only formats #0 and #1 are supported. Detected format: %d\n", midiformat);
+    fclose(fd);
+    free(chunkmap);
+    return(ACTION_ERR_SOFT);
+  }
+
+  if (miditracks > MAXTRACKS) {
+    printf("Too many tracks. Sorry. File contains: %d. Max. limit: %d.\n", miditracks, MAXTRACKS);
+    fclose(fd);
+    free(chunkmap);
+    return(ACTION_ERR_SOFT);
+  }
+
+  trackinfo = calloc(sizeof(struct trackinfodata), 1);
+  if (trackinfo == NULL) {
+    puts("Out of memory! Free some conventional memory and try again.");
+    return(ACTION_ERR_HARD);
+  }
+  /* set default params for trackinfo variables */
+  trackinfo->midiformat = midiformat;
+  trackinfo->tempo = 500000l;
+  for (i = 0; i < 16; i++) trackinfo->chanprogs[i] = i;
+  for (i = 0; i < UI_TITLENODES; i++) trackinfo->title[i] = trackinfo->titledat[i];
+  filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
+
+  for (i = 0; i < miditracks; i++) {
+    printf("Loading track %d/%d...\n", i + 1, miditracks);
+    /* is it really a track we got here? */
+    if (strcmp(chunkmap[i].id, "MTrk") != 0) {
+      fclose(fd);
+      printf("Unexpected chunk: was expecting track #%d...\n", i);
+      free(trackinfo);
+      return(ACTION_ERR_SOFT);
+    }
+    if (params->logfd != NULL) fprintf(params->logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, chunkmap[i].offset);
+    fseek(fd, chunkmap[i].offset, SEEK_SET);
+    if (i == 0) {
+        newtrack = midi_track2events(fd, trackinfo->title, UI_TITLENODES, UI_TITLEMAXLEN, trackinfo->copyright, UI_COPYRIGHTMAXLEN, &(trackinfo->channelsusage), params->logfd);
+      } else {
+        newtrack = midi_track2events(fd, NULL, 0, UI_TITLEMAXLEN, NULL, 0, &(trackinfo->channelsusage), params->logfd);
+    }
+    if (params->logfd != NULL) fprintf(params->logfd, "TRACK %d LOADED -> MERGING NOW\n", i);
+    trackpos = midi_mergetrack(trackpos, newtrack, &(trackinfo->totlen), miditimeunitdiv);
+    /* printf("merged track starts with %ld\n", trackpos); */
+  }
+  fclose(fd);
+  free(chunkmap);
+
+  eventscache = malloc(sizeof(struct midi_event_t) * EVENTSCACHESIZE);
+  if (eventscache == NULL) {
+    puts("Out of memory! Free some conventional memory and try again.");
+    return(ACTION_ERR_HARD);
+  }
+
+  if (params->logfd != NULL) fputs("RESET MPU-401", params->logfd);
+  if (mpu401_rst(params->mpuport) != 0) {
+    printf("Error: failed to reset the MPU-401 synthesizer via port %03Xh\n", params->mpuport);
+    return(ACTION_ERR_HARD);
+  }
+
+  if (params->logfd != NULL) fputs("SET UART MODE", params->logfd);
+  mpu401_uart(params->mpuport);
+
+  midi_reinit(params->mpuport); /* reinit the device */
+
+  /* save start time so we can compute elapsed time later */
+  timer_read(&midiplaybackstart);
+  nexteventtime = midiplaybackstart;
+
+  while (trackpos >= 0) {
+
+    /* fetch next event */
+    curevent = getnexteventfromcache(eventscache, trackpos, params->delay);
+
+    /* puts("flush MPU"); */
+    mpu401_flush(params->mpuport);
+    /* printf("Action: %d / Note: %d / Vel: %d / t=%lu / next->%ld\n", curevent->type, curevent->data.note.note, curevent->data.note.velocity, curevent->deltatime, curevent->next); */
+    if (curevent->deltatime > 0) { /* if I have some time ahead, I can do a few things */
+      nexteventtime += (curevent->deltatime * trackinfo->tempo / miditimeunitdiv);
+      elticks += curevent->deltatime;
+      while (exitaction == ACTION_NONE) {
+        unsigned long t;
+        /* is time for next event yet? */
+        timer_read(&t);
+        if (t >= nexteventtime) break;
+        /* detect wraparound of the timer counter */
+        if (nexteventtime - t > ULONG_MAX / 2) break;
+        /* if next event not due yet, do some keyboard/screen processing */
+        if (compute_elapsed_time(midiplaybackstart, &(trackinfo->elapsedsec)) != 0) refreshflags |= UI_REFRESH_TIME;
+        /* read keypresses */
+        switch (getkey_ifany()) {
+          case 0x1B: /* escape */
+            exitaction = ACTION_EXIT;
+            break;
+          case '+':  /* volume up */
+            volume += 5;                       /* note: I could also use a MIDI command to */
+            if (volume > 100) volume = 100;    /* adjust the MPU's global volume but this  */
+            refreshflags |= UI_REFRESH_VOLUME; /* is messy because the MIDI file might use */
+            break;                             /* such message, too. Besides, some MPUs do */
+          case '-':  /* volume down */         /* not support volume control (eg. my SB64) */
+            volume -= 5;
+            if (volume < 0) volume = 0;
+            refreshflags |= UI_REFRESH_VOLUME;
+            break;
+        }
+        /* do I need to refresh the screen now? if not, just call INT28h */
+        if (refreshflags != 0) {
+          ui_draw(trackinfo, &refreshflags, PVER, params->mpuport, volume);
+        } else if (params->nopowersave == 0) { /* if no screen refresh is     */
+          union REGS regs;                     /* needed, and power saver not */
+          int86(0x28, &regs, &regs);           /* disabled, then call INT 28h */
+        }                                      /* for some power saving       */
+      }
+      if (exitaction != ACTION_NONE) break;
+    }
+
+    switch (curevent->type) {
+      case EVENT_NOTEON:
+        if (params->logfd != NULL) fprintf(params->logfd, "%lu: NOTE ON chan: %d / note: %d / vel: %d\n", trackinfo->elapsedsec, curevent->data.note.chan, curevent->data.note.note, curevent->data.note.velocity);
+        noteon(params->mpuport, curevent->data.note.chan, curevent->data.note.note, (volume * curevent->data.note.velocity) / 100);
+        trackinfo->notestates[curevent->data.note.note] |= (1 << curevent->data.note.chan);
+        refreshflags |= UI_REFRESH_NOTES;
+        break;
+      case EVENT_NOTEOFF:
+        if (params->logfd != NULL) fprintf(params->logfd, "%lu: NOTE OFF chan: %d / note: %d\n", trackinfo->elapsedsec, curevent->data.note.chan, curevent->data.note.note);
+        noteoff(params->mpuport, curevent->data.note.chan, curevent->data.note.note);
+        trackinfo->notestates[curevent->data.note.note] &= (0xFFFF ^ (1 << curevent->data.note.chan));
+        refreshflags |= UI_REFRESH_NOTES;
+        break;
+      case EVENT_TEMPO:
+        if (params->logfd != NULL) fprintf(params->logfd, "%lu (%lu): TEMPO change from %lu to %lu\n", trackinfo->elapsedsec, elticks, trackinfo->tempo, curevent->data.tempoval);
+        trackinfo->tempo = curevent->data.tempoval;
+        refreshflags |= UI_REFRESH_TEMPO;
+        break;
+      case EVENT_PROGCHAN:
+        if (params->logfd != NULL) fprintf(params->logfd, "%lu: CHANNEL #%d PROG: %d\n", trackinfo->elapsedsec, curevent->data.prog.chan, curevent->data.prog.prog);
+        trackinfo->chanprogs[curevent->data.prog.chan] = curevent->data.prog.prog;
+        setchanprog(params->mpuport, curevent->data.prog.chan, curevent->data.prog.prog);
+        refreshflags |= UI_REFRESH_PROGS;
+        break;
+      default: /* probably a raw event - bit 7 should be set (>127) */
+        if (curevent->type & 128) {
+          if (params->logfd != NULL) {
+            fprintf(params->logfd, "%lu: RAW EVENT TYPE OF LEN %d: [0x%02X 0x%02X 0x%02X]\n", trackinfo->elapsedsec, curevent->type & 127, curevent->data.raw[0], curevent->data.raw[1], curevent->data.raw[2]);
+          }
+          rawevent(params->mpuport, curevent->data.raw, curevent->type & 127);
+          break;
+        } else {
+          if (params->logfd != NULL) {
+            fprintf(params->logfd, "%lu: ILLEGAL COMMAND: 0x%02X\n", trackinfo->elapsedsec, curevent->type);
+          }
+        }
+        break;
+    }
+
+    if (trackpos < 0) break;
+    trackpos = curevent->next;
+
+  }
+
+  if (params->logfd != NULL) fputs("Clear notes", params->logfd);
+
+  /* Look for notes that are still ON and turn them OFF */
+  for (i = 0; i < 128; i++) {
+    if (trackinfo->notestates[i] != 0) {
+      int c;
+      for (c = 0; c < 16; c++) {
+        if (trackinfo->notestates[i] & (1 << c)) {
+          /* printf("note #%d is still playing on channel %d\n", i, c); */
+          noteoff(params->mpuport, c, i);
+        }
+      }
+    }
+  }
+
+  if (params->logfd != NULL) fputs("Reset MPU", params->logfd);
+  midi_reinit(params->mpuport); /* reinit the device */
+  mpu401_rst(params->mpuport);  /* reset the MPU back into intelligent mode */
+
+  if (params->logfd != NULL) fputs("Free trackinfo memory", params->logfd);
+  free(trackinfo);
+  if (params->logfd != NULL) fputs("Free eventscache memory", params->logfd);
+  free(eventscache);
+
+  return(exitaction);
+}
+
+
+int main(int argc, char **argv) {
+  struct clioptions params;
+  char *errstr;
+  enum playactions action = ACTION_NONE;
 
   /* preload the mpu port to be used (might be forced later via **argv) */
   params.mpuport = preloadmpuport();
@@ -445,243 +701,64 @@ int main(int argc, char **argv) {
            " /nodelay  do not wait 2ms before accessing XMS memory (makes AWEUTIL crash)\n"
            " /mpu=XXX  use MPU port 0xXXX (by default it follows the BLASTER\n"
            "           environment variable, and if not found, uses 0x330)\n"
-           " /log=FILE logs highly verbose logs about DOSMid's activity to FILE\n"
+           " /log=FILE write highly verbose logs about DOSMid's activity to FILE\n"
            " /fullcpu  do not let DOSMid trying to be CPU-friendly\n"
       );
     }
     return(1);
   }
 
-  /* inti random numbers */
+  /* allocate the work memory */
+  if (mem_init(params.workmem, params.memmode) == 0) {
+    puts("ERROR: Memory init failed!");
+    return(1);
+  }
+
+  /* init random numbers */
   srand((unsigned int)time(NULL));
 
   /* initialize the high resolution timer */
   timer_init();
 
-  if (params.playlist != NULL) {
-    params.midifile = getnextm3uitem(params.playlist);
-    if (params.midifile == NULL) {
-      puts("Error: Failed to fetch an entry from the playlist");
-      return(1);
-    }
-  }
-
-  fd = fopen(params.midifile, "rb");
-  if (fd == NULL) {
-    puts("Error: Failed to open the midi file");
-    return(1);
-  }
-
-  chunkmap = malloc(sizeof(struct midi_chunkmap_t) * MAXTRACKS);
-  if (chunkmap == NULL) {
-    puts("Error: Out of memory");
-    return(1);
-  }
-
-  if (midi_readhdr(fd, &midiformat, &miditracks, &miditimeunitdiv, chunkmap, MAXTRACKS) != 0) {
-    puts("Invalid MIDI format file");
-    fclose(fd);
-    free(chunkmap);
-    return(1);
-  }
-
-  if (params.logfd != NULL) fprintf(params.logfd, "LOADED FILE '%s': format=%d tracks=%d timeunitdiv=%u\n", params.midifile, midiformat, miditracks, miditimeunitdiv);
-
-  if ((midiformat != 0) && (midiformat != 1)) {
-    printf("Unsupported MIDI format, sorry. So far only formats #0 and #1 are supported. Detected format: %d\n", midiformat);
-    fclose(fd);
-    free(chunkmap);
-    return(1);
-  }
-
-  if (miditracks > MAXTRACKS) {
-    printf("Too many tracks. Sorry. File contains: %d. Max. limit: %d.\n", miditracks, MAXTRACKS);
-    fclose(fd);
-    free(chunkmap);
-    return(1);
-  }
-
-  if (mem_init(params.workmem, params.memmode) == 0) {
-    puts("XMS init failed!");
-    fclose(fd);
-    free(chunkmap);
-    return(1);
-  }
-
-  trackinfo = calloc(sizeof(struct trackinfodata), 1);
-  if (trackinfo == NULL) {
-    puts("Out of memory! Free some conventional memory and try again.");
-    mem_close();
-    return(1);
-  }
-  /* set default params for trackinfo variables */
-  trackinfo->midiformat = midiformat;
-  trackinfo->tempo = 500000l;
-  trackinfo->volume = 100;
-  for (i = 0; i < 16; i++) trackinfo->chanprogs[i] = i;
-  for (i = 0; i < UI_TITLENODES; i++) trackinfo->title[i] = trackinfo->titledat[i];
-  filename2basename(params.midifile, trackinfo->filename, UI_FILENAMEMAXLEN);
-
-  for (i = 0; i < miditracks; i++) {
-    printf("Loading track %d/%d...\n", i + 1, miditracks);
-    /* is it really a track we got here? */
-    if (strcmp(chunkmap[i].id, "MTrk") != 0) {
-      fclose(fd);
-      printf("Unexpected chunk: was expecting track #%d...\n", i);
-      mem_close();
-      free(trackinfo);
-      return(1);
-    }
-    if (params.logfd != NULL) fprintf(params.logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, chunkmap[i].offset);
-    fseek(fd, chunkmap[i].offset, SEEK_SET);
-    if (i == 0) {
-        newtrack = midi_track2events(fd, trackinfo->title, UI_TITLENODES, UI_TITLEMAXLEN, trackinfo->copyright, UI_COPYRIGHTMAXLEN, &(trackinfo->channelsusage), params.logfd);
-      } else {
-        newtrack = midi_track2events(fd, NULL, 0, UI_TITLEMAXLEN, NULL, 0, &(trackinfo->channelsusage), params.logfd);
-    }
-    if (params.logfd != NULL) fprintf(params.logfd, "TRACK %d LOADED -> MERGING NOW\n", i);
-    trackpos = midi_mergetrack(trackpos, newtrack, &(trackinfo->totlen), miditimeunitdiv);
-    /* printf("merged track starts with %ld\n", trackpos); */
-  }
-  fclose(fd);
-  free(chunkmap);
-
-  eventscache = malloc(sizeof(struct midi_event_t) * EVENTSCACHESIZE);
-  if (eventscache == NULL) {
-    puts("Out of memory! Free some conventional memory and try again.");
-    mem_close();
-    return(1);
-  }
-
-  puts("RESET MPU-401...");
-  if (mpu401_rst(params.mpuport) != 0) {
-    printf("Error: failed to reset the MPU-401 synthesizer via port %03Xh\n", params.mpuport);
-    mem_close();
-    return(1);
-  }
-
-  puts("SET UART MODE..");
-  mpu401_uart(params.mpuport);
-
-  midi_reinit(params.mpuport); /* reinit the device */
-
   /* init ui and hide the blinking cursor */
   ui_init();
   ui_hidecursor();
 
-  /* save start time so we can compute elapsed time later */
-  timer_read(&midiplaybackstart);
-  nexteventtime = midiplaybackstart;
+  /* playlist loop */
+  while (action == ACTION_NONE) {
 
-  while (trackpos >= 0) {
-
-    /* fetch next event */
-    curevent = getnexteventfromcache(eventscache, trackpos, params.delay);
-
-    /* puts("flush MPU"); */
-    mpu401_flush(params.mpuport);
-    /* printf("Action: %d / Note: %d / Vel: %d / t=%lu / next->%ld\n", curevent->type, curevent->data.note.note, curevent->data.note.velocity, curevent->deltatime, curevent->next); */
-    if (curevent->deltatime > 0) {
-      nexteventtime += (curevent->deltatime * trackinfo->tempo / miditimeunitdiv);
-      elticks += curevent->deltatime;
-      for (;;) {
-        unsigned long t;
-        /* is time for next event yet? */
-        timer_read(&t);
-        if (t >= nexteventtime) break;
-        /* detect wraparound of the timer counter */
-        if (nexteventtime - t > ULONG_MAX / 2) break;
-        /* if next event not due yet, do some keyboard/screen processing */
-        if (compute_elapsed_time(midiplaybackstart, &(trackinfo->elapsedsec)) != 0) refreshflags |= UI_REFRESH_TIME;
-        /* read keypresses */
-        switch (getkey_ifany()) {
-          case 0x1B: /* escape */
-            trackpos = -1;
-            break;
-          case '+':  /* volume up */
-            trackinfo->volume += 5;                               /* note about volume: I could also use a MIDI    */
-            if (trackinfo->volume > 100) trackinfo->volume = 100; /* command to adjust the MPU's global volume     */
-            refreshflags |= UI_REFRESH_VOLUME;                    /* but this is messy because the MIDI file might */
-            break;                                                /* already use such message. Besides, some MPUs  */
-          case '-':  /* volume down */                            /* do not support volume controls (eg. my SB64)  */
-            trackinfo->volume -= 5;
-            if (trackinfo->volume < 0) trackinfo->volume = 0;
-            refreshflags |= UI_REFRESH_VOLUME;
-            break;
-        }
-        /* do I need to refresh the screen now? if not, just call INT28h */
-        if (refreshflags != 0) {
-          ui_draw(trackinfo, &refreshflags, PVER, params.mpuport); /* draw the UI between non-zero gaps only */
-        } else if (params.nopowersave == 0) { /* if no screen refresh is     */
-          union REGS regs;                    /* needed, and power saver not */
-          int86(0x28, &regs, &regs);          /* disabled, then call INT 28h */
-        }                                     /* for some power saving       */
-      }
-    }
-    switch (curevent->type) {
-      case EVENT_NOTEON:
-        if (params.logfd != NULL) fprintf(params.logfd, "%lu: NOTE ON chan: %d / note: %d / vel: %d\n", trackinfo->elapsedsec, curevent->data.note.chan, curevent->data.note.note, curevent->data.note.velocity);
-        noteon(params.mpuport, curevent->data.note.chan, curevent->data.note.note, (trackinfo->volume * curevent->data.note.velocity) / 100);
-        trackinfo->notestates[curevent->data.note.note] |= (1 << curevent->data.note.chan);
-        refreshflags |= UI_REFRESH_NOTES;
+    action = playfile(&params);
+    switch (action) {
+      case ACTION_EXIT:
+        /* do nothing, we will exit at the end of the loop anyway */
         break;
-      case EVENT_NOTEOFF:
-        if (params.logfd != NULL) fprintf(params.logfd, "%lu: NOTE OFF chan: %d / note: %d\n", trackinfo->elapsedsec, curevent->data.note.chan, curevent->data.note.note);
-        noteoff(params.mpuport, curevent->data.note.chan, curevent->data.note.note);
-        trackinfo->notestates[curevent->data.note.note] &= (0xFFFF ^ (1 << curevent->data.note.chan));
-        refreshflags |= UI_REFRESH_NOTES;
+      case ACTION_PREV:
+        /* TODO to be implemented */
         break;
-      case EVENT_TEMPO:
-        if (params.logfd != NULL) fprintf(params.logfd, "%lu (%lu): TEMPO change from %lu to %lu\n", trackinfo->elapsedsec, elticks, trackinfo->tempo, curevent->data.tempoval);
-        trackinfo->tempo = curevent->data.tempoval;
-        refreshflags |= UI_REFRESH_TEMPO;
+      case ACTION_NEXT:
+        /* no explicit action - we will do a 'next' action by default */
         break;
-      case EVENT_PROGCHAN:
-        if (params.logfd != NULL) fprintf(params.logfd, "%lu: CHANNEL #%d PROG: %d\n", trackinfo->elapsedsec, curevent->data.prog.chan, curevent->data.prog.prog);
-        trackinfo->chanprogs[curevent->data.prog.chan] = curevent->data.prog.prog;
-        setchanprog(params.mpuport, curevent->data.prog.chan, curevent->data.prog.prog);
-        refreshflags |= UI_REFRESH_PROGS;
+      case ACTION_ERR_HARD: /* wait for a keypress and quit */
+        getkey();
+        action = ACTION_EXIT;
         break;
-      default: /* probably a raw event - bit 7 should be set (>127) */
-        if (curevent->type & 128) {
-          if (params.logfd != NULL) {
-            fprintf(params.logfd, "%lu: RAW EVENT TYPE OF LEN %d: [0x%02X 0x%02X 0x%02X]\n", trackinfo->elapsedsec, curevent->type & 127, curevent->data.raw[0], curevent->data.raw[1], curevent->data.raw[2]);
-          }
-          rawevent(params.mpuport, curevent->data.raw, curevent->type & 127);
-          break;
+      case ACTION_ERR_SOFT: /* wait for a keypress so the user acknowledges the */
+        getkey();      /* error message, and then continue as usual        */
+      case ACTION_NONE: /* choose an action depending of the mode we are in */
+        if (params.playlist == NULL) {
+          action = ACTION_EXIT;
         } else {
-          if (params.logfd != NULL) {
-            fprintf(params.logfd, "%lu: ILLEGAL COMMAND: 0x%02X\n", trackinfo->elapsedsec, curevent->type);
-          }
+          action = ACTION_NEXT;
         }
+        break;
     }
-
-    if (trackpos < 0) break;
-    trackpos = curevent->next;
-
   }
 
-  /* reset screen */
+  /* reset screen (clears the screen and makes the cursor visible again) */
   ui_init();
 
-  puts("Clear notes...");
-
-  /* Look for notes that are still ON and turn them OFF */
-  for (i = 0; i < 128; i++) {
-    if (trackinfo->notestates[i] != 0) {
-      int c;
-      for (c = 0; c < 16; c++) {
-        if (trackinfo->notestates[i] & (1 << c)) {
-          /* printf("note #%d is still playing on channel %d\n", i, c); */
-          noteoff(params.mpuport, c, i);
-        }
-      }
-    }
-  }
-
-  puts("Reset MPU...");
-  midi_reinit(params.mpuport); /* reinit the device */
-  mpu401_rst(params.mpuport);  /* reset the MPU back into intelligent mode */
+  /* unload XMS memory */
+  mem_close();
 
   /* if a verbose log file was used, close it now */
   if (params.logfd != NULL) {
@@ -689,10 +766,7 @@ int main(int argc, char **argv) {
     fclose(params.logfd);
   }
 
-  puts("Free memory...");
-  mem_close();
-  free(trackinfo);
-  free(eventscache);
+  puts("DOSMid v" PVER " Copyright (C) Mateusz Viste " PDATE);
 
   return(0);
 }

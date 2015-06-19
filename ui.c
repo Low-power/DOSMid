@@ -60,7 +60,7 @@ void ui_hidecursor(void) {
 }
 
 /* draws the UI screen */
-void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int mpuport) {
+void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int mpuport, int volume) {
   #include "gm.h"  /* GM instruments names */
   int x, y;
   /* draw ascii graphic frames, etc */
@@ -131,7 +131,7 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int
   /* volume */
   if (*refreshflags & UI_REFRESH_VOLUME) {
     char tempstr[16];
-    sprintf(tempstr, "Volume: %d%%", trackinfo->volume);
+    sprintf(tempstr, "Volume: %d%%", volume);
     ui_printstr(18, 45, tempstr, 20, COLOR_TEMPO);
   }
   /* title and copyright notice */
@@ -161,23 +161,22 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int
     unsigned long perc;
     unsigned int curcol;
     int rpos;
-    sprintf(tempstr1, " %lu:%02lu (%lu%%)     ", trackinfo->elapsedsec / 60, trackinfo->elapsedsec % 60, (trackinfo->elapsedsec  * 100) / (trackinfo->totlen + 1));
-    sprintf(tempstr2, "%lu:%02lu ", trackinfo->totlen / 60, trackinfo->totlen % 60);
+    sprintf(tempstr1, " %lu:%02lu (%lu%%)     ", trackinfo->elapsedsec / 60, trackinfo->elapsedsec % 60, ((trackinfo->elapsedsec + 1) * 100) / (trackinfo->totlen + 1));
+    rpos = 78 - sprintf(tempstr2, "%lu:%02lu ", trackinfo->totlen / 60, trackinfo->totlen % 60);
     /* draw the progress bar */
     perc = (trackinfo->elapsedsec * 78) / trackinfo->totlen;
-    rpos = 78 - strlen(tempstr2);
     for (x = 0; x < 78; x++) {
       if (x < perc) {
-          curcol = COLOR_PROGRESS1;
-        } else {
-          curcol = COLOR_PROGRESS2;
+        curcol = COLOR_PROGRESS1;
+      } else {
+        curcol = COLOR_PROGRESS2;
       }
       if (x < 15) {
-          ui_printchar(23, 1 + x, tempstr1[x] | curcol);
-        } else if (x >= rpos) {
-          ui_printchar(23, 1 + x, tempstr2[x - rpos] | curcol);
-        } else {
-          ui_printchar(23, 1 + x, ' ' | curcol);
+        ui_printchar(23, 1 + x, tempstr1[x] | curcol);
+      } else if (x >= rpos) {
+        ui_printchar(23, 1 + x, tempstr2[x - rpos] | curcol);
+      } else {
+        ui_printchar(23, 1 + x, ' ' | curcol);
       }
     }
   }

@@ -28,7 +28,6 @@ struct trackinfodata {
   unsigned char chanprogs[16];
   int titlescount;
   int midiformat;
-  int volume;
   char titledat[UI_TITLENODES][UI_TITLEMAXLEN + 1];
   char *title[UI_TITLENODES];
   char copyright[UI_COPYRIGHTMAXLEN + 1];
@@ -42,7 +41,7 @@ void ui_init(void);
 void ui_hidecursor(void);
 
 /* draws the UI screen */
-void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int mpuport);
+void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int mpuport, int volume);
 
 /* waits for a keypress and return it. Returns 0 for extended keystroke, then
    function must be called again to return scan code. */
