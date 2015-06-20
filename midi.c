@@ -112,7 +112,7 @@ struct midi_chunk_t *midi_readchunk(FILE *fd) {
   return(res);
 }
 
-int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned int *timeunitdiv, struct midi_chunkmap_t *chunklist, int maxchunks) {
+int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned short *timeunitdiv, struct midi_chunkmap_t *chunklist, int maxchunks) {
   struct midi_chunk_t *chunk;
   unsigned char rmidbuff[12];
   /* test for RMID format and rewind if not found */

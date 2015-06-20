@@ -25,6 +25,7 @@ struct trackinfodata {
   unsigned long elapsedsec; /* time elapsed (in seconds) */
   unsigned short notestates[128]; /* here I record the state of every note on every channel, to turn all notes OFF in case of program termination */
   unsigned short channelsusage;  /* a bit field indicating what channels are used */
+  unsigned short miditimeunitdiv;
   unsigned char chanprogs[16];
   int titlescount;
   int midiformat;

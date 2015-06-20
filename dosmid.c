@@ -285,12 +285,14 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
   return(NULL);
 }
 
+
 static void setchanprog(int mpuport, int chan, int prog) {
   mpu401_waitwrite(mpuport);   /* Wait for port ready */
   outp(mpuport, 0xC0 | chan);  /* Send channel */
   mpu401_waitwrite(mpuport);   /* Wait for port ready */
   outp(mpuport, prog);         /* Send patch id */
 }
+
 
 /* computes the time elapsed since the song started (in secs). Returns 0 if
  * elapsed time didn't changed since last time, non-zero otherwise */
@@ -307,6 +309,7 @@ static int compute_elapsed_time(unsigned long starttime, unsigned long *elapsed)
   *elapsed = res;
   return(1);
 }
+
 
 /* check the event cache for a given event */
 static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscache, long trackpos, int delay) {
@@ -445,46 +448,12 @@ static char *getnextm3uitem(char *playlist) {
 }
 
 
-/* plays a file. returns 0 on success, non-zero if the program must exit */
-static enum playactions playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event_t *eventscache) {
-  static int volume = 100; /* volume is static because it needs to be retained between songs */
-  int miditracks;
-  unsigned int miditimeunitdiv;
-  int i;
-  enum playactions exitaction = ACTION_NONE;
-  unsigned long nexteventtime;
-  int refreshflags;
-  struct midi_chunkmap_t *chunkmap;
+static enum playactions loadmidifile(struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
   FILE *fd;
-  long newtrack, trackpos = -1;
-  unsigned long midiplaybackstart;
-  struct midi_event_t *curevent;
-  unsigned long elticks = 0;
-
-  /* clear out trackinfo & eventscache data */
-  memset(trackinfo, 0, sizeof(struct trackinfodata));
-  memset(eventscache, 0, sizeof(struct midi_event_t));
-
-  /* set default params for trackinfo variables */
-  trackinfo->tempo = 500000l;
-  for (i = 0; i < 16; i++) trackinfo->chanprogs[i] = i;
-  for (i = 0; i < UI_TITLENODES; i++) trackinfo->title[i] = trackinfo->titledat[i];
-
-  /* draw the UI a first time, without data yet */
-  refreshflags = 0xff;
-  sprintf(trackinfo->title[0], "Loading...");
-  ui_draw(trackinfo, &refreshflags, PVER, params->mpuport, volume);
-  sprintf(trackinfo->title[0], "          ");
-  refreshflags = 0xff;
-
-  /* if running on a playlist, load next song */
-  if (params->playlist != NULL) {
-    params->midifile = getnextm3uitem(params->playlist);
-    if (params->midifile == NULL) {
-      ui_puterrmsg(params->playlist, "Error: Failed to fetch an entry from the playlist");
-      return(ACTION_ERR_SOFT);
-    }
-  }
+  struct midi_chunkmap_t *chunkmap;
+  int miditracks;
+  int i;
+  long newtrack;
 
   fd = fopen(params->midifile, "rb");
   if (fd == NULL) {
@@ -499,14 +468,14 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     return(ACTION_ERR_HARD);
   }
 
-  if (midi_readhdr(fd, &(trackinfo->midiformat), &miditracks, &miditimeunitdiv, chunkmap, MAXTRACKS) != 0) {
+  if (midi_readhdr(fd, &(trackinfo->midiformat), &miditracks, &(trackinfo->miditimeunitdiv), chunkmap, MAXTRACKS) != 0) {
     ui_puterrmsg(params->midifile, "Error: Invalid MIDI file format");
     fclose(fd);
     free(chunkmap);
     return(ACTION_ERR_SOFT);
   }
 
-  if (params->logfd != NULL) fprintf(params->logfd, "LOADED FILE '%s': format=%d tracks=%d timeunitdiv=%u\n", params->midifile, (trackinfo->midiformat), miditracks, miditimeunitdiv);
+  if (params->logfd != NULL) fprintf(params->logfd, "LOADED FILE '%s': format=%d tracks=%d timeunitdiv=%u\n", params->midifile, trackinfo->midiformat, miditracks, trackinfo->miditimeunitdiv);
 
   if ((trackinfo->midiformat != 0) && (trackinfo->midiformat != 1)) {
     char errstr[64];
@@ -528,13 +497,13 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 
   filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
   for (i = 0; i < miditracks; i++) {
-    /* printf("Loading track %d/%d...\n", i + 1, miditracks);*/ /* TODO replace this by some kind of status message */
     /* is it really a track we got here? */
     if (strcmp(chunkmap[i].id, "MTrk") != 0) {
       char errstr[64];
       sprintf(errstr, "Error: Unexpected chunk (expecting mtrk #%d)", i);
       ui_puterrmsg(params->midifile, errstr);
       fclose(fd);
+      free(chunkmap);
       return(ACTION_ERR_SOFT);
     }
     if (params->logfd != NULL) fprintf(params->logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, chunkmap[i].offset);
@@ -545,11 +514,54 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         newtrack = midi_track2events(fd, NULL, 0, UI_TITLEMAXLEN, NULL, 0, &(trackinfo->channelsusage), params->logfd);
     }
     if (params->logfd != NULL) fprintf(params->logfd, "TRACK %d LOADED -> MERGING NOW\n", i);
-    trackpos = midi_mergetrack(trackpos, newtrack, &(trackinfo->totlen), miditimeunitdiv);
+    *trackpos = midi_mergetrack(*trackpos, newtrack, &(trackinfo->totlen), trackinfo->miditimeunitdiv);
     /* printf("merged track starts with %ld\n", trackpos); */
   }
   fclose(fd);
   free(chunkmap);
+  return(ACTION_NONE);
+}
+
+
+/* plays a file. returns 0 on success, non-zero if the program must exit */
+static enum playactions playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event_t *eventscache) {
+  static int volume = 100; /* volume is static because it needs to be retained between songs */
+  int i;
+  enum playactions exitaction;
+  unsigned long nexteventtime;
+  int refreshflags;
+  long trackpos = -1;
+  unsigned long midiplaybackstart;
+  struct midi_event_t *curevent;
+  unsigned long elticks = 0;
+
+  /* clear out trackinfo & eventscache data */
+  memset(trackinfo, 0, sizeof(struct trackinfodata));
+  memset(eventscache, 0, sizeof(struct midi_event_t));
+
+  /* set default params for trackinfo variables */
+  trackinfo->tempo = 500000l;
+  for (i = 0; i < 16; i++) trackinfo->chanprogs[i] = i;
+  for (i = 0; i < UI_TITLENODES; i++) trackinfo->title[i] = trackinfo->titledat[i];
+
+  /* draw the UI a first time, without data yet */
+  refreshflags = 0xff;
+  sprintf(trackinfo->title[0], "Loading...");
+  ui_draw(trackinfo, &refreshflags, PVER, params->mpuport, volume);
+  memset(trackinfo->title[0], 0, 16);
+  refreshflags = 0xff;
+
+  /* if running on a playlist, load next song */
+  if (params->playlist != NULL) {
+    params->midifile = getnextm3uitem(params->playlist);
+    if (params->midifile == NULL) {
+      ui_puterrmsg(params->playlist, "Error: Failed to fetch an entry from the playlist");
+      return(ACTION_ERR_SOFT);
+    }
+  }
+
+  exitaction = loadmidifile(params, trackinfo, &trackpos);
+  if (exitaction != ACTION_NONE) return(exitaction);
 
   if (params->logfd != NULL) fputs("RESET MPU-401", params->logfd);
   if (mpu401_rst(params->mpuport) != 0) {
@@ -574,7 +586,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     mpu401_flush(params->mpuport);
     /* printf("Action: %d / Note: %d / Vel: %d / t=%lu / next->%ld\n", curevent->type, curevent->data.note.note, curevent->data.note.velocity, curevent->deltatime, curevent->next); */
     if (curevent->deltatime > 0) { /* if I have some time ahead, I can do a few things */
-      nexteventtime += (curevent->deltatime * trackinfo->tempo / miditimeunitdiv);
+      nexteventtime += (curevent->deltatime * trackinfo->tempo / trackinfo->miditimeunitdiv);
       elticks += curevent->deltatime;
       while (exitaction == ACTION_NONE) {
         unsigned long t;

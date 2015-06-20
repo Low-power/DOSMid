@@ -78,7 +78,7 @@ struct midi_event_t {
 
 struct midi_chunk_t *midi_readchunk(FILE *fd);
 
-int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned int *timeunitdiv, struct midi_chunkmap_t *chunklist, int maxchunks);
+int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned short *timeunitdiv, struct midi_chunkmap_t *chunklist, int maxchunks);
 
 /* parse a track object and returns the id of the first events in the linked list */
 long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, char *copyright, int copyrightmaxlen, unsigned short *channelsusage, FILE *logfd);
