@@ -311,12 +311,20 @@ static int compute_elapsed_time(unsigned long starttime, unsigned long *elapsed)
 }
 
 
-/* check the event cache for a given event */
+/* check the event cache for a given event. to reset the cache, issue a single
+ * call with trackpos < 0. */
 static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscache, long trackpos, int delay) {
   static unsigned int itemsincache = 0;
   static unsigned int curcachepos = 0;
   struct midi_event_t *res = NULL;
   long nextevent;
+  /* if trackpos < 0 then this is only about flushing cache */
+  if (trackpos < 0) {
+    memset(eventscache, 0, sizeof(*eventscache));
+    itemsincache = 0;
+    curcachepos = 0;
+    return(NULL);
+  }
   /* if we have available cache */
   if (itemsincache > 0) {
       curcachepos++;
@@ -455,6 +463,8 @@ static enum playactions loadmidifile(struct clioptions *params, struct trackinfo
   int i;
   long newtrack;
 
+  *trackpos = -1;
+
   fd = fopen(params->midifile, "rb");
   if (fd == NULL) {
     ui_puterrmsg(params->midifile, "Error: Failed to open the midi file");
@@ -530,14 +540,14 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   enum playactions exitaction;
   unsigned long nexteventtime;
   int refreshflags;
-  long trackpos = -1;
+  long trackpos;
   unsigned long midiplaybackstart;
   struct midi_event_t *curevent;
   unsigned long elticks = 0;
 
-  /* clear out trackinfo & eventscache data */
-  memset(trackinfo, 0, sizeof(struct trackinfodata));
-  memset(eventscache, 0, sizeof(struct midi_event_t));
+  /* clear out trackinfo & cache data */
+  memset(trackinfo, 0, sizeof(*trackinfo));
+  getnexteventfromcache(eventscache, -1, 0);
 
   /* set default params for trackinfo variables */
   trackinfo->tempo = 500000l;

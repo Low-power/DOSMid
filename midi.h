@@ -87,6 +87,6 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
  * to the unique track. I take care here to not allocate/free memory here.
  * All notes are already in RAM after all. totlen is filled with the total
  * time of the merged tracks (in miliseconds). */
-long midi_mergetrack(long t0, long t1, unsigned long *totlen, unsigned int timeunitdiv);
+long midi_mergetrack(long t0, long t1, unsigned long *totlen, unsigned short timeunitdiv);
 
 #endif
