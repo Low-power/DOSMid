@@ -18,9 +18,9 @@ Minimal requirements:
  - a video card able to display an 80x25 text mode (ie. CGA or better)
 
 Highly recommended:
- - an 80286 CPU
+ - an 80386 CPU
  - VGA
- - 256K of available XMS memory
+ - 512K of available XMS memory
 
 
 *** USAGE ***
