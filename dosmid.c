@@ -442,84 +442,93 @@ static char *getnextm3uitem(char *playlist) {
 
 
 /* plays a file. returns 0 on success, non-zero if the program must exit */
-static enum playactions playfile(struct clioptions *params) {
+static enum playactions playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event_t *eventscache) {
   static int volume = 100; /* volume is static because it needs to be retained between songs */
-  int midiformat, miditracks;
+  int miditracks;
   unsigned int miditimeunitdiv;
   int i;
   enum playactions exitaction = ACTION_NONE;
   unsigned long nexteventtime;
-  int refreshflags = 0xFF;
+  int refreshflags;
   struct midi_chunkmap_t *chunkmap;
   FILE *fd;
   long newtrack, trackpos = -1;
   unsigned long midiplaybackstart;
-  struct midi_event_t *curevent, *eventscache;
-  struct trackinfodata *trackinfo;
+  struct midi_event_t *curevent;
   unsigned long elticks = 0;
 
+  /* clear out trackinfo & eventscache data */
+  memset(trackinfo, 0, sizeof(struct trackinfodata));
+  memset(eventscache, 0, sizeof(struct midi_event_t));
+
+  /* set default params for trackinfo variables */
+  trackinfo->tempo = 500000l;
+  for (i = 0; i < 16; i++) trackinfo->chanprogs[i] = i;
+  for (i = 0; i < UI_TITLENODES; i++) trackinfo->title[i] = trackinfo->titledat[i];
+
+  /* draw the UI a first time, without data yet */
+  refreshflags = 0xff;
+  ui_draw(trackinfo, &refreshflags, PVER, params->mpuport, volume);
+  refreshflags = 0xff;
+
+  /* if running on a playlist, load next song */
   if (params->playlist != NULL) {
     params->midifile = getnextm3uitem(params->playlist);
     if (params->midifile == NULL) {
-      puts("Error: Failed to fetch an entry from the playlist");
+      ui_puterrmsg(params->playlist, "Error: Failed to fetch an entry from the playlist");
       return(ACTION_ERR_SOFT);
     }
   }
 
   fd = fopen(params->midifile, "rb");
   if (fd == NULL) {
-    puts("Error: Failed to open the midi file");
+    ui_puterrmsg(params->midifile, "Error: Failed to open the midi file");
     return(ACTION_ERR_SOFT);
   }
 
   chunkmap = malloc(sizeof(struct midi_chunkmap_t) * MAXTRACKS);
   if (chunkmap == NULL) {
-    puts("Error: Out of memory");
+    ui_puterrmsg(params->midifile, "Error: Out of memory");
+    fclose(fd);
     return(ACTION_ERR_HARD);
   }
 
-  if (midi_readhdr(fd, &midiformat, &miditracks, &miditimeunitdiv, chunkmap, MAXTRACKS) != 0) {
-    puts("Invalid MIDI format file");
+  if (midi_readhdr(fd, &(trackinfo->midiformat), &miditracks, &miditimeunitdiv, chunkmap, MAXTRACKS) != 0) {
+    ui_puterrmsg(params->midifile, "Error: Invalid MIDI file format");
     fclose(fd);
     free(chunkmap);
     return(ACTION_ERR_SOFT);
   }
 
-  if (params->logfd != NULL) fprintf(params->logfd, "LOADED FILE '%s': format=%d tracks=%d timeunitdiv=%u\n", params->midifile, midiformat, miditracks, miditimeunitdiv);
+  if (params->logfd != NULL) fprintf(params->logfd, "LOADED FILE '%s': format=%d tracks=%d timeunitdiv=%u\n", params->midifile, (trackinfo->midiformat), miditracks, miditimeunitdiv);
 
-  if ((midiformat != 0) && (midiformat != 1)) {
-    printf("Unsupported MIDI format, sorry. So far only formats #0 and #1 are supported. Detected format: %d\n", midiformat);
+  if ((trackinfo->midiformat != 0) && (trackinfo->midiformat != 1)) {
+    char errstr[64];
+    sprintf(errstr, "Error: Unsupported MIDI format (%d)", trackinfo->midiformat);
+    ui_puterrmsg(params->midifile, errstr);
     fclose(fd);
     free(chunkmap);
     return(ACTION_ERR_SOFT);
   }
 
   if (miditracks > MAXTRACKS) {
-    printf("Too many tracks. Sorry. File contains: %d. Max. limit: %d.\n", miditracks, MAXTRACKS);
+    char errstr[64];
+    sprintf(errstr, "Error: Too many tracks (%d, max: %d)", miditracks, MAXTRACKS);
+    ui_puterrmsg(params->midifile, errstr);
     fclose(fd);
     free(chunkmap);
     return(ACTION_ERR_SOFT);
   }
 
-  trackinfo = calloc(sizeof(struct trackinfodata), 1);
-  if (trackinfo == NULL) {
-    puts("Out of memory! Free some conventional memory and try again.");
-    return(ACTION_ERR_HARD);
-  }
-  /* set default params for trackinfo variables */
-  trackinfo->midiformat = midiformat;
-  trackinfo->tempo = 500000l;
-  for (i = 0; i < 16; i++) trackinfo->chanprogs[i] = i;
-  for (i = 0; i < UI_TITLENODES; i++) trackinfo->title[i] = trackinfo->titledat[i];
   filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
-
   for (i = 0; i < miditracks; i++) {
-    printf("Loading track %d/%d...\n", i + 1, miditracks);
+    /* printf("Loading track %d/%d...\n", i + 1, miditracks);*/ /* TODO replace this by some kind of status message */
     /* is it really a track we got here? */
     if (strcmp(chunkmap[i].id, "MTrk") != 0) {
+      char errstr[64];
+      sprintf(errstr, "Error: Unexpected chunk (expecting mtrk #%d)", i);
+      ui_puterrmsg(params->midifile, errstr);
       fclose(fd);
-      printf("Unexpected chunk: was expecting track #%d...\n", i);
-      free(trackinfo);
       return(ACTION_ERR_SOFT);
     }
     if (params->logfd != NULL) fprintf(params->logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, chunkmap[i].offset);
@@ -535,12 +544,6 @@ static enum playactions playfile(struct clioptions *params) {
   }
   fclose(fd);
   free(chunkmap);
-
-  eventscache = malloc(sizeof(struct midi_event_t) * EVENTSCACHESIZE);
-  if (eventscache == NULL) {
-    puts("Out of memory! Free some conventional memory and try again.");
-    return(ACTION_ERR_HARD);
-  }
 
   if (params->logfd != NULL) fputs("RESET MPU-401", params->logfd);
   if (mpu401_rst(params->mpuport) != 0) {
@@ -562,7 +565,6 @@ static enum playactions playfile(struct clioptions *params) {
     /* fetch next event */
     curevent = getnexteventfromcache(eventscache, trackpos, params->delay);
 
-    /* puts("flush MPU"); */
     mpu401_flush(params->mpuport);
     /* printf("Action: %d / Note: %d / Vel: %d / t=%lu / next->%ld\n", curevent->type, curevent->data.note.note, curevent->data.note.velocity, curevent->deltatime, curevent->next); */
     if (curevent->deltatime > 0) { /* if I have some time ahead, I can do a few things */
@@ -581,6 +583,9 @@ static enum playactions playfile(struct clioptions *params) {
         switch (getkey_ifany()) {
           case 0x1B: /* escape */
             exitaction = ACTION_EXIT;
+            break;
+          case 0x0D: /* return */
+            exitaction = ACTION_NEXT;
             break;
           case '+':  /* volume up */
             volume += 5;                       /* note: I could also use a MIDI command to */
@@ -667,11 +672,6 @@ static enum playactions playfile(struct clioptions *params) {
   midi_reinit(params->mpuport); /* reinit the device */
   mpu401_rst(params->mpuport);  /* reset the MPU back into intelligent mode */
 
-  if (params->logfd != NULL) fputs("Free trackinfo memory", params->logfd);
-  free(trackinfo);
-  if (params->logfd != NULL) fputs("Free eventscache memory", params->logfd);
-  free(eventscache);
-
   return(exitaction);
 }
 
@@ -680,6 +680,8 @@ int main(int argc, char **argv) {
   struct clioptions params;
   char *errstr;
   enum playactions action = ACTION_NONE;
+  struct trackinfodata *trackinfo;
+  struct midi_event_t *eventscache;
 
   /* preload the mpu port to be used (might be forced later via **argv) */
   params.mpuport = preloadmpuport();
@@ -714,6 +716,18 @@ int main(int argc, char **argv) {
     return(1);
   }
 
+  /* allocate memory segments to be used later */
+  trackinfo = malloc(sizeof(struct trackinfodata));
+  eventscache = malloc(sizeof(struct midi_event_t) * EVENTSCACHESIZE);
+
+  if ((trackinfo == NULL) || (eventscache == NULL)) {
+    puts("ERROR: Out of memory! Free some conventional memory.");
+    mem_close();
+    if (trackinfo != NULL) free(trackinfo);
+    if (eventscache != NULL) free(eventscache);
+    return(1);
+  }
+
   /* init random numbers */
   srand((unsigned int)time(NULL));
 
@@ -725,9 +739,9 @@ int main(int argc, char **argv) {
   ui_hidecursor();
 
   /* playlist loop */
-  while (action == ACTION_NONE) {
+  while (action != ACTION_EXIT) {
 
-    action = playfile(&params);
+    action = playfile(&params, trackinfo, eventscache);
     switch (action) {
       case ACTION_EXIT:
         /* do nothing, we will exit at the end of the loop anyway */
@@ -742,8 +756,8 @@ int main(int argc, char **argv) {
         getkey();
         action = ACTION_EXIT;
         break;
-      case ACTION_ERR_SOFT: /* wait for a keypress so the user acknowledges the */
-        getkey();      /* error message, and then continue as usual        */
+      case ACTION_ERR_SOFT: /* wait for a keypress so the user acknowledges */
+        getkey();           /* the error message, then continue as usual    */
       case ACTION_NONE: /* choose an action depending of the mode we are in */
         if (params.playlist == NULL) {
           action = ACTION_EXIT;
@@ -762,9 +776,14 @@ int main(int argc, char **argv) {
 
   /* if a verbose log file was used, close it now */
   if (params.logfd != NULL) {
-    fputs("closing the log file", params.logfd);
+    fputs("Closing the log file", params.logfd);
     fclose(params.logfd);
   }
+
+  /* free allocated heap memory */
+  if (params.logfd != NULL) fputs("Free heap memory", params.logfd);
+  free(trackinfo);
+  free(eventscache);
 
   puts("DOSMid v" PVER " Copyright (C) Mateusz Viste " PDATE);
 

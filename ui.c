@@ -19,6 +19,7 @@
 #define COLOR_CHANS_DIS 0x1800u
 #define COLOR_PROGRESS1 0x2000u /* elapsed time */
 #define COLOR_PROGRESS2 0x8000u /* not yet elapsed */
+#define COLOR_ERRMSG    0x4700u
 
 
 /* prints a character on screen, at position [x,y]. charbyte is a 16bit
@@ -57,6 +58,29 @@ void ui_hidecursor(void) {
   regs.h.ah = 0x01;
   regs.x.cx = 0x2000;
   int86(0x10, &regs, &regs);
+}
+
+/* outputs an error message onscreen (title can be NULL) */
+void ui_puterrmsg(char *title, char *errmsg) {
+  int x, y;
+  int msglen, titlelen, maxlen;
+  int xstart;
+  msglen = strlen(errmsg);
+  maxlen = msglen;
+  if (title != NULL) {
+    titlelen = strlen(title);
+    if (titlelen > msglen) maxlen = titlelen;
+  }
+  xstart = 40 - (maxlen >> 1);
+  /* draw a red 'box' first */
+  for (y = 8; y < 13; y++) {
+    for (x = maxlen + 3; x >= 0; x--) {
+      ui_printchar(y, xstart + x - 2, ' ' | COLOR_ERRMSG);
+    }
+  }
+  /* print out the title (if any), and the actual error string */
+  if (title != NULL) ui_printstr(8, 40 - (titlelen >> 1), title, titlelen, COLOR_ERRMSG);
+  ui_printstr(10, 40 - (msglen >> 1), errmsg, msglen, COLOR_ERRMSG);
 }
 
 /* draws the UI screen */
@@ -122,7 +146,11 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int
     ui_printstr(18, 17, "Format:", 8, COLOR_TEMPO);
     ui_printstr(18, 25, tempstr, 4, COLOR_TEMPO);
     /* print tempo */
-    miditempo = 60000000lu/trackinfo->tempo;
+    if (trackinfo->tempo > 0) {
+      miditempo = 60000000lu / trackinfo->tempo;
+    } else {
+      miditempo = 0;
+    }
     ultoa(miditempo, tempstr, 10);
     strcat(tempstr, " bpm");
     ui_printstr(18, 29, "Tempo:", 7, COLOR_TEMPO);
@@ -161,10 +189,19 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int
     unsigned long perc;
     unsigned int curcol;
     int rpos;
-    sprintf(tempstr1, " %lu:%02lu (%lu%%)     ", trackinfo->elapsedsec / 60, trackinfo->elapsedsec % 60, ((trackinfo->elapsedsec + 1) * 100) / (trackinfo->totlen + 1));
+    if (trackinfo->totlen > 0) {
+      perc = (trackinfo->elapsedsec * 100) / trackinfo->totlen;
+    } else {
+      perc = 0;
+    }
+    sprintf(tempstr1, " %lu:%02lu (%lu%%)     ", trackinfo->elapsedsec / 60, trackinfo->elapsedsec % 60, perc);
     rpos = 78 - sprintf(tempstr2, "%lu:%02lu ", trackinfo->totlen / 60, trackinfo->totlen % 60);
     /* draw the progress bar */
-    perc = (trackinfo->elapsedsec * 78) / trackinfo->totlen;
+    if (trackinfo->totlen > 0) {
+      perc = (trackinfo->elapsedsec * 78) / trackinfo->totlen;
+    } else {
+      perc = 0;
+    }
     for (x = 0; x < 78; x++) {
       if (x < perc) {
         curcol = COLOR_PROGRESS1;

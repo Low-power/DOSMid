@@ -40,6 +40,9 @@ void ui_init(void);
 /* hides the blinking cursor */
 void ui_hidecursor(void);
 
+/* outputs an error message onscreen (title can be NULL) */
+void ui_puterrmsg(char *title, char *errmsg);
+
 /* draws the UI screen */
 void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int mpuport, int volume);
 
