@@ -468,7 +468,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 
   /* draw the UI a first time, without data yet */
   refreshflags = 0xff;
+  sprintf(trackinfo->title[0], "Loading...");
   ui_draw(trackinfo, &refreshflags, PVER, params->mpuport, volume);
+  sprintf(trackinfo->title[0], "          ");
   refreshflags = 0xff;
 
   /* if running on a playlist, load next song */
