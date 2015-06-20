@@ -63,6 +63,7 @@ struct clioptions {
   int delay;
   int mpuport;
   int nopowersave;
+  int dontstop;
   char *midifile;   /* MIDI filename to play */
   char *playlist;   /* the playlist to read files from */
   FILE *logfd;      /* an open file descriptor to the debug log file */
@@ -230,6 +231,7 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
   params->delay = 1;
   params->logfd = NULL;
   params->nopowersave = 0;
+  params->dontstop = 0;
   /* if no params at all, don't waste time */
   if (argc == 0) return("");
   /* now read params */
@@ -241,6 +243,8 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       params->delay = 0;
     } else if (strcmp(argv[i], "/fullcpu") == 0) {
       params->nopowersave = 1;
+    } else if (strcmp(argv[i], "/dontstop") == 0) {
+      params->dontstop = 1;
     } else if (stringstartswith(argv[i], "/mpu=") == 0) {
       char *hexstr;
       hexstr = argv[i] + 5;
@@ -707,6 +711,7 @@ int main(int argc, char **argv) {
            "           environment variable, and if not found, uses 0x330)\n"
            " /log=FILE write highly verbose logs about DOSMid's activity to FILE\n"
            " /fullcpu  do not let DOSMid trying to be CPU-friendly\n"
+           " /dontstop never wait for a keypress on error and continue the playlist\n"
       );
     }
     return(1);
@@ -755,11 +760,19 @@ int main(int argc, char **argv) {
         /* no explicit action - we will do a 'next' action by default */
         break;
       case ACTION_ERR_HARD: /* wait for a keypress and quit */
-        getkey();
+        if (params.dontstop == 0) {
+          getkey();
+        } else {
+          sleep(2);
+        }
         action = ACTION_EXIT;
         break;
-      case ACTION_ERR_SOFT: /* wait for a keypress so the user acknowledges */
-        getkey();           /* the error message, then continue as usual    */
+      case ACTION_ERR_SOFT:         /* wait for a keypress so the user */
+        if (params.dontstop == 0) { /* acknowledges the error message, */
+          getkey();                 /* then continue as usual          */
+        } else {
+          sleep(2);
+        }
       case ACTION_NONE: /* choose an action depending of the mode we are in */
         if (params.playlist == NULL) {
           action = ACTION_EXIT;
