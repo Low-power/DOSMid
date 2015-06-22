@@ -9,7 +9,7 @@ clean: .symbolic
 	del *.obj
 	del dosmid.exe
 
-pkg: dosmid.exe
+pkg: dosmid.exe .symbolic
 	mkdir progs
 	mkdir progs\dosmid
 	mkdir source
@@ -18,6 +18,7 @@ pkg: dosmid.exe
 	if exist dosmid.zip del dosmid.zip
 	copy dosmid.exe progs\dosmid
 	copy dosmid.txt progs\dosmid
+	copy history.txt progs\dosmid
 	copy *.txt source\dosmid
 	copy *.c source\dosmid
 	copy *.h source\dosmid
