@@ -2,15 +2,15 @@
 * DOSMid history file *
 
 
-DOSMid v0.6 [xx Jun 2015]
+DOSMid v0.6 [22 Jun 2015]
  - fixed a timing issue leading sometimes to desynchronization of tracks,
  - fixed a bug that could potentially lead to XMS memory trashing,
  - configurable MPU port via the BLASTER variable or /mpu=XXX,
  - DOSMid fails gracefully when no MPU401 is present (instead of freezing),
  - added software volume controls under '+' and '-' keys,
- - the MPU is always reinitialized to default values before playing tracks,
+ - the MPU is reinitialized to default values before playing any new tracks,
  - interface fitted with a sexier color scheme,
- - using CPU-friendly calls when DOSMid is idle (disabled with /fullcpu),
+ - using CPU-friendly calls when waiting for notes (disabled with /fullcpu),
  - very basic support for reading M3U playlists,
  - added a verbose mode for debugging needs (/log=FILE).
 

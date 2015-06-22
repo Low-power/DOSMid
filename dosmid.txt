@@ -32,7 +32,7 @@ During runtime, DOSMid can be controlled with the keyboard:
 
 At the command-line, DOSMid accepts several options, as listed below:
 
-DOSMID [/noxms] [/delay] [/mpu=XXX] file.mid
+DOSMID [/noxms] [/delay] [/mpu=XXX] file.mid|playlist.m3u
 
  /noxms    Use conventional memory instead of XMS. This is obviously useful
            only if you don't have have XMS. Don't use this option otherwise,
