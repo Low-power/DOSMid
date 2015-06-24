@@ -37,7 +37,7 @@
 
 #include "mem.h"
 #include "midi.h"
-#include "mpu401.h"
+#include "outdev.h"
 #include "timer.h"
 #include "ui.h"
 
@@ -121,58 +121,6 @@ static int hexchar2int(char c) {
   if ((c >= 'a') && (c <= 'f')) return(c - 'a');
   if ((c >= 'A') && (c <= 'F')) return(c - 'A');
   return(-1);
-}
-
-
-static void noteon(int mpuport, int chan, int n, int velocity) {
-  mpu401_waitwrite(mpuport);      /* Wait for port ready */
-  outp(mpuport, 0x90 | chan);     /* Send note ON code on selected channel */
-
-  mpu401_waitwrite(mpuport);      /* Wait for port ready */
-  outp(mpuport, n);               /* Send note Number to turn ON */
-
-  mpu401_waitwrite(mpuport);      /* Wait for port ready */
-  outp(mpuport, velocity);        /* Send velocity */
-}
-
-
-static void noteoff(int mpuport, int chan, int n) {
-  mpu401_waitwrite(mpuport);      /* Wait for port ready */
-  outp(mpuport, 0x80 | chan);     /* Send note OFF code on selected channel */
-
-  mpu401_waitwrite(mpuport);      /* Wait for port ready */
-  outp(mpuport, n);               /* Send note number to turn OFF */
-
-  mpu401_waitwrite(mpuport);      /* Wait for port ready */
-  outp(mpuport, 64);              /* Send velocity */
-}
-
-
-static void rawevent(int mpuport, unsigned char far *rawdata, int rawlen) {
-  int i;
-  for (i = 0; i < rawlen; i++) {
-    mpu401_waitwrite(mpuport);     /* Wait for port ready */
-    outp(mpuport, rawdata[i]);     /* Send the raw byte over the wire */
-  }
-}
-
-
-static void midi_reinit(int mpuport) {
-  unsigned char buff[4] = {0, 0, 0, 0};
-  unsigned char far *buffptr;
-  buffptr = buff;
-  /* iterate on MIDI channels and send messages */
-  for (buff[0] = 0xB0; buff[0] <= 0xBF; buff[0] += 1) {
-    /* Send "all notes off" (second byte is zero) */
-    buff[1] = 0x7B;
-    rawevent(mpuport, buffptr, 3);
-    /* Send "all sounds off" (second byte is zero) */
-    buff[1] = 0x78;
-    rawevent(mpuport, buffptr, 3);
-    /* "all controllers off" */
-    buff[1] = 0x79;
-    rawevent(mpuport, buffptr, 3);
-  }
 }
 
 
@@ -283,14 +231,6 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
   }
   /* all good */
   return(NULL);
-}
-
-
-static void setchanprog(int mpuport, int chan, int prog) {
-  mpu401_waitwrite(mpuport);   /* Wait for port ready */
-  outp(mpuport, 0xC0 | chan);  /* Send channel */
-  mpu401_waitwrite(mpuport);   /* Wait for port ready */
-  outp(mpuport, prog);         /* Send patch id */
 }
 
 
@@ -574,15 +514,10 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   if (exitaction != ACTION_NONE) return(exitaction);
 
   if (params->logfd != NULL) fputs("RESET MPU-401", params->logfd);
-  if (mpu401_rst(params->mpuport) != 0) {
+  if (dev_init(DEV_MPU401, params->mpuport) != 0) {
     printf("Error: failed to reset the MPU-401 synthesizer via port %03Xh\n", params->mpuport);
     return(ACTION_ERR_HARD);
   }
-
-  if (params->logfd != NULL) fputs("SET UART MODE", params->logfd);
-  mpu401_uart(params->mpuport);
-
-  midi_reinit(params->mpuport); /* reinit the device */
 
   /* save start time so we can compute elapsed time later */
   timer_read(&midiplaybackstart);
@@ -593,7 +528,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     /* fetch next event */
     curevent = getnexteventfromcache(eventscache, trackpos, params->delay);
 
-    mpu401_flush(params->mpuport);
+    dev_process();
     /* printf("Action: %d / Note: %d / Vel: %d / t=%lu / next->%ld\n", curevent->type, curevent->data.note.note, curevent->data.note.velocity, curevent->deltatime, curevent->next); */
     if (curevent->deltatime > 0) { /* if I have some time ahead, I can do a few things */
       nexteventtime += (curevent->deltatime * trackinfo->tempo / trackinfo->miditimeunitdiv);
@@ -640,13 +575,13 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     switch (curevent->type) {
       case EVENT_NOTEON:
         if (params->logfd != NULL) fprintf(params->logfd, "%lu: NOTE ON chan: %d / note: %d / vel: %d\n", trackinfo->elapsedsec, curevent->data.note.chan, curevent->data.note.note, curevent->data.note.velocity);
-        noteon(params->mpuport, curevent->data.note.chan, curevent->data.note.note, (volume * curevent->data.note.velocity) / 100);
+        dev_noteon(curevent->data.note.chan, curevent->data.note.note, (volume * curevent->data.note.velocity) / 100);
         trackinfo->notestates[curevent->data.note.note] |= (1 << curevent->data.note.chan);
         refreshflags |= UI_REFRESH_NOTES;
         break;
       case EVENT_NOTEOFF:
         if (params->logfd != NULL) fprintf(params->logfd, "%lu: NOTE OFF chan: %d / note: %d\n", trackinfo->elapsedsec, curevent->data.note.chan, curevent->data.note.note);
-        noteoff(params->mpuport, curevent->data.note.chan, curevent->data.note.note);
+        dev_noteoff(curevent->data.note.chan, curevent->data.note.note);
         trackinfo->notestates[curevent->data.note.note] &= (0xFFFF ^ (1 << curevent->data.note.chan));
         refreshflags |= UI_REFRESH_NOTES;
         break;
@@ -658,7 +593,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
       case EVENT_PROGCHAN:
         if (params->logfd != NULL) fprintf(params->logfd, "%lu: CHANNEL #%d PROG: %d\n", trackinfo->elapsedsec, curevent->data.prog.chan, curevent->data.prog.prog);
         trackinfo->chanprogs[curevent->data.prog.chan] = curevent->data.prog.prog;
-        setchanprog(params->mpuport, curevent->data.prog.chan, curevent->data.prog.prog);
+        dev_setprog(curevent->data.prog.chan, curevent->data.prog.prog);
         refreshflags |= UI_REFRESH_PROGS;
         break;
       default: /* probably a raw event - bit 7 should be set (>127) */
@@ -666,7 +601,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
           if (params->logfd != NULL) {
             fprintf(params->logfd, "%lu: RAW EVENT TYPE OF LEN %d: [0x%02X 0x%02X 0x%02X]\n", trackinfo->elapsedsec, curevent->type & 127, curevent->data.raw[0], curevent->data.raw[1], curevent->data.raw[2]);
           }
-          rawevent(params->mpuport, curevent->data.raw, curevent->type & 127);
+          dev_rawmidi(curevent->data.raw, curevent->type & 127);
           break;
         } else {
           if (params->logfd != NULL) {
@@ -690,15 +625,15 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
       for (c = 0; c < 16; c++) {
         if (trackinfo->notestates[i] & (1 << c)) {
           /* printf("note #%d is still playing on channel %d\n", i, c); */
-          noteoff(params->mpuport, c, i);
+          dev_noteoff(c, i);
         }
       }
     }
   }
 
   if (params->logfd != NULL) fputs("Reset MPU", params->logfd);
-  midi_reinit(params->mpuport); /* reinit the device */
-  mpu401_rst(params->mpuport);  /* reset the MPU back into intelligent mode */
+  dev_clear(); /* reinit the device */
+  dev_close();
 
   return(exitaction);
 }
