@@ -1,5 +1,5 @@
 /*
- * Wrapper for outputing MIDI commands to different devices.
+ * Library to access OPL2 hardware
  *
  * Copyright (c) 2015, Mateusz Viste
  * All rights reserved.
@@ -27,46 +27,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef outdev_h_sentinel
-#define outdev_h_sentinel
-
-enum outdev_types {
-  DEV_NONE,
-  DEV_MPU401,
-  DEV_OPL2
-};
+#ifndef opl_h_sentinel
+#define opl_h_sentinel
 
 
-/* inits the out device, also selects the out device, from one of these:
- *  DEV_MPU401
- *  DEV_OPL2
- *  DEV_NONE
- *
- * This should be called only ONCE, when program starts.
- * Returns 0 on success, non-zero otherwise.
- */
-int dev_init(enum outdev_types dev, unsigned short port);
-
-/* close/deinitializes the out device */
-void dev_close(void);
-
-/* clears/reinits the out device (turns all sounds off...). this can be used
- * often (typically: between each song). */
-void dev_clear(void);
-
-/* activate note on channel */
-void dev_noteon(int channel, int note, int velocity);
-
-/* disable note on channel */
-void dev_noteoff(int channel, int note);
-
-/* sends raw midi message to channel */
-void dev_rawmidi(unsigned char far *rawdata, int rawlen);
-
-/* should be called by the application from time to time */
-void dev_tick(void);
-
-/* sets a "program" (meaning an instrument) on a channel */
-void dev_setprog(int channel, int program);
 
 #endif

@@ -42,6 +42,7 @@ static unsigned short outport = 0;
 /* inits the out device, also selects the out device, from one of these:
  *  DEV_MPU401
  *  DEV_OPL2
+ *  DEV_NONE
  *
  * This should be called only ONCE, when program starts.
  * Returns 0 on success, non-zero otherwise.
@@ -166,7 +167,7 @@ void dev_rawmidi(unsigned char far *rawdata, int rawlen) {
 
 
 /* should be called by the application from time to time */
-void dev_process(void) {
+void dev_tick(void) {
   switch (outdev) {
     case DEV_MPU401:
       mpu401_flush(outport);

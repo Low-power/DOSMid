@@ -57,6 +57,7 @@ DOSMID [/noxms] [/delay] [/mpu=XXX] file.mid|playlist.m3u
            useful if you want to play a long playlist and don't care about
            bad MIDI files, simply skipping them (or if you play a single file
            and wish that DOSMid exit immediately if the file is unplayable).
+ /nosound  Disable sound (not very useful for a music player!)
 
 
 *** LICENSE ***

@@ -41,7 +41,7 @@
 #include "timer.h"
 #include "ui.h"
 
-#define PVER "0.6"
+#define PVER "0.7"
 #define PDATE "2014-2015"
 
 #define MAXTRACKS 64
@@ -64,6 +64,7 @@ struct clioptions {
   int mpuport;
   int nopowersave;
   int dontstop;
+  enum outdev_types device;
   char *midifile;   /* MIDI filename to play */
   char *playlist;   /* the playlist to read files from */
   FILE *logfd;      /* an open file descriptor to the debug log file */
@@ -193,10 +194,13 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       params->nopowersave = 1;
     } else if (strcmp(argv[i], "/dontstop") == 0) {
       params->dontstop = 1;
+    } else if (strcmp(argv[i], "/nosound") == 0) {
+      params->device = DEV_NONE;
     } else if (stringstartswith(argv[i], "/mpu=") == 0) {
       char *hexstr;
       hexstr = argv[i] + 5;
       params->mpuport = 0;
+      params->device = DEV_MPU401;
       while (*hexstr != 0) {
         int c;
         c = hexchar2int(*hexstr);
@@ -317,9 +321,15 @@ static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscac
 }
 
 
-/* reads the BLASTER variable for MPU port. If not found, fallbacks to 0x330 */
-static int preloadmpuport(void) {
+/* reads the BLASTER variable for best guessing of current hardware and port.
+ * If nothing found, fallbacks to MPU and 0x330 */
+static void preload_outdev(struct clioptions *params) {
   char *blaster;
+
+  /* default choice is MPU401 on port 0x330 */
+  params->mpuport = 0x330;
+  params->device = DEV_MPU401;
+
   /* check if a blaster variable is present */
   blaster = getenv("BLASTER");
   /* if so, read it looking for a 'P' parameter */
@@ -343,11 +353,9 @@ static int preloadmpuport(void) {
         p |= c;
       }
       /* if what we have read looks sane, return it */
-      if (p > 0) return(p);
+      if (p > 0) params->mpuport = p;
     }
   }
-  /* if nothing else worked, fallback to 0x330 */
-  return(0x330);
 }
 
 
@@ -514,8 +522,8 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   if (exitaction != ACTION_NONE) return(exitaction);
 
   if (params->logfd != NULL) fputs("RESET MPU-401", params->logfd);
-  if (dev_init(DEV_MPU401, params->mpuport) != 0) {
-    printf("Error: failed to reset the MPU-401 synthesizer via port %03Xh\n", params->mpuport);
+  if (dev_init(params->device, params->mpuport) != 0) {
+    ui_puterrmsg("Hardware error", "Error: Failed to initialize the sound device");
     return(ACTION_ERR_HARD);
   }
 
@@ -528,7 +536,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     /* fetch next event */
     curevent = getnexteventfromcache(eventscache, trackpos, params->delay);
 
-    dev_process();
+    dev_tick();
     /* printf("Action: %d / Note: %d / Vel: %d / t=%lu / next->%ld\n", curevent->type, curevent->data.note.note, curevent->data.note.velocity, curevent->deltatime, curevent->next); */
     if (curevent->deltatime > 0) { /* if I have some time ahead, I can do a few things */
       nexteventtime += (curevent->deltatime * trackinfo->tempo / trackinfo->miditimeunitdiv);
@@ -647,7 +655,7 @@ int main(int argc, char **argv) {
   struct midi_event_t *eventscache;
 
   /* preload the mpu port to be used (might be forced later via **argv) */
-  params.mpuport = preloadmpuport();
+  preload_outdev(&params);
 
   errstr = parseargv(argc, argv, &params);
   if (errstr != NULL) {
@@ -669,6 +677,7 @@ int main(int argc, char **argv) {
            " /log=FILE write highly verbose logs about DOSMid's activity to FILE\n"
            " /fullcpu  do not let DOSMid trying to be CPU-friendly\n"
            " /dontstop never wait for a keypress on error and continue the playlist\n"
+           " /nosound  disable sound output\n"
       );
     }
     return(1);

@@ -1,5 +1,5 @@
 /*
- * Wrapper for outputing MIDI commands to different devices.
+ * Library to access OPL2 hardware
  *
  * Copyright (c) 2015, Mateusz Viste
  * All rights reserved.
@@ -27,46 +27,36 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef outdev_h_sentinel
-#define outdev_h_sentinel
+#include <conio.h> /* inp(), out() */
+#include <dos.h>
+#include <stdio.h>
 
-enum outdev_types {
-  DEV_NONE,
-  DEV_MPU401,
-  DEV_OPL2
-};
+#include "opl.h" /* include self for control */
 
 
-/* inits the out device, also selects the out device, from one of these:
- *  DEV_MPU401
- *  DEV_OPL2
- *  DEV_NONE
- *
- * This should be called only ONCE, when program starts.
- * Returns 0 on success, non-zero otherwise.
+static void oplregwr(unsigned short port, unsigned short reg, unsigned char data) {
+  int i;
+  /* select the register we want to write to, via the index register */
+  outp(port, reg);
+  /* OPL2 requires 3.3us to pass before writing to the data port. AdLib
+   * recommends reading 6 times from the index register to make time pass. */
+  i = 6;
+  while (i--) inp(port);
+  /* write the data to the data register */
+  outp(port+1, data);
+  /* OPL2 requires 23us to pass before writing to the data port. AdLib
+   * recommends reading 35 times from the index register to make time pass. */
+  i = 35;
+  while (i--) inp(port);
+}
+
+
+/*
+ * Initialize hardware upon startup
  */
-int dev_init(enum outdev_types dev, unsigned short port);
-
-/* close/deinitializes the out device */
-void dev_close(void);
-
-/* clears/reinits the out device (turns all sounds off...). this can be used
- * often (typically: between each song). */
-void dev_clear(void);
-
-/* activate note on channel */
-void dev_noteon(int channel, int note, int velocity);
-
-/* disable note on channel */
-void dev_noteoff(int channel, int note);
-
-/* sends raw midi message to channel */
-void dev_rawmidi(unsigned char far *rawdata, int rawlen);
-
-/* should be called by the application from time to time */
-void dev_tick(void);
-
-/* sets a "program" (meaning an instrument) on a channel */
-void dev_setprog(int channel, int program);
-
-#endif
+void oplinit(unsigned short port, int opl3flag) {
+  oplregwr(port, 0x01, 0x20);    /* enable Waveform Select */
+  oplregwr(port, 0x04, 0x00);    /* turn off timers IRQs */
+  oplregwr(port, 0x08, 0x40);    /* turn off CSW mode */
+  oplregwr(port, 0xBD, 0x00);    /* set vibrato/tremolo depth to low, set melodic mode */
+}
