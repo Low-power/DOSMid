@@ -198,16 +198,20 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
             fseek(fd, metalen, SEEK_CUR);
             break;
           case 2: /* copyright notice */
-            for (i = 0; i < metalen; i++) {
-              if (i == copyrightmaxlen) break; /* avoid overflow */
-              copyright[i] = fgetc(fd);
+            i = 0;
+            if (copyright != NULL) { /* take care, copyright might be NULL */
+              for (; i < metalen; i++) {
+                if (i == copyrightmaxlen) break; /* avoid overflow */
+                copyright[i] = fgetc(fd);
+              }
+              copyright[i] = 0;
             }
-            copyright[i] = 0;
             for (; i < metalen; i++) fgetc(fd); /* skip the rest, if we had to truncate the string */
             break;
           case 3: /* track name */
+            i = 0;
             /* find the first empty track */
-            {
+            if (title != NULL) { /* title might be NULL */
               int titid = -1, t;
               for (t = 0; t < titlenodes; t++) {
                 if (title[t][0] == 0) {

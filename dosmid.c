@@ -41,7 +41,7 @@
 #include "timer.h"
 #include "ui.h"
 
-#define PVER "0.7"
+#define PVER "0.6.1"
 #define PDATE "2014-2015"
 
 #define MAXTRACKS 64
@@ -454,6 +454,7 @@ static enum playactions loadmidifile(struct clioptions *params, struct trackinfo
   }
 
   filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
+
   for (i = 0; i < miditracks; i++) {
     /* is it really a track we got here? */
     if (strcmp(chunkmap[i].id, "MTrk") != 0) {
@@ -464,6 +465,7 @@ static enum playactions loadmidifile(struct clioptions *params, struct trackinfo
       free(chunkmap);
       return(ACTION_ERR_SOFT);
     }
+
     if (params->logfd != NULL) fprintf(params->logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, chunkmap[i].offset);
     fseek(fd, chunkmap[i].offset, SEEK_SET);
     if (i == 0) {
@@ -477,6 +479,7 @@ static enum playactions loadmidifile(struct clioptions *params, struct trackinfo
   }
   fclose(fd);
   free(chunkmap);
+
   return(ACTION_NONE);
 }
 
@@ -755,16 +758,16 @@ int main(int argc, char **argv) {
   /* unload XMS memory */
   mem_close();
 
+  /* free allocated heap memory */
+  if (params.logfd != NULL) fputs("Free heap memory", params.logfd);
+  free(trackinfo);
+  free(eventscache);
+
   /* if a verbose log file was used, close it now */
   if (params.logfd != NULL) {
     fputs("Closing the log file", params.logfd);
     fclose(params.logfd);
   }
-
-  /* free allocated heap memory */
-  if (params.logfd != NULL) fputs("Free heap memory", params.logfd);
-  free(trackinfo);
-  free(eventscache);
 
   puts("DOSMid v" PVER " Copyright (C) Mateusz Viste " PDATE);
 
