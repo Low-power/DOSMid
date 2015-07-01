@@ -289,7 +289,7 @@ static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscac
           nextslot &= EVENTSCACHEMASK;
           pullres = pullevent(nextevent, &eventscache[nextslot]);
           if (pullres != 0) {
-            printf("pullevent() ERROR: %u (eventid = %ld)\n", pullres, trackpos);
+            /* printf("pullevent() ERROR: %u (eventid = %ld)\n", pullres, trackpos); */
             return(NULL);
           }
           nextevent = eventscache[nextslot].next;
@@ -307,7 +307,7 @@ static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscac
       for (refillcount = 0; refillcount < EVENTSCACHESIZE; refillcount++) {
         pullres = pullevent(nextevent, &eventscache[refillcount]);
         if (pullres != 0) {
-          printf("pullevent() ERROR: %u (eventid = %ld)\n", pullres, trackpos);
+          /* printf("pullevent() ERROR: %u (eventid = %ld)\n", pullres, trackpos); */
           return(NULL);
         }
         nextevent = eventscache[refillcount].next;
@@ -538,8 +538,15 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 
     /* fetch next event */
     curevent = getnexteventfromcache(eventscache, trackpos, params->delay);
+    if (curevent == NULL) { /* abort on error */
+      ui_puterrmsg(params->midifile, "Error: Memory access fault");
+      exitaction = ACTION_ERR_HARD;
+      break;
+    }
 
+    /* give some time to the outdev driver for doing its things */
     dev_tick();
+
     /* printf("Action: %d / Note: %d / Vel: %d / t=%lu / next->%ld\n", curevent->type, curevent->data.note.note, curevent->data.note.velocity, curevent->deltatime, curevent->next); */
     if (curevent->deltatime > 0) { /* if I have some time ahead, I can do a few things */
       nexteventtime += (curevent->deltatime * trackinfo->tempo / trackinfo->miditimeunitdiv);

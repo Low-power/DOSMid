@@ -2,8 +2,9 @@
 * DOSMid history file *
 
 
-DOSMid v0.6.1 [02 Jul 2015]
+DOSMid v0.6.1 [01 Jul 2015]
  - Fixed a NULL pointer dereferencing bug,
+ - Possible memory access troubles are reported clearly to the user,
  - Refactored the sound output code (and added /nosound).
 
 DOSMid v0.6 [22 Jun 2015]
