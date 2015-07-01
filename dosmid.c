@@ -56,6 +56,13 @@ enum playactions {
   ACTION_EXIT = 64
 };
 
+enum fileformats {
+  FORMAT_UNKNOWN,
+  FORMAT_MIDI,
+  FORMAT_RMID,
+  FORMAT_MUS
+};
+
 struct clioptions {
   int memmode;      /* type of memory to use: MEM_XMS or MEM_MALLOC */
   int workmem;      /* amount of work memory to allocate, in KiBs */
@@ -136,6 +143,26 @@ static void udelay(unsigned long us) {
         break;
     }
   }
+}
+
+
+/* analyzes a 16 bytes file header and guess the file format */
+enum fileformats header2fileformat(unsigned char *hdr) {
+  /* Classic MIDI */
+  if ((hdr[0] == 'M') && (hdr[1] == 'T') && (hdr[2] == 'h') && (hdr[3] == 'd')) {
+    return(FORMAT_MIDI);
+  }
+  /* RMID inside a RIFF container */
+  if ((hdr[0] == 'R') && (hdr[1] == 'I') && (hdr[2] == 'F') && (hdr[3] == 'F')
+   && (hdr[8] == 'R') && (hdr[9] == 'M') && (hdr[10] == 'I') && (hdr[11] == 'D')) {
+    return(FORMAT_RMID);
+  }
+  /* MUS (as used in Doom, from Id Software) */
+  if ((hdr[0] == 'M') && (hdr[1] == 'U') && (hdr[2] == 'S') && (hdr[3] == 0x1A)) {
+    return(FORMAT_MUS);
+  }
+  /* else I don't know */
+  return(FORMAT_UNKNOWN);
 }
 
 
@@ -403,8 +430,13 @@ static char *getnextm3uitem(char *playlist) {
 }
 
 
-static enum playactions loadmidifile(struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
+/*static enum playactions loadmusfile(struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
   FILE *fd;
+  fd = fopen(params->midifile, "rb");
+}*/
+
+
+static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
   struct midi_chunkmap_t *chunkmap;
   int miditracks;
   int i;
@@ -412,22 +444,16 @@ static enum playactions loadmidifile(struct clioptions *params, struct trackinfo
 
   *trackpos = -1;
 
-  fd = fopen(params->midifile, "rb");
-  if (fd == NULL) {
-    ui_puterrmsg(params->midifile, "Error: Failed to open the midi file");
-    return(ACTION_ERR_SOFT);
-  }
+  if (fd == NULL) return(ACTION_ERR_HARD);
 
   chunkmap = malloc(sizeof(struct midi_chunkmap_t) * MAXTRACKS);
   if (chunkmap == NULL) {
     ui_puterrmsg(params->midifile, "Error: Out of memory");
-    fclose(fd);
     return(ACTION_ERR_HARD);
   }
 
   if (midi_readhdr(fd, &(trackinfo->midiformat), &miditracks, &(trackinfo->miditimeunitdiv), chunkmap, MAXTRACKS) != 0) {
     ui_puterrmsg(params->midifile, "Error: Invalid MIDI file format");
-    fclose(fd);
     free(chunkmap);
     return(ACTION_ERR_SOFT);
   }
@@ -438,7 +464,6 @@ static enum playactions loadmidifile(struct clioptions *params, struct trackinfo
     char errstr[64];
     sprintf(errstr, "Error: Unsupported MIDI format (%d)", trackinfo->midiformat);
     ui_puterrmsg(params->midifile, errstr);
-    fclose(fd);
     free(chunkmap);
     return(ACTION_ERR_SOFT);
   }
@@ -447,7 +472,6 @@ static enum playactions loadmidifile(struct clioptions *params, struct trackinfo
     char errstr[64];
     sprintf(errstr, "Error: Too many tracks (%d, max: %d)", miditracks, MAXTRACKS);
     ui_puterrmsg(params->midifile, errstr);
-    fclose(fd);
     free(chunkmap);
     return(ACTION_ERR_SOFT);
   }
@@ -460,7 +484,6 @@ static enum playactions loadmidifile(struct clioptions *params, struct trackinfo
       char errstr[64];
       sprintf(errstr, "Error: Unexpected chunk (expecting mtrk #%d)", i);
       ui_puterrmsg(params->midifile, errstr);
-      fclose(fd);
       free(chunkmap);
       return(ACTION_ERR_SOFT);
     }
@@ -476,10 +499,53 @@ static enum playactions loadmidifile(struct clioptions *params, struct trackinfo
     *trackpos = midi_mergetrack(*trackpos, newtrack, &(trackinfo->totlen), trackinfo->miditimeunitdiv);
     /* printf("merged track starts with %ld\n", trackpos); */
   }
-  fclose(fd);
   free(chunkmap);
 
   return(ACTION_NONE);
+}
+
+
+static enum playactions loadfile(struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
+  FILE *fd;
+  unsigned char hdr[16];
+  enum playactions res;
+  enum fileformats fileformat;
+
+  fd = fopen(params->midifile, "rb");
+  if (fd == NULL) {
+    ui_puterrmsg(params->midifile, "Error: Failed to open the file");
+    return(ACTION_ERR_SOFT);
+  }
+
+  /* read first few bytes of the file to detect its format, and rewind */
+  if (fread(hdr, 1, 16, fd) != 16) {
+    fclose(fd);
+    ui_puterrmsg(params->midifile, "Error: Unknown file format");
+    return(ACTION_ERR_SOFT);
+  }
+  rewind(fd);
+
+  /* analyze the header to guess the format of the file */
+  fileformat = header2fileformat(hdr);
+
+  /* load file if format recognized */
+  switch (fileformat) {
+    case FORMAT_MIDI:
+    case FORMAT_RMID:
+      res = loadfile_midi(fd, params, trackinfo, trackpos);
+      break;
+    case FORMAT_MUS:
+      res = ACTION_ERR_SOFT;
+      ui_puterrmsg(params->midifile, "Error: MUS not supported yet");
+      break;
+    default:
+      res = ACTION_ERR_SOFT;
+      ui_puterrmsg(params->midifile, "Error: Unknown file format");
+      break;
+  }
+
+  fclose(fd);
+  return(res);
 }
 
 
@@ -520,7 +586,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     }
   }
 
-  exitaction = loadmidifile(params, trackinfo, &trackpos);
+  exitaction = loadfile(params, trackinfo, &trackpos);
   if (exitaction != ACTION_NONE) return(exitaction);
 
   if (params->logfd != NULL) fputs("RESET MPU-401", params->logfd);
