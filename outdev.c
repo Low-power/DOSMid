@@ -86,6 +86,7 @@ void dev_close(void) {
 void dev_clear(void) {
   unsigned char buff[4] = {0, 0, 0, 0};
   unsigned char far *buffptr;
+  int i;
   switch (outdev) {
     case DEV_MPU401:
       buffptr = buff;
@@ -107,6 +108,8 @@ void dev_clear(void) {
     case DEV_NONE:
       break;
   }
+  /* load default GM instruments (even real MIDI synths do not always reset those) */
+  for (i = 0; i < 16; i++) dev_setprog(i, i);
 }
 
 
