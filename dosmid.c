@@ -28,7 +28,6 @@
  */
 
 #include <dos.h>
-#include <conio.h>  /* kbhit() */
 #include <stdio.h>  /* printf(), puts(), fopen()... */
 #include <limits.h> /* ULONG_MAX */
 #include <stdlib.h> /* malloc(), free(), rand() */
@@ -41,7 +40,7 @@
 #include "timer.h"
 #include "ui.h"
 
-#define PVER "0.6.1"
+#define PVER "0.7"
 #define PDATE "2014-2015"
 
 #define MAXTRACKS 64
