@@ -38,10 +38,12 @@
 static unsigned char far *mempool = NULL;
 static int memmode = 0;
 static struct xms_struct xms;
+static long nexteventid = 0;
 
 /* initializes the memory module using 'mode' method */
 int mem_init(unsigned int memsize, int mode) {
   memmode = mode;
+  nexteventid = 0;
   if (memmode == MEM_XMS) {
       return(xms_init(&xms, memsize));
     } else {
@@ -75,12 +77,18 @@ int pushevent(void far *ptr, long eventid) {
   }
 }
 
-/* returns a free eventid for a new event */
+/* returns a free eventid for a new event - if flushflag is non-zero, it means
+ * I don't care about any previous events anymore */
 long newevent(void) {
-  static long eventid = 0;
-  if ((eventid + 1) * sizeof(struct midi_event_t) <= xms.memsize) return(eventid++);
+  if ((nexteventid + 1) * sizeof(struct midi_event_t) <= xms.memsize) return(nexteventid++);
   return(-1);
 }
+
+
+void flushevents(void) {
+  nexteventid = 0;
+}
+
 
 /* closes / deallocates the memory module */
 void mem_close(void) {

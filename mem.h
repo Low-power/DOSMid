@@ -38,4 +38,5 @@
   int pushevent(void far *ptr, long eventid);
   long newevent(void);
   void mem_close(void);
+  void flushevents(void);
 #endif

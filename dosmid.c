@@ -1,5 +1,5 @@
 /*
- * DOSMID - a low-requirement MIDI player for DOS
+ * DOSMID - a low-requirement MIDI and MUS player for DOS
  *
  * Copyright (c) 2014, 2015, Mateusz Viste
  * All rights reserved.
@@ -36,6 +36,7 @@
 
 #include "mem.h"
 #include "midi.h"
+#include "mus.h"
 #include "outdev.h"
 #include "timer.h"
 #include "ui.h"
@@ -430,12 +431,6 @@ static char *getnextm3uitem(char *playlist) {
 }
 
 
-/*static enum playactions loadmusfile(struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
-  FILE *fd;
-  fd = fopen(params->midifile, "rb");
-}*/
-
-
 static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
   struct midi_chunkmap_t *chunkmap;
   int miditracks;
@@ -511,6 +506,10 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
   enum playactions res;
   enum fileformats fileformat;
 
+  /* flush all MIDI events from memory for new events to have where to load */
+  flushevents();
+
+  /* (try to) open the music file */
   fd = fopen(params->midifile, "rb");
   if (fd == NULL) {
     ui_puterrmsg(params->midifile, "Error: Failed to open the file");
@@ -535,8 +534,14 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
       res = loadfile_midi(fd, params, trackinfo, trackpos);
       break;
     case FORMAT_MUS:
-      res = ACTION_ERR_SOFT;
-      ui_puterrmsg(params->midifile, "Error: MUS not supported yet");
+      memset(trackinfo, 0, sizeof(struct trackinfodata));
+      *trackpos = mus_load(fd);
+      if (*trackpos < 0) {
+        char msg[64];
+        res = ACTION_ERR_SOFT;
+        sprintf(msg, "Error: Failed to load the MUS file (%ld)", *trackpos);
+        ui_puterrmsg(params->midifile, msg);
+      }
       break;
     default:
       res = ACTION_ERR_SOFT;
