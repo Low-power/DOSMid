@@ -3,7 +3,7 @@ all: dosmid.exe
 
 dosmid.exe: dosmid.c mem.c midi.c mpu401.c mus.c outdev.c timer.c ui.c xms.c
 	wcl -lr -we -d0 -0 -s -mc -wx dosmid.c mem.c midi.c mpu401.c mus.c outdev.c timer.c ui.c xms.c
-	upx --8086 --best dosmid.exe
+	#upx --8086 --best dosmid.exe
 
 clean: .symbolic
 	del *.obj

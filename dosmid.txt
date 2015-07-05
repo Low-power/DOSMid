@@ -1,12 +1,13 @@
 
-           DOSMid - a low-requirements MIDI player for DOS
+         DOSMid - a low-requirements MIDI and MUS player for DOS
                     http://dosmid.sourceforge.net
 
 
 *** INTRO ***
 
-DOSMid is a MIDI player for DOS. It's a real mode application designed to run
-on very modest hardware configurations. It plays both MIDI and RMID files.
+DOSMid is a MIDI and MUS player for DOS. It's a real mode application designed
+to run on very modest hardware configurations. It plays MIDI, RMID and MUS
+files.
 DOSMid is not a software MIDI emulator, thus it requires a MIDI-capable
 hardware available via the standard MPU-401 interface. Some sound cards
 provide such interface natively, although many need an additional 'wavetable'

@@ -32,6 +32,6 @@
 
 /* loads a MUS file into memory, returns the id of the first event on success,
  * or -1 on error. */
-long mus_load(FILE *fd);
+long mus_load(FILE *fd, unsigned long *totlen);
 
 #endif

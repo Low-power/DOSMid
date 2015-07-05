@@ -118,7 +118,7 @@ int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned short *timeunitdiv
   /* test for RMID format and rewind if not found */
   /* a RMID file starts with RIFFxxxxRMID (xxxx being the data size) */
   /* read first 12 bytes - if unable, return an error */
-  if (fread(rmidbuff, 1, 12, fd) != 12) return(-5);
+  if (fread(rmidbuff, 1, 12, fd) != 12) return(-7);
   /* if no RMID header, then rewind the file assuming it's normal MIDI */
   if ((rmidbuff[0] != 'R') || (rmidbuff[1] != 'I')  || (rmidbuff[2] != 'F') || (rmidbuff[3] != 'F')
    || (rmidbuff[8] != 'R') || (rmidbuff[9] != 'M') || (rmidbuff[10] != 'I') || (rmidbuff[11] != 'D')) {
@@ -126,15 +126,18 @@ int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned short *timeunitdiv
   }
   /* Read the first chunk of data (should be the MIDI header) */
   chunk = midi_readchunk(fd);
+  if (chunk == NULL) {
+    return(-6);
+  }
   /* check id */
   if (strcmp(chunk->id, "MThd") != 0) {
     free(chunk);
-    return(-4);
+    return(-5);
   }
   /* check len - must be at least 6 bytes */
   if (chunk->datalen < 6) {
     free(chunk);
-    return(-3);
+    return(-4);
   }
   *format = (chunk->data[0] << 8) | chunk->data[1];
   *tracks = (chunk->data[2] << 8) | chunk->data[3];
@@ -142,6 +145,11 @@ int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned short *timeunitdiv
   *timeunitdiv = chunk->data[4];
   *timeunitdiv <<= 8;
   *timeunitdiv |= chunk->data[5];
+  /* timeunitdiv must be a positive number */
+  if (*timeunitdiv < 1) {
+    free(chunk);
+    return(-3);
+  }
 
   /*  default tempo -> quarter note (1 beat) == 500'000 microseconds (0.5s), ie 120 bpm.
       a delta time unit is therefore (0.5s / DIV) long. */
@@ -384,7 +392,7 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
 /* merge two MIDI tracks into a single (serialized) one. returns a "pointer"
  * to the unique track. I take care here to not allocate/free memory here.
  * All notes are already in RAM after all. totlen is filled with the total
- * time of the merged tracks (in miliseconds). */
+ * time of the merged tracks (in seconds). */
 long midi_mergetrack(long t0, long t1, unsigned long *totlen, unsigned short timeunitdiv) {
   long res = -1, lasteventid = -1, selectedid;
   int selected;

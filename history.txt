@@ -3,6 +3,7 @@
 
 
 DOSMid v0.7 [xx xxx xxxx]
+ - Song's filename is displayed during loading,
  - ...
 
 DOSMid v0.6.1 [01 Jul 2015]

@@ -471,8 +471,6 @@ static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struc
     return(ACTION_ERR_SOFT);
   }
 
-  filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
-
   for (i = 0; i < miditracks; i++) {
     /* is it really a track we got here? */
     if (strcmp(chunkmap[i].id, "MTrk") != 0) {
@@ -534,13 +532,17 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
       res = loadfile_midi(fd, params, trackinfo, trackpos);
       break;
     case FORMAT_MUS:
-      memset(trackinfo, 0, sizeof(struct trackinfodata));
-      *trackpos = mus_load(fd);
+      /* memset(trackinfo, 0, sizeof(struct trackinfodata)); */ /* should I ? */
+      trackinfo->miditimeunitdiv = 1; /* MUS are always played with same tempo */
+      *trackpos = mus_load(fd, &(trackinfo->totlen));
+      sleep(1);
       if (*trackpos < 0) {
         char msg[64];
         res = ACTION_ERR_SOFT;
-        sprintf(msg, "Error: Failed to load the MUS file (%ld)", *trackpos);
+        snprintf(msg, 64, "Error: Failed to load the MUS file (%ld)", *trackpos);
         ui_puterrmsg(params->midifile, msg);
+      } else {
+        res = ACTION_NONE;
       }
       break;
     default:
@@ -575,13 +577,6 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   for (i = 0; i < 16; i++) trackinfo->chanprogs[i] = i;
   for (i = 0; i < UI_TITLENODES; i++) trackinfo->title[i] = trackinfo->titledat[i];
 
-  /* draw the UI a first time, without data yet */
-  refreshflags = 0xff;
-  sprintf(trackinfo->title[0], "Loading...");
-  ui_draw(trackinfo, &refreshflags, PVER, params->mpuport, volume);
-  memset(trackinfo->title[0], 0, 16);
-  refreshflags = 0xff;
-
   /* if running on a playlist, load next song */
   if (params->playlist != NULL) {
     params->midifile = getnextm3uitem(params->playlist);
@@ -590,6 +585,14 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
       return(ACTION_ERR_SOFT);
     }
   }
+
+  /* draw the UI a first time, without data yet */
+  refreshflags = 0xff;
+  sprintf(trackinfo->title[0], "Loading...");
+  filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
+  ui_draw(trackinfo, &refreshflags, PVER, params->mpuport, volume);
+  memset(trackinfo->title[0], 0, 16);
+  refreshflags = 0xff;
 
   exitaction = loadfile(params, trackinfo, &trackpos);
   if (exitaction != ACTION_NONE) return(exitaction);
