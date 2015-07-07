@@ -35,7 +35,8 @@
 
 #include "mus.h" /* include self for control */
 
-#define TICKLEN 7143l /* length of a single MUS tick, in us */
+#define TICKLEN 500000l /* length of a single MUS tick, in us */
+#define TIMEUNITDIV 70  /* the MIDI time unit divisor */
 
 
 /* pushes an event to memory. take care to call this with event == NULL to
@@ -69,7 +70,8 @@ static void addevent(struct midi_event_t *event, long *root) {
 
 /* loads a MUS file into memory, returns the id of the first event on success,
  * or -1 on error. */
-long mus_load(FILE *fd, unsigned long *totlen) {
+long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv) {
+  unsigned char remapchannel[16] = {0,1,2,3,4,5,6,7,8,15,10,11,12,13,14,9};
   unsigned char hdr_or_chanvol[16];
   unsigned short scorestart;
   int bytebuff, bytebuff2, loadflag = 0;
@@ -93,6 +95,7 @@ long mus_load(FILE *fd, unsigned long *totlen) {
   /* set tempo to 140 bpm (428571 us per quarter note) */
   memset(&midievent, 0, sizeof(struct midi_event_t));
   midievent.type = EVENT_TEMPO;
+  *timeunitdiv = TIMEUNITDIV;
   midievent.data.tempoval = TICKLEN;
   addevent(&midievent, &res);
 
@@ -108,41 +111,38 @@ long mus_load(FILE *fd, unsigned long *totlen) {
     event_type = bytebuff & 7;
     bytebuff >>= 3;
     event_dtime = bytebuff; /* if the 'last' bit is set, remember to read time after the event later */
+    /* if channel is 15, it is percussion, and must be remapped to MIDI #9 */
+    event_channel = remapchannel[event_channel];
+    /* clear out midievent to make room for the incoming MIDI message */
+    memset(&midievent, 0, sizeof(struct midi_event_t));
     /* read complementary data, if any */
     switch (event_type) {
       case 0: /* release note (1 byte follows) */
         bytebuff = fgetc(fd);
         if ((bytebuff & 128) != 0) return(-13); /* MSB should always be zero */
-        memset(&midievent, 0, sizeof(struct midi_event_t));
-        midievent.deltatime = nextwait;
         midievent.type = EVENT_NOTEOFF;
         midievent.data.note.note = bytebuff;
         midievent.data.note.chan = event_channel;
         midievent.data.note.velocity = 0;
-        addevent(&midievent, NULL);
         break;
-      case 1: /* play note (2 bytes follow) */
+      case 1: /* play note (1 or 2 bytes follow) */
         bytebuff = fgetc(fd);
-        memset(&midievent, 0, sizeof(struct midi_event_t));
-        midievent.deltatime = nextwait;
         midievent.type = EVENT_NOTEON;
         midievent.data.note.note = bytebuff & 127;
         midievent.data.note.chan = event_channel;
         if ((bytebuff & 128) != 0) {
           midievent.data.note.velocity = fgetc(fd);
+          hdr_or_chanvol[event_channel] = midievent.data.note.velocity; /* remember the last velocity, might be needed later */
         } else {
           midievent.data.note.velocity = hdr_or_chanvol[event_channel];
         }
-        addevent(&midievent, NULL);
         break;
       case 2: /* pitch wheel (1 byte follows) */
         bytebuff = fgetc(fd);
-        memset(&midievent, 0, sizeof(struct midi_event_t));
         midievent.type = 128 | 3; /* 'raw' event 3 bytes long */
         midievent.data.raw[0] = 0xE0 | event_channel;
         midievent.data.raw[1] = (bytebuff << 6) & 127;
         midievent.data.raw[2] = bytebuff >> 1;
-        addevent(&midievent, NULL);
         /* TODO - MIDI says that pitch wheel is a 14bit value with the center
          * being at 0x2000, but here it's 8bit... how do I translate this? */
         break;
@@ -150,26 +150,23 @@ long mus_load(FILE *fd, unsigned long *totlen) {
         bytebuff = fgetc(fd);
         if ((bytebuff & 128) != 0) return(-11); /* MSB should always be zero */
         /* TODO */
+        return(-90);
         break;
       case 4: /* control (2 bytes follow) */
         bytebuff = fgetc(fd);
         bytebuff2 = fgetc(fd);
         if ((bytebuff == 0) && (bytebuff2 < 128)) { /* change program */
-          memset(&midievent, 0, sizeof(struct midi_event_t));
-          midievent.deltatime = nextwait;
           midievent.type = EVENT_PROGCHAN;
           midievent.data.prog.prog = bytebuff2;
           midievent.data.note.chan = event_channel;
-          addevent(&midievent, NULL);
         } else if ((bytebuff >= 1) && (bytebuff <= 9)) { /* else it maps directly to a MIDI controller message */
           int tmpmap[10] = {0,0,1,7,10,11,91,93,64,67};
-          memset(&midievent, 0, sizeof(struct midi_event_t));
-          midievent.deltatime = nextwait;
           midievent.type = 128 | 3; /* 'raw' event 3 bytes long */
           midievent.data.raw[0] = 0xB0 | event_channel;
           midievent.data.raw[1] = tmpmap[bytebuff];
           midievent.data.raw[2] = bytebuff2;
-          addevent(&midievent, NULL);
+        } else {
+          return(-91);
         }
         break;
       case 6: /* end of song (no byte follow) */
@@ -182,6 +179,8 @@ long mus_load(FILE *fd, unsigned long *totlen) {
     }
     /* if file loaded fine, break out of the loop now */
     if (loadflag != 0) break;
+    /* fill in the delta time */
+    midievent.deltatime = nextwait;
     /* if dtime is non-zero, read the number of ticks to wait before next note */
     nextwait = 0;
     while (event_dtime != 0) {
@@ -191,6 +190,9 @@ long mus_load(FILE *fd, unsigned long *totlen) {
       nextwait <<= 7;
       nextwait |= (bytebuff & 127);
     }
+    /* push the event into memory */
+    addevent(&midievent, NULL);
+    /* recompute total song's length */
     tickduration += nextwait;
     while (tickduration >= 1000) {
       mslen += TICKLEN; /* mslen is in miliseconds, while TICKLEN is in us */

@@ -533,8 +533,7 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
       break;
     case FORMAT_MUS:
       /* memset(trackinfo, 0, sizeof(struct trackinfodata)); */ /* should I ? */
-      trackinfo->miditimeunitdiv = 1; /* MUS are always played with same tempo */
-      *trackpos = mus_load(fd, &(trackinfo->totlen));
+      *trackpos = mus_load(fd, &(trackinfo->totlen), &(trackinfo->miditimeunitdiv));
       sleep(1);
       if (*trackpos < 0) {
         char msg[64];

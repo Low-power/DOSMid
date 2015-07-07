@@ -3,7 +3,8 @@
 
 
 DOSMid v0.7 [xx xxx xxxx]
- - Song's filename is displayed during loading,
+ - support for *.MUS files (as used in many Doom-like games by Id Software),
+ - song's filename is displayed during load time,
  - ...
 
 DOSMid v0.6.1 [01 Jul 2015]
