@@ -198,12 +198,12 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
     addevent(&midievent, NULL);
     /* recompute total song's length */
     tickduration += nextwait;
-    while (tickduration >= 1000) {
-      mslen += TICKLEN; /* mslen is in miliseconds, while TICKLEN is in us */
-      tickduration -= 1000;
+    while (tickduration >= TIMEUNITDIV) {
+      mslen += TICKLEN / 1000; /* mslen is in miliseconds, while TICKLEN is in us */
+      tickduration -= TIMEUNITDIV;
     }
   }
-  mslen += (tickduration * TICKLEN) / 1000;
+  mslen += (tickduration / TIMEUNITDIV * TICKLEN) / 1000;
   *totlen = mslen / 1000; /* totlen is in seconds */
   /* */
   return(res);
