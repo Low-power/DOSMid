@@ -69,8 +69,9 @@ static void addevent(struct midi_event_t *event, long *root) {
 
 
 /* loads a MUS file into memory, returns the id of the first event on success,
- * or -1 on error. */
-long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv) {
+ * or -1 on error. channelsusage contains 16 flags indicating what channels
+ * are used. */
+long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsigned short *channelsusage) {
   unsigned char remapchannel[16] = {0,1,2,3,4,5,6,7,8,15,10,11,12,13,14,9};
   unsigned char hdr_or_chanvol[16];
   unsigned short scorestart;
@@ -102,6 +103,8 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv) {
   /* since now on, hdr_or_chanvol is used to store volume of channels */
   memset(hdr_or_chanvol, 0, 16);
 
+  *channelsusage = 0; /* zero out the used instruments map */
+
   /* read events from the MUS file and translate them into midi events */
   for (;;) {
     bytebuff = fgetc(fd);
@@ -126,6 +129,7 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv) {
         midievent.data.note.velocity = 0;
         break;
       case 1: /* play note (1 or 2 bytes follow) */
+        *channelsusage |= (1 << event_channel); /* update the channel usage flags */
         bytebuff = fgetc(fd);
         midievent.type = EVENT_NOTEON;
         midievent.data.note.note = bytebuff & 127;
