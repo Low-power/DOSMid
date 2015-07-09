@@ -142,19 +142,23 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
         }
         break;
       case 2: /* pitch wheel (1 byte follows) */
+        /* MIDI says that pitch wheel is a 14bit value with the center being
+         * at 0x2000. MUS on the other hand provides only 8bits, so some
+         * adjustement must be made as to fit into this scheme:
+         *   0  =  two half-tones down
+         *  64  =  one half-tone down
+         * 128  =  normal (default)
+         * 192  =  one half-tone up
+         * 255  =  two half-tones up  */
         bytebuff = fgetc(fd);
         midievent.type = 128 | 3; /* 'raw' event 3 bytes long */
         midievent.data.raw[0] = 0xE0 | event_channel;
-        midievent.data.raw[1] = (bytebuff << 6) & 127;
-        midievent.data.raw[2] = bytebuff >> 1;
-        /* TODO - MIDI says that pitch wheel is a 14bit value with the center
-         * being at 0x2000, but here it's 8bit... how do I translate this? */
+        midievent.data.raw[1] = (bytebuff << 6) & 127; /* converting the wheel value to a  */
+        midievent.data.raw[2] = bytebuff >> 1;         /* 14bit value, as expected by MIDI */
         break;
-      case 3: /* sysex (1 byte follows) */
+      case 3: /* sysex (1 byte follows) - I ignore SYSEX messages */
         bytebuff = fgetc(fd);
         if ((bytebuff & 128) != 0) return(-11); /* MSB should always be zero */
-        /* TODO */
-        return(-90);
         break;
       case 4: /* control (2 bytes follow) */
         bytebuff = fgetc(fd);
@@ -169,7 +173,7 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
           midievent.data.raw[0] = 0xB0 | event_channel;
           midievent.data.raw[1] = tmpmap[bytebuff];
           midievent.data.raw[2] = bytebuff2;
-        } else {
+        } else { /* else it's an illegate byte pattern - abort mission, captain! */
           return(-91);
         }
         break;
