@@ -33,12 +33,14 @@
 enum outdev_types {
   DEV_NONE,
   DEV_MPU401,
+  DEV_AWE,
   DEV_OPL2
 };
 
 
 /* inits the out device, also selects the out device, from one of these:
  *  DEV_MPU401
+ *  DEV_AWE
  *  DEV_OPL2
  *  DEV_NONE
  *

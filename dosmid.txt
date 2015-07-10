@@ -15,7 +15,8 @@ provide such interface natively, although many need an additional 'wavetable'
 daughterboard to produce actual MIDI sound.
 
 Minimal requirements:
- - a MPU-401 compatible sound card with a synthesizer (wavetable or external)
+ - a MPU-401 compatible sound card with a synthesizer (wavetable or external),
+   or a SoundBlaster AWE32/AWE64
  - an 8086 CPU or better
  - a video card able to display an 80x25 text mode (ie. CGA or better)
 
@@ -49,6 +50,7 @@ DOSMID [/noxms] [/delay] [/mpu=XXX] file.mid|playlist.m3u
  /mpu=XXX  Force dosmid to use MPU-401 on port XXX. If not forced, DOSMID
            scans the BLASTER environment variable for the MPU port, and if not
            found, it fallbacks to port 330h.
+ /awe      use the EMU8000 synth chip found on SoundBlaster AWE32/AWE64 cards.
  /log=FILE Logs all DOSMid activity to FILE. This is clearly a debugging
            option that you shouldn't be interested in. Beware, the log file
            can be pretty big (much bigger than the MIDI file you are playing).

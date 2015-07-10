@@ -31,8 +31,15 @@
 #include <dos.h>
 
 #include "mpu401.h"
+#include "awe32/ctaweapi.h"
 
 #include "outdev.h" /* include self for control */
+
+/* force the compiler to load valid DS segment value before calling
+ * the AWE32 API functions (in far data models, where DS is floating) */
+#pragma aux __pascal "^" parm loadds reverse routine [] \
+                         value struct float struct caller [] \
+                         modify [ax bx cx dx es];
 
 
 static enum outdev_types outdev = DEV_NONE;
@@ -41,6 +48,7 @@ static unsigned short outport = 0;
 
 /* inits the out device, also selects the out device, from one of these:
  *  DEV_MPU401
+ *  DEV_AWE
  *  DEV_OPL2
  *  DEV_NONE
  *
@@ -57,6 +65,19 @@ int dev_init(enum outdev_types dev, unsigned short port) {
       /* put it into UART mode */
       mpu401_uart(outport);
       break;
+    case DEV_AWE:
+      if (awe32Detect(port) != 0) return(-1);
+      if (awe32InitHardware() != 0) return(-2);
+      /* load GM samples from AWE's ROM */
+      awe32SoundPad.SPad1 = awe32SPad1Obj;
+      awe32SoundPad.SPad2 = awe32SPad2Obj;
+      awe32SoundPad.SPad3 = awe32SPad3Obj;
+      awe32SoundPad.SPad4 = awe32SPad4Obj;
+      awe32SoundPad.SPad5 = awe32SPad5Obj;
+      awe32SoundPad.SPad6 = awe32SPad6Obj;
+      awe32SoundPad.SPad7 = awe32SPad7Obj;
+      if (awe32InitMIDI() != 0) return(-3);
+      break;
     case DEV_OPL2:
       break;
     case DEV_NONE:
@@ -72,6 +93,12 @@ void dev_close(void) {
   switch (outdev) {
     case DEV_MPU401:
       mpu401_rst(outport); /* resets it to intelligent mode */
+      break;
+    case DEV_AWE:
+      /* Creative recommends to disable interrupts during AWE shutdown */
+      _disable();
+      awe32Terminate();
+      _enable();
       break;
     case DEV_OPL2:
       break;
@@ -126,6 +153,9 @@ void dev_noteon(int channel, int note, int velocity) {
       break;
     case DEV_OPL2:
       break;
+    case DEV_AWE:
+      awe32NoteOn(channel, note, velocity);
+      break;
     case DEV_NONE:
       break;
   }
@@ -144,6 +174,9 @@ void dev_noteoff(int channel, int note) {
       outp(outport, 64);              /* Send velocity */
       break;
     case DEV_OPL2:
+      break;
+    case DEV_AWE:
+      awe32NoteOff(channel, note, 64);
       break;
     case DEV_NONE:
       break;
@@ -193,6 +226,9 @@ void dev_setprog(int channel, int program) {
       outp(outport, program);        /* Send patch id */
       break;
     case DEV_OPL2:
+      break;
+    case DEV_AWE:
+      awe32ProgramChange(channel, program);
       break;
     case DEV_NONE:
       break;

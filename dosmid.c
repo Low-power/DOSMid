@@ -223,6 +223,9 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       params->dontstop = 1;
     } else if (strcmp(argv[i], "/nosound") == 0) {
       params->device = DEV_NONE;
+    } else if (strcmp(argv[i], "/awe") == 0) {
+      params->device = DEV_AWE;
+      params->mpuport = 0x620; /* EMU8000 is usually under 0x620 */
     } else if (stringstartswith(argv[i], "/mpu=") == 0) {
       char *hexstr;
       hexstr = argv[i] + 5;
@@ -756,6 +759,7 @@ int main(int argc, char **argv) {
            " /nodelay  do not wait 2ms before accessing XMS memory (makes AWEUTIL crash)\n"
            " /mpu=XXX  use MPU port 0xXXX (by default it follows the BLASTER\n"
            "           environment variable, and if not found, uses 0x330)\n"
+           " /awe      use the EMU8000 synth on AWE32/AWE64 SoundBlaster cards\n"
            " /log=FILE write highly verbose logs about DOSMid's activity to FILE\n"
            " /fullcpu  do not let DOSMid trying to be CPU-friendly\n"
            " /dontstop never wait for a keypress on error and continue the playlist\n"
