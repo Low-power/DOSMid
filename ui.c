@@ -84,7 +84,7 @@ void ui_puterrmsg(char *title, char *errmsg) {
 }
 
 /* draws the UI screen */
-void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int mpuport, int volume) {
+void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, char *devname, unsigned int mpuport, int volume) {
   #include "gm.h"  /* GM instruments names */
   int x, y;
   /* draw ascii graphic frames, etc */
@@ -108,7 +108,7 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, int
     ui_printchar(24, 79, 188 | COLOR_TUI);
     sprintf(tempstr, "[ DOSMid v%s ]", pver);
     ui_printstr(24, 78 - strlen(tempstr), tempstr, -1, COLOR_TUI);
-    sprintf(tempstr, "MPU port: %03Xh", mpuport);
+    sprintf(tempstr, "%s port: %03Xh", devname, mpuport);
     ui_printstr(18, 79 - strlen(tempstr), tempstr, -1, COLOR_TEMPO);
   }
   /* print notes states on every channel */

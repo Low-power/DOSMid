@@ -68,10 +68,11 @@ struct clioptions {
   int memmode;      /* type of memory to use: MEM_XMS or MEM_MALLOC */
   int workmem;      /* amount of work memory to allocate, in KiBs */
   int delay;
-  int mpuport;
+  int devport;
   int nopowersave;
   int dontstop;
   enum outdev_types device;
+  char *devname;    /* the human name of the out device (MPU, AWE..) */
   char *midifile;   /* MIDI filename to play */
   char *playlist;   /* the playlist to read files from */
   FILE *logfd;      /* an open file descriptor to the debug log file */
@@ -132,7 +133,23 @@ static int hexchar2int(char c) {
 }
 
 
-/* high resolution sleeping routine */
+/* converts a hex string to unsigned int. stops at first null terminator or
+ * space. returns zero on error. */
+static unsigned int hexstr2uint(char *hexstr) {
+  unsigned int v = 0;
+  while ((*hexstr != 0) && (*hexstr != ' ')) {
+    int c;
+    c = hexchar2int(*hexstr);
+    if (c < 0) return(0);
+    v <<= 4;
+    v |= c;
+    hexstr++;
+  }
+  return(v);
+}
+
+
+/* high resolution sleeping routine, waits n microseconds */
 static void udelay(unsigned long us) {
   unsigned long t1, t2;
   timer_read(&t1);
@@ -143,6 +160,16 @@ static void udelay(unsigned long us) {
       } else if (t2 - t1 >= us) {
         break;
     }
+  }
+}
+
+
+static char *devtoname(enum outdev_types device) {
+  switch (device) {
+    case DEV_MPU401: return("MPU");
+    case DEV_AWE:    return("AWE");
+    case DEV_OPL2:   return("OPL");
+    default:         return("UNK");
   }
 }
 
@@ -225,21 +252,21 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       params->device = DEV_NONE;
     } else if (strcmp(argv[i], "/awe") == 0) {
       params->device = DEV_AWE;
-      params->mpuport = 0x620; /* EMU8000 is usually under 0x620 */
+      params->devport = 0x620; /* EMU8000 is usually under 0x620 */
     } else if (stringstartswith(argv[i], "/mpu=") == 0) {
       char *hexstr;
       hexstr = argv[i] + 5;
-      params->mpuport = 0;
+      params->devport = 0;
       params->device = DEV_MPU401;
       while (*hexstr != 0) {
         int c;
         c = hexchar2int(*hexstr);
         if (c < 0) return("Invalid MPU port provided. Example: /mpu=330");
-        params->mpuport <<= 4;
-        params->mpuport |= c;
+        params->devport <<= 4;
+        params->devport |= c;
         hexstr++;
       }
-      if (params->mpuport < 1) return("Invalid MPU port provided. Example: /mpu=330");
+      if (params->devport < 1) return("Invalid MPU port provided. Example: /mpu=330");
     } else if (stringstartswith(argv[i], "/log=") == 0) {
       params->logfd = fopen(argv[i] + 5, "wb");
       if (params->logfd == NULL) {
@@ -355,36 +382,58 @@ static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscac
  * If nothing found, fallbacks to MPU and 0x330 */
 static void preload_outdev(struct clioptions *params) {
   char *blaster;
-
-  /* default choice is MPU401 on port 0x330 */
-  params->mpuport = 0x330;
-  params->device = DEV_MPU401;
+  unsigned short mpu = 0;
+  unsigned short awe = 0;
+  unsigned short *portptr;
 
   /* check if a blaster variable is present */
   blaster = getenv("BLASTER");
-  /* if so, read it looking for a 'P' parameter */
+  /* if so, read it looking for 'P' and 'E' parameters */
   if (blaster != NULL) {
-    while ((*blaster != 'P') && (*blaster != 0)) {
-      blaster++;
+    char *blasterptr[16];
+    int blastercount = 0;
+
+    /* read the variable in a first pass to collect all starting points */
+    if (*blaster != 0) {
+      blasterptr[blastercount++] = blaster++;
     }
-    /* have we found a 'P' param? */
-    if (*blaster == 'P') {
-      int p = 0;
-      /* read the P param into a variable */
-      blaster++;
-      while ((*blaster != 0) && (*blaster != ' ')) {
-        int c = hexchar2int(*blaster);
+    for (;;) {
+      if (*blaster == ' ') {
+        blasterptr[blastercount++] = ++blaster;
+      } else if ((*blaster == 0) || (blastercount >= 16)) {
+        break;
+      } else {
         blaster++;
-        if (c < 0) {
-          p = -1;
-          break;
-        }
-        p <<= 4;
-        p |= c;
       }
-      /* if what we have read looks sane, return it */
-      if (p > 0) params->mpuport = p;
     }
+
+    while (blastercount-- > 0) {
+      unsigned short p;
+      blaster = blasterptr[blastercount];
+      /* have we found an interesting param? */
+      if ((*blaster != 'P') && (*blaster != 'E')) continue;
+      if (*blaster == 'E') {
+        portptr = &awe;
+      } else {
+        portptr = &mpu;
+      }
+      /* read the param value into a variable */
+      p = hexstr2uint(blaster + 1);
+      /* if what we have read looks sane, keep it */
+      if (p > 0) *portptr = p;
+    }
+  }
+
+  /* look at what we got, and choose in order of preference */
+  if (awe > 0) { /* AWE is the most desirable, if present */
+    params->device = DEV_AWE;
+    params->devport = awe;
+  } else if (mpu > 0) { /* then look for MPU */
+    params->device = DEV_MPU401;
+    params->devport = mpu;
+  } else { /* if all else fails, fallback to MPU401 on 0x330 */
+    params->device = DEV_MPU401;
+    params->devport = 0x330;
   }
 }
 
@@ -592,7 +641,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   refreshflags = 0xff;
   sprintf(trackinfo->title[0], "Loading...");
   filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
-  ui_draw(trackinfo, &refreshflags, PVER, params->mpuport, volume);
+  ui_draw(trackinfo, &refreshflags, PVER, params->devname, params->devport, volume);
   memset(trackinfo->title[0], 0, 16);
   refreshflags = 0xff;
 
@@ -600,7 +649,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   if (exitaction != ACTION_NONE) return(exitaction);
 
   if (params->logfd != NULL) fputs("RESET MPU-401", params->logfd);
-  if (dev_init(params->device, params->mpuport) != 0) {
+  if (dev_init(params->device, params->devport) != 0) {
     ui_puterrmsg("Hardware error", "Error: Failed to initialize the sound device");
     return(ACTION_ERR_HARD);
   }
@@ -656,7 +705,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         }
         /* do I need to refresh the screen now? if not, just call INT28h */
         if (refreshflags != 0) {
-          ui_draw(trackinfo, &refreshflags, PVER, params->mpuport, volume);
+          ui_draw(trackinfo, &refreshflags, PVER, params->devname, params->devport, volume);
         } else if (params->nopowersave == 0) { /* if no screen refresh is     */
           union REGS regs;                     /* needed, and power saver not */
           int86(0x28, &regs, &regs);           /* disabled, then call INT 28h */
@@ -768,6 +817,8 @@ int main(int argc, char **argv) {
     }
     return(1);
   }
+
+  params.devname = devtoname(params.device);
 
   /* allocate the work memory */
   if (mem_init(params.workmem, params.memmode) == 0) {
