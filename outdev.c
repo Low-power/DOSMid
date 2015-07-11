@@ -76,6 +76,8 @@ int dev_init(enum outdev_types dev, unsigned short port) {
       awe32SoundPad.SPad5 = awe32SPad5Obj;
       awe32SoundPad.SPad6 = awe32SPad6Obj;
       awe32SoundPad.SPad7 = awe32SPad7Obj;
+      /* make use of all 32 oscillators on the EMU8000 (possible as long as I don't use DRAM samples) */
+      awe32NumG = 32;
       if (awe32InitMIDI() != 0) return(-3);
       break;
     case DEV_OPL2:
