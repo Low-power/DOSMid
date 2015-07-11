@@ -53,8 +53,7 @@ static unsigned short outport = 0;
  *  DEV_NONE
  *
  * This should be called only ONCE, when program starts.
- * Returns 0 on success, non-zero otherwise.
- */
+ * Returns 0 on success, non-zero otherwise. */
 int dev_init(enum outdev_types dev, unsigned short port) {
   outdev = dev;
   outport = port;
@@ -76,7 +75,7 @@ int dev_init(enum outdev_types dev, unsigned short port) {
       awe32SoundPad.SPad5 = awe32SPad5Obj;
       awe32SoundPad.SPad6 = awe32SPad6Obj;
       awe32SoundPad.SPad7 = awe32SPad7Obj;
-      /* make use of all 32 oscillators on the EMU8000 (possible as long as I don't use DRAM samples) */
+      /* make use of all 32 oscillators on the EMU chip (possible as long as I don't want to use DRAM sound fonts) */
       awe32NumG = 32;
       if (awe32InitMIDI() != 0) return(-3);
       break;
@@ -113,34 +112,23 @@ void dev_close(void) {
 /* clears/reinits the out device (turns all sounds off...). this can be used
  * often (typically: between each song). */
 void dev_clear(void) {
-  unsigned char buff[4] = {0, 0, 0, 0};
-  unsigned char far *buffptr;
   int i;
   switch (outdev) {
     case DEV_MPU401:
-      buffptr = buff;
-      /* iterate on MIDI channels and send messages */
-      for (buff[0] = 0xB0; buff[0] <= 0xBF; buff[0] += 1) {
-        /* Send "all notes off" (second byte is zero) */
-        buff[1] = 0x7B;
-        dev_rawmidi(buffptr, 3);
-        /* Send "all sounds off" (second byte is zero) */
-        buff[1] = 0x78;
-        dev_rawmidi(buffptr, 3);
-        /* "all controllers off" */
-        buff[1] = 0x79;
-        dev_rawmidi(buffptr, 3);
-      }
-      break;
     case DEV_AWE:
-      /* TODO awe32Controller(WORD, WORD, WORD); */
+      /* iterate on MIDI channels and send messages */
+      for (i = 0; i < 16; i++) {
+        dev_controller(i, 123, 0);   /* "all notes off" */
+        dev_controller(i, 120, 0);   /* "all sounds off" */
+        dev_controller(i, 121, 0);   /* "all controllers off" */
+      }
       break;
     case DEV_OPL2:
       break;
     case DEV_NONE:
       break;
   }
-  /* load default GM instruments (even real MIDI synths do not always reset those) */
+  /* load default GM instruments (even real MIDI synths do not always reset those properly) */
   for (i = 0; i < 16; i++) dev_setprog(i, i);
 }
 
@@ -266,24 +254,6 @@ void dev_keypressure(int channel, int note, int pressure) {
       break;
     case DEV_AWE:
       awe32PolyKeyPressure(channel, note, pressure);
-      break;
-    case DEV_NONE:
-      break;
-  }
-}
-
-
-/* sends raw midi message */
-void dev_rawmidi(unsigned char far *rawdata, int rawlen) {
-  int i;
-  switch (outdev) {
-    case DEV_MPU401:
-      for (i = 0; i < rawlen; i++) {
-        mpu401_waitwrite(outport);     /* Wait for port ready */
-        outp(outport, rawdata[i]);     /* Send the raw byte over the wire */
-      }
-      break;
-    case DEV_OPL2:
       break;
     case DEV_NONE:
       break;

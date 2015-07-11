@@ -754,17 +754,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         if (params->logfd != NULL) fprintf(params->logfd, "%lu: KEY PRESSURE %d ON CHAN #%d, KEY %d\n", trackinfo->elapsedsec, curevent->data.keypressure.pressure, curevent->data.keypressure.chan, curevent->data.keypressure.note);
         dev_keypressure(curevent->data.keypressure.chan, curevent->data.keypressure.note, curevent->data.keypressure.pressure);
         break;
-      default: /* probably a raw event - bit 7 should be set (>127) */
-        if (curevent->type & 128) {
-          if (params->logfd != NULL) {
-            fprintf(params->logfd, "%lu: RAW EVENT TYPE OF LEN %d: [0x%02X 0x%02X 0x%02X]\n", trackinfo->elapsedsec, curevent->type & 127, curevent->data.raw[0], curevent->data.raw[1], curevent->data.raw[2]);
-          }
-          dev_rawmidi(curevent->data.raw, curevent->type & 127);
-          break;
-        } else {
-          if (params->logfd != NULL) {
-            fprintf(params->logfd, "%lu: ILLEGAL COMMAND: 0x%02X\n", trackinfo->elapsedsec, curevent->type);
-          }
+      default:
+        if (params->logfd != NULL) {
+          fprintf(params->logfd, "%lu: ILLEGAL COMMAND: 0x%02X\n", trackinfo->elapsedsec, curevent->type);
         }
         break;
     }

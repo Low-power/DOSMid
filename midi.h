@@ -93,7 +93,7 @@ struct midi_event_keypressure_t {
 struct midi_event_t {
   long next;
   unsigned long deltatime;
-  unsigned int type; /* if bit 7 set (>127) then it's a raw length */
+  enum midi_midievents type;
   union {
     struct midi_event_note_t note;
     struct midi_event_prog_t prog;
@@ -101,7 +101,6 @@ struct midi_event_t {
     struct midi_event_control_t control;
     struct midi_event_chanpressure_t chanpressure;
     struct midi_event_keypressure_t keypressure;
-    unsigned char raw[3];
     unsigned long tempoval;
   } data;
 };

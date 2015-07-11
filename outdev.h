@@ -74,9 +74,6 @@ void dev_chanpressure(int channel, int pressure);
 /* key aftertouch */
 void dev_keypressure(int channel, int note, int pressure);
 
-/* sends raw midi message to channel */
-void dev_rawmidi(unsigned char far *rawdata, int rawlen);
-
 /* should be called by the application from time to time */
 void dev_tick(void);
 

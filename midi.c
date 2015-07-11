@@ -190,7 +190,6 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
     } else { /* get back one byte */
       fseek(fd, -1, SEEK_CUR);
     }
-    event.data.raw[0] = statusbyte;
     event.type = EVENT_NONE;
     event.deltatime = deltatime;
     event.next = -1;
@@ -281,9 +280,6 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
             if (metalen != 2) {
               if (logfd != NULL) fprintf(logfd, "%lu: INVALID KEY SIGNATURE!\n", tracklen);
             } else {
-              /* event.type = 128 | 3; */ /* 128 to mark it as a 'raw event', then its length */
-              /* event.data.raw[1] = fgetc(fd);
-              event.data.raw[2] = fgetc(fd);*/
               fseek(fd, metalen, SEEK_CUR);
               if (logfd != NULL) fprintf(logfd, "%lu: KEY SIGNATURE (ignored)\n", tracklen);
             }
