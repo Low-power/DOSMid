@@ -17,6 +17,7 @@ pkg: dosmid.exe .symbolic
 	mkdir progs\dosmid
 	mkdir source
 	mkdir source\dosmid
+	mkdir source\dosmid\awe32
 	mkdir appinfo
 	if exist dosmid.zip del dosmid.zip
 	copy dosmid.exe progs\dosmid
@@ -25,6 +26,7 @@ pkg: dosmid.exe .symbolic
 	copy *.txt source\dosmid
 	copy *.c source\dosmid
 	copy *.h source\dosmid
+	copy awe32\*.* source\dosmid\awe32
 	copy Makefile source\dosmid
 	copy dosmid.lsm source\dosmid
 	copy dosmid.lsm appinfo
