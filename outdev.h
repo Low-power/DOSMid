@@ -62,6 +62,9 @@ void dev_noteon(int channel, int note, int velocity);
 /* disable note on channel */
 void dev_noteoff(int channel, int note);
 
+/* adjust the pitch wheel on channel */
+void dev_pitchwheel(int channel, int wheelvalue);
+
 /* sends raw midi message to channel */
 void dev_rawmidi(unsigned char far *rawdata, int rawlen);
 

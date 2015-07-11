@@ -130,6 +130,9 @@ void dev_clear(void) {
         dev_rawmidi(buffptr, 3);
       }
       break;
+    case DEV_AWE:
+      /* TODO awe32Controller(WORD, WORD, WORD); */
+      break;
     case DEV_OPL2:
       break;
     case DEV_NONE:
@@ -177,6 +180,28 @@ void dev_noteoff(int channel, int note) {
       break;
     case DEV_AWE:
       awe32NoteOff(channel, note, 64);
+      break;
+    case DEV_NONE:
+      break;
+  }
+}
+
+
+/* adjust the pitch wheel of a channel */
+void dev_pitchwheel(int channel, int wheelvalue) {
+  switch (outdev) {
+    case DEV_MPU401:
+      mpu401_waitwrite(outport);      /* Wait for port ready */
+      outp(outport, 0xE0 | channel);  /* Send selected channel */
+      mpu401_waitwrite(outport);      /* Wait for port ready */
+      outp(outport, wheelvalue & 127);/* Send the lowest (least significant) 7 bits of the wheel value */
+      mpu401_waitwrite(outport);      /* Wait for port ready */
+      outp(outport, wheelvalue >> 7); /* Send the highest (most significant) 7 bits of the wheel value */
+      break;
+    case DEV_OPL2:
+      break;
+    case DEV_AWE:
+      awe32PitchBend(channel, wheelvalue & 127, wheelvalue >> 7);
       break;
     case DEV_NONE:
       break;

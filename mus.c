@@ -151,10 +151,9 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
          * 192  =  one half-tone up
          * 255  =  two half-tones up  */
         bytebuff = fgetc(fd);
-        midievent.type = 128 | 3; /* 'raw' event 3 bytes long */
-        midievent.data.raw[0] = 0xE0 | event_channel;
-        midievent.data.raw[1] = (bytebuff << 6) & 127; /* converting the wheel value to a  */
-        midievent.data.raw[2] = bytebuff >> 1;         /* 14bit value, as expected by MIDI */
+        midievent.type = EVENT_PITCH;
+        midievent.data.pitch.wheel = bytebuff << 6; /* convert wheel value to 14 bits as expected by MIDI */
+        midievent.data.pitch.chan = event_channel;
         break;
       case 3: /* sysex (1 byte follows) - I ignore SYSEX messages */
         bytebuff = fgetc(fd);

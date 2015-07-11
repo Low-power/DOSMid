@@ -340,9 +340,10 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
             event.data.raw[1] = fgetc(fd);
             break;
           case 0xE0:  /* pitch wheel change */
-            event.type = 128 | 3; /* 128 to mark it as a 'raw event', then its length */
-            event.data.raw[1] = fgetc(fd);
-            event.data.raw[2] = fgetc(fd);
+            event.type = EVENT_PITCH;
+            event.data.pitch.chan = statusbyte & 0x0F;
+            event.data.pitch.wheel = fgetc(fd);
+            event.data.pitch.wheel |= (fgetc(fd) << 7);
             break;
           default:
             puts("unknown note data");

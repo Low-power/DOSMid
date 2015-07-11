@@ -738,6 +738,10 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         dev_setprog(curevent->data.prog.chan, curevent->data.prog.prog);
         refreshflags |= UI_REFRESH_PROGS;
         break;
+      case EVENT_PITCH:
+        if (params->logfd != NULL) fprintf(params->logfd, "%lu: PITCH WHEEL ON CHAN #%d: %d\n", trackinfo->elapsedsec, curevent->data.pitch.chan, curevent->data.pitch.wheel);
+        dev_pitchwheel(curevent->data.prog.chan, curevent->data.pitch.wheel);
+        break;
       default: /* probably a raw event - bit 7 should be set (>127) */
         if (curevent->type & 128) {
           if (params->logfd != NULL) {
