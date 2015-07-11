@@ -35,22 +35,22 @@ During runtime, DOSMid can be controlled with the keyboard:
 
 At the command-line, DOSMid accepts several options, as listed below:
 
-DOSMID [/noxms] [/delay] [/mpu=XXX] file.mid|playlist.m3u
+DOSMID [options] file.mid (or m3u playlist)
 
  /noxms    Use conventional memory instead of XMS. This is obviously useful
            only if you don't have have XMS. Don't use this option otherwise,
            since without XMS you won't be able to load MIDI files bigger
            than a few dozen KiBs (at least not all tracks).
- /nodelay  Do not wait 2ms before each XMS access. Such waiting is sometimes
-           required when the MPU controller is emulated by a TSR driver
-           (specifically, the AWEUTIL driver used with SoundBlaster AWE 32/64
-           cards happens to crash if XMS accesses are not slightly delayed).
-           If you are a MIDI puritan (and NOT using AWEUTIL), you can use
-           /nodelay, but you are unlikely to hear any difference anyway.
+ /delay    Wait 2ms before each XMS access. Such waiting is required sometimes
+           when the MPU controller is emulated by a TSR driver (specifically,
+           the AWEUTIL driver used with SoundBlaster AWE 32/64 cards happens
+           to crash if XMS accesses are not slightly delayed).
  /mpu=XXX  Force dosmid to use MPU-401 on port XXX. If not forced, DOSMID
            scans the BLASTER environment variable for the MPU port, and if not
-           found, it fallbacks to port 330h.
- /awe      use the EMU8000 synth chip found on SoundBlaster AWE32/AWE64 cards.
+           found, it fallbacks to port 330h. The port part is optional, that
+           means you can use "/mpu" to just force MPU usage.
+ /awe=XXX  Use the EMU8000 synth chip found on SoundBlaster AWE32/AWE64 cards
+           on port XXX (the port is optional, you can specify just "/awe").
  /log=FILE Logs all DOSMid activity to FILE. This is clearly a debugging
            option that you shouldn't be interested in. Beware, the log file
            can be pretty big (much bigger than the MIDI file you are playing).

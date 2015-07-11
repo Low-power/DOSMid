@@ -231,7 +231,7 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
   params->playlist = NULL;
   params->memmode = MEM_XMS;
   params->workmem = 16384;  /* try to use 16M of XMS memory by default */
-  params->delay = 1;
+  params->delay = 0;
   params->logfd = NULL;
   params->nopowersave = 0;
   params->dontstop = 0;
@@ -242,8 +242,8 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
     if (strcmp(argv[i], "/noxms") == 0) {
       params->memmode = MEM_MALLOC;
       params->workmem = 63; /* using 'normal' malloc, fallback to 63K */
-    } else if (strcmp(argv[i], "/nodelay") == 0) {
-      params->delay = 0;
+    } else if (strcmp(argv[i], "/delay") == 0) {
+      params->delay = 1;
     } else if (strcmp(argv[i], "/fullcpu") == 0) {
       params->nopowersave = 1;
     } else if (strcmp(argv[i], "/dontstop") == 0) {
@@ -252,20 +252,17 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       params->device = DEV_NONE;
     } else if (strcmp(argv[i], "/awe") == 0) {
       params->device = DEV_AWE;
-      params->devport = 0x620; /* EMU8000 is usually under 0x620 */
-    } else if (stringstartswith(argv[i], "/mpu=") == 0) {
-      char *hexstr;
-      hexstr = argv[i] + 5;
-      params->devport = 0;
+      params->devport = 0x620; /* EMU8000 is usually under 0x620 TODO: autodetect via BLASTER */
+    } else if (strcmp(argv[i], "/mpu") == 0) {
       params->device = DEV_MPU401;
-      while (*hexstr != 0) {
-        int c;
-        c = hexchar2int(*hexstr);
-        if (c < 0) return("Invalid MPU port provided. Example: /mpu=330");
-        params->devport <<= 4;
-        params->devport |= c;
-        hexstr++;
-      }
+      params->devport = 0x330; /* MPU is usually under 0x330 TODO: autodetect via BLASTER */
+    } else if (stringstartswith(argv[i], "/awe=") == 0) {
+      params->device = DEV_AWE;
+      params->devport = hexstr2uint(argv[i] + 5);
+      if (params->devport < 1) return("Invalid AWE port provided. Example: /awe=620");
+    } else if (stringstartswith(argv[i], "/mpu=") == 0) {
+      params->device = DEV_MPU401;
+      params->devport = hexstr2uint(argv[i] + 5);
       if (params->devport < 1) return("Invalid MPU port provided. Example: /mpu=330");
     } else if (stringstartswith(argv[i], "/log=") == 0) {
       params->logfd = fopen(argv[i] + 5, "wb");
@@ -806,21 +803,23 @@ int main(int argc, char **argv) {
     } else {
       puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste\n"
            "\n"
-           "DOSMid is a MIDI player that reads *.MID or *.RMI files and drives a MPU401\n"
-           "synthesizer.\n"
+           "DOSMid is a MIDI player that reads *.MID or *.RMI files and drives a MIDI\n"
+           "synthesizer, either via MPU-401 or an \"AWE\" EMU8000 chip.\n"
            "\n"
-           "Usage: dosmid [options] file.mid|playlist.m3u\n"
+           "Usage: dosmid [options] file.mid (or m3u playlist)\n"
            "\n"
            "options:\n"
-           " /noxms    use conventional memory instead of XMS\n"
-           " /nodelay  do not wait 2ms before accessing XMS memory (makes AWEUTIL crash)\n"
-           " /mpu=XXX  use MPU port 0xXXX (by default it follows the BLASTER\n"
-           "           environment variable, and if not found, uses 0x330)\n"
-           " /awe      use the EMU8000 synth on AWE32/AWE64 SoundBlaster cards\n"
-           " /log=FILE write highly verbose logs about DOSMid's activity to FILE\n"
-           " /fullcpu  do not let DOSMid trying to be CPU-friendly\n"
-           " /dontstop never wait for a keypress on error and continue the playlist\n"
-           " /nosound  disable sound output\n"
+           " /noxms     use conventional memory instead of XMS\n"
+           " /delay     wait 2ms before accessing XMS memory (AWEUTIL compatibility)\n"
+           " /mpu[=XXX] forces DOSMid to use MPU-401 for MIDI output, you can\n"
+           "            optionally specify the port if needed (otherwise it will\n"
+           "            be read from the BLASTER environment variable)\n"
+           " /awe[=XXX] use the EMU8000 synth on AWE32/AWE64 SoundBlaster cards, you\n"
+           "            can specify the port if needed (read from BLASTER otherwise)\n"
+           " /log=FILE  write highly verbose logs about DOSMid's activity to FILE\n"
+           " /fullcpu   do not let DOSMid trying to be CPU-friendly\n"
+           " /dontstop  never wait for a keypress on error and continue the playlist\n"
+           " /nosound   disable sound output\n"
       );
     }
     return(1);
