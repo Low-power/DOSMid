@@ -321,9 +321,10 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
             break;
           case 0xA0:  /* key after-touch */
             /* puts("KEY AFTER-TOUCH"); */
-            event.type = 128 | 3; /* 128 to mark it as a 'raw event', then its length */
-            event.data.raw[1] = fgetc(fd);
-            event.data.raw[2] = fgetc(fd);
+            event.type = EVENT_KEYPRESSURE;
+            event.data.keypressure.chan = statusbyte & 0x0F;
+            event.data.keypressure.note = fgetc(fd);
+            event.data.keypressure.pressure = fgetc(fd);
             break;
           case 0xB0:  /* control change */
             /* puts("CONTROL CHANGE"); */
@@ -337,9 +338,10 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
             event.data.prog.chan = statusbyte & 0x0F;
             event.data.prog.prog = fgetc(fd);
             break;
-          case 0xD0:  /* channel after-touch */
-            event.type = 128 | 2; /* 128 to mark it as a 'raw event', then its length */
-            event.data.raw[1] = fgetc(fd);
+          case 0xD0:  /* channel after-touch (aka "channel pressure") */
+            event.type = EVENT_CHANPRESSURE;
+            event.data.chanpressure.chan = statusbyte & 0x0F;
+            event.data.chanpressure.pressure = fgetc(fd);
             break;
           case 0xE0:  /* pitch wheel change */
             event.type = EVENT_PITCH;

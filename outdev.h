@@ -68,6 +68,12 @@ void dev_pitchwheel(int channel, int wheelvalue);
 /* send a 'controller' message */
 void dev_controller(int channel, int id, int val);
 
+/* channel aftertouch */
+void dev_chanpressure(int channel, int pressure);
+
+/* key aftertouch */
+void dev_keypressure(int channel, int note, int pressure);
+
 /* sends raw midi message to channel */
 void dev_rawmidi(unsigned char far *rawdata, int rawlen);
 

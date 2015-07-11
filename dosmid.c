@@ -740,11 +740,19 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         break;
       case EVENT_PITCH:
         if (params->logfd != NULL) fprintf(params->logfd, "%lu: PITCH WHEEL ON CHAN #%d: %d\n", trackinfo->elapsedsec, curevent->data.pitch.chan, curevent->data.pitch.wheel);
-        dev_pitchwheel(curevent->data.prog.chan, curevent->data.pitch.wheel);
+        dev_pitchwheel(curevent->data.pitch.chan, curevent->data.pitch.wheel);
         break;
       case EVENT_CONTROL:
         if (params->logfd != NULL) fprintf(params->logfd, "%lu: CONTROLLER %d ON CHAN #%d -> val %d\n", trackinfo->elapsedsec, curevent->data.control.id, curevent->data.control.chan, curevent->data.control.val);
         dev_controller(curevent->data.control.chan, curevent->data.control.id, curevent->data.control.val);
+        break;
+      case EVENT_CHANPRESSURE:
+        if (params->logfd != NULL) fprintf(params->logfd, "%lu: CHANNEL PRESSURE %d ON CHAN #%d\n", trackinfo->elapsedsec, curevent->data.chanpressure.pressure, curevent->data.chanpressure.chan);
+        dev_chanpressure(curevent->data.chanpressure.chan, curevent->data.chanpressure.pressure);
+        break;
+      case EVENT_KEYPRESSURE:
+        if (params->logfd != NULL) fprintf(params->logfd, "%lu: KEY PRESSURE %d ON CHAN #%d, KEY %d\n", trackinfo->elapsedsec, curevent->data.keypressure.pressure, curevent->data.keypressure.chan, curevent->data.keypressure.note);
+        dev_keypressure(curevent->data.keypressure.chan, curevent->data.keypressure.note, curevent->data.keypressure.pressure);
         break;
       default: /* probably a raw event - bit 7 should be set (>127) */
         if (curevent->type & 128) {

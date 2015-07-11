@@ -233,6 +233,46 @@ void dev_controller(int channel, int id, int val) {
 }
 
 
+void dev_chanpressure(int channel, int pressure) {
+  switch (outdev) {
+    case DEV_MPU401:
+      mpu401_waitwrite(outport);      /* Wait for port ready */
+      outp(outport, 0xD0 | channel);  /* Send selected channel */
+      mpu401_waitwrite(outport);      /* Wait for port ready */
+      outp(outport, pressure);        /* Send the pressure value */
+      break;
+    case DEV_OPL2:
+      break;
+    case DEV_AWE:
+      awe32ChannelPressure(channel, pressure);
+      break;
+    case DEV_NONE:
+      break;
+  }
+}
+
+
+void dev_keypressure(int channel, int note, int pressure) {
+  switch (outdev) {
+    case DEV_MPU401:
+      mpu401_waitwrite(outport);      /* Wait for port ready */
+      outp(outport, 0xA0 | channel);  /* Send selected channel */
+      mpu401_waitwrite(outport);      /* Wait for port ready */
+      outp(outport, note);            /* Send the note we target */
+      mpu401_waitwrite(outport);      /* Wait for port ready */
+      outp(outport, pressure);        /* Send the pressure value */
+      break;
+    case DEV_OPL2:
+      break;
+    case DEV_AWE:
+      awe32PolyKeyPressure(channel, note, pressure);
+      break;
+    case DEV_NONE:
+      break;
+  }
+}
+
+
 /* sends raw midi message */
 void dev_rawmidi(unsigned char far *rawdata, int rawlen) {
   int i;
