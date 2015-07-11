@@ -304,16 +304,17 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
         if (logfd != NULL) fprintf(logfd, "%lu: SYSEX EVENT OF %ld BYTES (ignored)\n", tracklen, sysexlen);
         fseek(fd, sysexlen, SEEK_CUR);
       } else if ((statusbyte >= 0x80) && (statusbyte <= 0xEF)) { /* else it's a note-related command */
-        event.data.note.chan = statusbyte & 0x0F;
         switch (statusbyte & 0xF0) { /* I care only about NoteOn/NoteOff events */
           case 0x80:  /* Note OFF */
             event.type = EVENT_NOTEOFF;
+            event.data.note.chan = statusbyte & 0x0F;
             event.data.note.note = fgetc(fd) & 127; /* a note must be in range 0..127 */
             event.data.note.velocity = fgetc(fd);
             break;
           case 0x90:  /* Note ON */
             *channelsusage |= (1 << event.data.note.chan); /* update the channel usage flags */
             event.type = EVENT_NOTEON;
+            event.data.note.chan = statusbyte & 0x0F;
             event.data.note.note = fgetc(fd) & 127;
             event.data.note.velocity = fgetc(fd);
             if (event.data.note.velocity == 0) event.type = EVENT_NOTEOFF; /* if no velocity, it's in fact a note OFF */
@@ -325,10 +326,11 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
             event.data.raw[2] = fgetc(fd);
             break;
           case 0xB0:  /* control change */
-            event.type = 128 | 3; /* 128 to mark it as a 'raw event', then its length */
             /* puts("CONTROL CHANGE"); */
-            event.data.raw[1] = fgetc(fd);
-            event.data.raw[2] = fgetc(fd);
+            event.type = EVENT_CONTROL;
+            event.data.control.chan = statusbyte & 0x0F;
+            event.data.control.id = fgetc(fd);
+            event.data.control.val = fgetc(fd);
             break;
           case 0xC0:  /* program (patch) change */
             event.type = EVENT_PROGCHAN;

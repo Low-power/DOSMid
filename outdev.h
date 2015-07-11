@@ -65,6 +65,9 @@ void dev_noteoff(int channel, int note);
 /* adjust the pitch wheel on channel */
 void dev_pitchwheel(int channel, int wheelvalue);
 
+/* send a 'controller' message */
+void dev_controller(int channel, int id, int val);
+
 /* sends raw midi message to channel */
 void dev_rawmidi(unsigned char far *rawdata, int rawlen);
 

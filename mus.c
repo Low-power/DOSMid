@@ -167,11 +167,11 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
           midievent.data.prog.prog = bytebuff2;
           midievent.data.note.chan = event_channel;
         } else if ((bytebuff >= 1) && (bytebuff <= 9)) { /* else it maps directly to a MIDI controller message */
-          int tmpmap[10] = {0,0,1,7,10,11,91,93,64,67};
-          midievent.type = 128 | 3; /* 'raw' event 3 bytes long */
-          midievent.data.raw[0] = 0xB0 | event_channel;
-          midievent.data.raw[1] = tmpmap[bytebuff];
-          midievent.data.raw[2] = bytebuff2;
+          int tmpmap[10] = {0,0,1,7,10,11,91,93,64,67}; /* map MUS controllers to MIDI controller IDs */
+          midievent.type = EVENT_CONTROL;
+          midievent.data.control.chan = event_channel;
+          midievent.data.control.id = tmpmap[bytebuff];
+          midievent.data.control.val = bytebuff2;
         } else { /* else it's an illegate byte pattern - abort mission, captain! */
           return(-91);
         }

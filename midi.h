@@ -39,6 +39,7 @@ enum midi_midievents {
   EVENT_RAW = 3,
   EVENT_PROGCHAN = 4,
   EVENT_PITCH = 5,
+  EVENT_CONTROL = 6,
   EVENT_NONE = 100
 };
 
@@ -70,6 +71,12 @@ struct midi_event_pitch_t {
   unsigned char chan;
 };
 
+struct midi_event_control_t {
+  unsigned char id;
+  unsigned char chan;
+  unsigned char val;
+};
+
 struct midi_event_t {
   long next;
   unsigned long deltatime;
@@ -78,6 +85,7 @@ struct midi_event_t {
     struct midi_event_note_t note;
     struct midi_event_prog_t prog;
     struct midi_event_pitch_t pitch;
+    struct midi_event_control_t control;
     unsigned char raw[3];
     unsigned long tempoval;
   } data;

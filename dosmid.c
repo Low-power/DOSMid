@@ -742,6 +742,10 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         if (params->logfd != NULL) fprintf(params->logfd, "%lu: PITCH WHEEL ON CHAN #%d: %d\n", trackinfo->elapsedsec, curevent->data.pitch.chan, curevent->data.pitch.wheel);
         dev_pitchwheel(curevent->data.prog.chan, curevent->data.pitch.wheel);
         break;
+      case EVENT_CONTROL:
+        if (params->logfd != NULL) fprintf(params->logfd, "%lu: CONTROLLER %d ON CHAN #%d -> val %d\n", trackinfo->elapsedsec, curevent->data.control.id, curevent->data.control.chan, curevent->data.control.val);
+        dev_controller(curevent->data.control.chan, curevent->data.control.id, curevent->data.control.val);
+        break;
       default: /* probably a raw event - bit 7 should be set (>127) */
         if (curevent->type & 128) {
           if (params->logfd != NULL) {

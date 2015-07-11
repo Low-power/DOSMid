@@ -209,6 +209,28 @@ void dev_pitchwheel(int channel, int wheelvalue) {
 }
 
 
+/* send a 'controller' message */
+void dev_controller(int channel, int id, int val) {
+  switch (outdev) {
+    case DEV_MPU401:
+      mpu401_waitwrite(outport);      /* Wait for port ready */
+      outp(outport, 0xB0 | channel);  /* Send selected channel */
+      mpu401_waitwrite(outport);      /* Wait for port ready */
+      outp(outport, id);              /* Send the controller's id */
+      mpu401_waitwrite(outport);      /* Wait for port ready */
+      outp(outport, val);             /* Send controller's value */
+      break;
+    case DEV_OPL2:
+      break;
+    case DEV_AWE:
+      awe32Controller(channel, id, val);
+      break;
+    case DEV_NONE:
+      break;
+  }
+}
+
+
 /* sends raw midi message */
 void dev_rawmidi(unsigned char far *rawdata, int rawlen) {
   int i;
