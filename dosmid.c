@@ -68,7 +68,10 @@ struct clioptions {
   int memmode;      /* type of memory to use: MEM_XMS or MEM_MALLOC */
   int workmem;      /* amount of work memory to allocate, in KiBs */
   int delay;
-  int devport;
+  unsigned short devport;
+  unsigned short port_mpu;
+  unsigned short port_awe;
+  unsigned short port_opl;
   int nopowersave;
   int dontstop;
   enum outdev_types device;
@@ -252,10 +255,14 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       params->device = DEV_NONE;
     } else if (strcmp(argv[i], "/awe") == 0) {
       params->device = DEV_AWE;
-      params->devport = 0x620; /* EMU8000 is usually under 0x620 TODO: autodetect via BLASTER */
+      params->devport = params->port_awe;
+      /* if AWE port not found in BLASTER, use the default 0x620 */
+      if (params->devport == 0) params->devport = 0x620;
     } else if (strcmp(argv[i], "/mpu") == 0) {
       params->device = DEV_MPU401;
-      params->devport = 0x330; /* MPU is usually under 0x330 TODO: autodetect via BLASTER */
+      params->devport = params->port_mpu;
+      /* if MPU port not found in BLASTER, use the default 0x330 */
+      if (params->devport == 0) params->devport = 0x330;
     } else if (stringstartswith(argv[i], "/awe=") == 0) {
       params->device = DEV_AWE;
       params->devport = hexstr2uint(argv[i] + 5);
@@ -379,9 +386,10 @@ static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscac
  * If nothing found, fallbacks to MPU and 0x330 */
 static void preload_outdev(struct clioptions *params) {
   char *blaster;
-  unsigned short mpu = 0;
-  unsigned short awe = 0;
-  unsigned short *portptr;
+
+  params->port_mpu = 0;
+  params->port_awe = 0;
+  params->port_opl = 0;
 
   /* check if a blaster variable is present */
   blaster = getenv("BLASTER");
@@ -406,13 +414,14 @@ static void preload_outdev(struct clioptions *params) {
 
     while (blastercount-- > 0) {
       unsigned short p;
+      unsigned short *portptr;
       blaster = blasterptr[blastercount];
       /* have we found an interesting param? */
       if ((*blaster != 'P') && (*blaster != 'E')) continue;
       if (*blaster == 'E') {
-        portptr = &awe;
+        portptr = &(params->port_awe);
       } else {
-        portptr = &mpu;
+        portptr = &(params->port_mpu);
       }
       /* read the param value into a variable */
       p = hexstr2uint(blaster + 1);
@@ -422,12 +431,12 @@ static void preload_outdev(struct clioptions *params) {
   }
 
   /* look at what we got, and choose in order of preference */
-  if (awe > 0) { /* AWE is the most desirable, if present */
+  if (params->port_awe > 0) { /* AWE is the most desirable, if present */
     params->device = DEV_AWE;
-    params->devport = awe;
-  } else if (mpu > 0) { /* then look for MPU */
+    params->devport = params->port_awe;
+  } else if (params->port_mpu > 0) { /* then look for MPU */
     params->device = DEV_MPU401;
-    params->devport = mpu;
+    params->devport = params->port_mpu;
   } else { /* if all else fails, fallback to MPU401 on 0x330 */
     params->device = DEV_MPU401;
     params->devport = 0x330;
