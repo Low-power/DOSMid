@@ -561,6 +561,7 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
   unsigned char hdr[16];
   enum playactions res;
   enum fileformats fileformat;
+  time_t loadtime = time(NULL); /* TODO remove me */
 
   /* flush all MIDI events from memory for new events to have where to load */
   flushevents();
@@ -609,6 +610,10 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
   }
 
   fclose(fd);
+
+  printf("LOAD TIME: %d s\n", time(NULL) - loadtime);
+  sleep(3);
+
   return(res);
 }
 

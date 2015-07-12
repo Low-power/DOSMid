@@ -77,6 +77,36 @@ int pushevent(void far *ptr, long eventid) {
   }
 }
 
+
+/* pushes an event to memory, and link events as they come. take care to call
+ * this with event == NULL to close the song. */
+void pusheventqueue(struct midi_event_t *event, long *root) {
+  static struct midi_event_t lastevent;
+  static long lasteventid;
+  struct midi_event_t far *lasteventfarptr;
+
+  if (root != NULL) {
+    lasteventid = newevent();
+    *root = lasteventid;
+    memcpy(&lastevent, event, sizeof(struct midi_event_t));
+    return;
+  }
+
+  lasteventfarptr = &lastevent;
+
+  if (event == NULL) {
+    lastevent.next = -1;
+    pushevent(lasteventfarptr, lasteventid);
+    return;
+  }
+
+  lastevent.next = newevent();
+  pushevent(lasteventfarptr, lasteventid);
+  lasteventid = lastevent.next;
+  memcpy(&lastevent, event, sizeof(struct midi_event_t));
+}
+
+
 /* returns a free eventid for a new event - if flushflag is non-zero, it means
  * I don't care about any previous events anymore */
 long newevent(void) {

@@ -36,6 +36,7 @@
   int mem_init(unsigned int memsize, int mode);
   int pullevent(long eventid, void far *ptr);
   int pushevent(void far *ptr, long eventid);
+  void pusheventqueue(struct midi_event_t *event, long *root);
   long newevent(void);
   void mem_close(void);
   void flushevents(void);

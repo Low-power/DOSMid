@@ -174,7 +174,7 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
   unsigned long deltatime;
   unsigned char statusbyte = 0, tmp;
   struct midi_event_t event;
-  long result = -1, lastnode = -1, newnode;
+  long result = -1;
   unsigned long tracklen = 0;
   unsigned long ignoreddeltas = 0;
 
@@ -357,36 +357,17 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
     if (event.type == EVENT_NONE) {
       ignoreddeltas += event.deltatime;
     } else {
-      int pullpushres;
-      struct midi_event_t far *eventptr;
       event.deltatime += ignoreddeltas; /* add any previous ignored delta times */
       ignoreddeltas = 0;
-      eventptr = &event;
       /* add the event to the queue */
-      newnode = newevent();
-      if (newnode < 0) {
-        puts("OUT OF MEMORY");
-        break;
-      }
-      pullpushres = pushevent(eventptr, newnode);
-      if (pullpushres != 0) {
-        printf("PUSHEVENT ERROR %02X\n", pullpushres);
-        break;
-      }
       if (result < 0) {
-          result = newnode;
-          lastnode = newnode;
-        } else {
-          if (pullevent(lastnode, eventptr) != 0) {
-            puts("PULLEVENT ERROR");
-            break;
-          }
-          event.next = newnode;
-          pushevent(&event, lastnode);
-          lastnode = newnode;
+        pusheventqueue(&event, &result);
+      } else {
+        pusheventqueue(&event, NULL);
       }
     }
   }
+  pusheventqueue(NULL, NULL); /* flush last event in buffer to memory */
   return(result);
 }
 

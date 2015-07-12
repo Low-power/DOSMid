@@ -39,35 +39,6 @@
 #define TIMEUNITDIV 70  /* the MIDI time unit divisor */
 
 
-/* pushes an event to memory. take care to call this with event == NULL to
- * close the song. */
-static void addevent(struct midi_event_t *event, long *root) {
-  static struct midi_event_t lastevent;
-  static long lasteventid;
-  struct midi_event_t far *lasteventfarptr;
-
-  if (root != NULL) {
-    lasteventid = newevent();
-    *root = lasteventid;
-    memcpy(&lastevent, event, sizeof(struct midi_event_t));
-    return;
-  }
-
-  lasteventfarptr = &lastevent;
-
-  if (event == NULL) {
-    lastevent.next = -1;
-    pushevent(lasteventfarptr, lasteventid);
-    return;
-  }
-
-  lastevent.next = newevent();
-  pushevent(lasteventfarptr, lasteventid);
-  lasteventid = lastevent.next;
-  memcpy(&lastevent, event, sizeof(struct midi_event_t));
-}
-
-
 /* loads a MUS file into memory, returns the id of the first event on success,
  * or -1 on error. channelsusage contains 16 flags indicating what channels
  * are used. */
@@ -98,7 +69,7 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
   midievent.type = EVENT_TEMPO;
   *timeunitdiv = TIMEUNITDIV;
   midievent.data.tempoval = TICKLEN;
-  addevent(&midievent, &res);
+  pusheventqueue(&midievent, &res);
 
   /* since now on, hdr_or_chanvol is used to store volume of channels */
   memset(hdr_or_chanvol, 0, 16);
@@ -177,7 +148,7 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
         }
         break;
       case 6: /* end of song (no byte follow) */
-        addevent(NULL, NULL);
+        pusheventqueue(NULL, NULL);
         loadflag = 1;
         break;
       default: /* unknown event type - abort */
@@ -198,7 +169,7 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
       nextwait |= (bytebuff & 127);
     }
     /* push the event into memory */
-    addevent(&midievent, NULL);
+    pusheventqueue(&midievent, NULL);
     /* recompute total song's length */
     tickduration += nextwait;
     while (tickduration >= TIMEUNITDIV) {
