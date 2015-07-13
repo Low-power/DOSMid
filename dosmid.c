@@ -712,6 +712,18 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
             break;
           case ' ':  /* pause */
             ui_puterrmsg("PAUSE", "[ Press any key ]");
+            /* turn off all notes before pausing */
+            for (i = 0; i < 128; i++) {
+              if (trackinfo->notestates[i] != 0) {
+                int c;
+                for (c = 0; c < 16; c++) {
+                  if (trackinfo->notestates[i] & (1 << c)) {
+                    /* printf("note #%d is still playing on channel %d\n", i, c); */
+                    dev_noteoff(c, i);
+                  }
+                }
+              }
+            }
             getkey();
             timer_read(&nexteventtime); /* set nexteventtime to NOW to resync the song */
             break;
