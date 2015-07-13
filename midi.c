@@ -177,6 +177,7 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
   long result = -1;
   unsigned long tracklen = 0;
   unsigned long ignoreddeltas = 0;
+  unsigned char ubuff[4]; /* micro buffer for loading data */
 
   for (;;) {
     /* read the delta time first - variable length */
@@ -213,7 +214,7 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
               }
               copyright[i] = 0;
             }
-            for (; i < metalen; i++) fgetc(fd); /* skip the rest, if we had to truncate the string */
+            fseek(fd, metalen - i, SEEK_CUR); /* skip the rest, if we had to truncate the string */
             break;
           case 3: /* track name */
             i = 0;
@@ -227,16 +228,14 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
                 }
               }
               if (titid >= 0) {
-                  for (i = 0; i < metalen; i++) {
-                    if (i == titlemaxlen) break; /* avoid overflow */
-                    title[titid][i] = fgetc(fd);
-                  }
-                  title[titid][i] = 0;
-                } else {
-                  i = 0;
+                for (i = 0; i < metalen; i++) {
+                  if (i == titlemaxlen) break; /* avoid overflow */
+                  title[titid][i] = fgetc(fd);
+                }
+                title[titid][i] = 0;
               }
             }
-            for (; i < metalen; i++) fgetc(fd); /* skip the rest, if we had to truncate the string */
+            fseek(fd, metalen - i, SEEK_CUR); /* skip the rest, if we had to truncate the string */
             break;
           case 4: /* instrument name */
           case 5: /* lyric */
@@ -255,12 +254,13 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
             if (metalen != 3) {
               if (logfd != NULL) fprintf(logfd, "%lu: TEMPO ERROR\n", tracklen);
             } else {
+              fread(ubuff, 1, 3, fd);
               event.type = EVENT_TEMPO;
-              event.data.tempoval = fgetc(fd);
+              event.data.tempoval = ubuff[0];
               event.data.tempoval <<= 8;
-              event.data.tempoval |= fgetc(fd);
+              event.data.tempoval |= ubuff[1];
               event.data.tempoval <<= 8;
-              event.data.tempoval |= fgetc(fd);
+              event.data.tempoval |= ubuff[2];
               if (logfd != NULL) fprintf(logfd, "%lu: TEMPO -> %lu\n", tracklen, event.data.tempoval);
             }
             break;
@@ -271,6 +271,7 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
           case 0x58:  /* Time signature */
             if (metalen != 4) {
               if (logfd != NULL) fprintf(logfd, "%lu: INVALID TIME SIGNATURE!\n", tracklen);
+              return(-1);
             } else {
               fseek(fd, metalen, SEEK_CUR);
               if (logfd != NULL) fprintf(logfd, "%lu: TIME SIGNATURE (ignored)\n", tracklen);
@@ -279,6 +280,7 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
           case 0x59:  /* key signature */
             if (metalen != 2) {
               if (logfd != NULL) fprintf(logfd, "%lu: INVALID KEY SIGNATURE!\n", tracklen);
+              return(-1);
             } else {
               fseek(fd, metalen, SEEK_CUR);
               if (logfd != NULL) fprintf(logfd, "%lu: KEY SIGNATURE (ignored)\n", tracklen);
@@ -293,7 +295,7 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
             if (logfd != NULL) fprintf(logfd, "%lu: UNHANDLED META EVENT [0x%02X] (ignored)\n", tracklen, subtype);
             break;
         }
-        if (endoftrack) break;
+        if (endoftrack != 0) break;
       } else if ((statusbyte >= 0xF0) && (statusbyte <= 0xF7)) { /* SYSEX event */
         unsigned long sysexlen;
         midi_fetch_variablelen_fromfile(fd, &sysexlen); /* get length */
@@ -302,32 +304,36 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
       } else if ((statusbyte >= 0x80) && (statusbyte <= 0xEF)) { /* else it's a note-related command */
         switch (statusbyte & 0xF0) { /* I care only about NoteOn/NoteOff events */
           case 0x80:  /* Note OFF */
+            fread(ubuff, 1, 2, fd);
             event.type = EVENT_NOTEOFF;
             event.data.note.chan = statusbyte & 0x0F;
-            event.data.note.note = fgetc(fd) & 127; /* a note must be in range 0..127 */
-            event.data.note.velocity = fgetc(fd);
+            event.data.note.note = ubuff[0] & 127; /* a note must be in range 0..127 */
+            event.data.note.velocity = ubuff[1];
             break;
           case 0x90:  /* Note ON */
+            fread(ubuff, 1, 2, fd);
             *channelsusage |= (1 << event.data.note.chan); /* update the channel usage flags */
             event.type = EVENT_NOTEON;
             event.data.note.chan = statusbyte & 0x0F;
-            event.data.note.note = fgetc(fd) & 127;
-            event.data.note.velocity = fgetc(fd);
+            event.data.note.note = ubuff[0] & 127;
+            event.data.note.velocity = ubuff[1];
             if (event.data.note.velocity == 0) event.type = EVENT_NOTEOFF; /* if no velocity, it's in fact a note OFF */
             break;
           case 0xA0:  /* key after-touch */
             /* puts("KEY AFTER-TOUCH"); */
+            fread(ubuff, 1, 2, fd);
             event.type = EVENT_KEYPRESSURE;
             event.data.keypressure.chan = statusbyte & 0x0F;
-            event.data.keypressure.note = fgetc(fd);
-            event.data.keypressure.pressure = fgetc(fd);
+            event.data.keypressure.note = ubuff[0];
+            event.data.keypressure.pressure = ubuff[1];
             break;
           case 0xB0:  /* control change */
             /* puts("CONTROL CHANGE"); */
+            fread(ubuff, 1, 2, fd);
             event.type = EVENT_CONTROL;
             event.data.control.chan = statusbyte & 0x0F;
-            event.data.control.id = fgetc(fd);
-            event.data.control.val = fgetc(fd);
+            event.data.control.id = ubuff[0];
+            event.data.control.val = ubuff[1];
             break;
           case 0xC0:  /* program (patch) change */
             event.type = EVENT_PROGCHAN;
@@ -340,24 +346,27 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
             event.data.chanpressure.pressure = fgetc(fd);
             break;
           case 0xE0:  /* pitch wheel change */
+            fread(ubuff, 1, 2, fd);
             event.type = EVENT_PITCH;
             event.data.pitch.chan = statusbyte & 0x0F;
-            event.data.pitch.wheel = fgetc(fd);
-            event.data.pitch.wheel |= (fgetc(fd) << 7);
+            event.data.pitch.wheel = ubuff[1];
+            event.data.pitch.wheel <<= 7;
+            event.data.pitch.wheel |= ubuff[0];
             break;
           default:
-            puts("unknown note data");
+            if (logfd != NULL) fprintf(logfd, "%lu: Unknown note data\n", tracklen);
+            return(-1);
             break;
         }
       } else { /* else it's an error - free memory we allocated and return NULL */
-        printf("Err. at offset %04lX (bytebuff = 0x%02X)\n", ftell(fd), statusbyte);
+        if (logfd != NULL) fprintf(logfd, "Err. at offset %04lX (bytebuff = 0x%02X)\n", ftell(fd), statusbyte);
         return(-1);
     }
     /* add the event to the queue */
     if (event.type == EVENT_NONE) {
       ignoreddeltas += event.deltatime;
     } else {
-      event.deltatime += ignoreddeltas; /* add any previous ignored delta times */
+      event.deltatime += ignoreddeltas; /* add any previously ignored delta times */
       ignoreddeltas = 0;
       /* add the event to the queue */
       if (result < 0) {
@@ -367,19 +376,19 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
       }
     }
   }
-  pusheventqueue(NULL, NULL); /* flush last event in buffer to memory */
+  if (result >= 0) pusheventqueue(NULL, NULL); /* flush last event in buffer to memory */
   return(result);
 }
 
 /* merge two MIDI tracks into a single (serialized) one. returns a "pointer"
- * to the unique track. I take care here to not allocate/free memory here.
+ * to the unique track. I take care not to allocate/free memory here.
  * All notes are already in RAM after all. totlen is filled with the total
  * time of the merged tracks (in seconds). */
 long midi_mergetrack(long t0, long t1, unsigned long *totlen, unsigned short timeunitdiv) {
   long res = -1, lasteventid = -1, selectedid;
   int selected;
   unsigned long curtempo = 500000l, utotlen = 0;
-  struct midi_event_t event[2], tmpevent;
+  struct midi_event_t event[2], lastevent;
 
   if (totlen != NULL) *totlen = 0;
   /* fetch first events for both tracks */
@@ -389,52 +398,52 @@ long midi_mergetrack(long t0, long t1, unsigned long *totlen, unsigned short tim
   while ((t0 >= 0) || (t1 >= 0)) {
     /* compare both tracks, and select the soonest one */
     if (t0 >= 0) {
-        if ((t1 >= 0) && (event[1].deltatime < event[0].deltatime)) {
-          selected = 1;
-          selectedid = t1;
-        } else {
-          selected = 0;
-          selectedid = t0;
-        }
-      } else {
+      if ((t1 >= 0) && (event[1].deltatime < event[0].deltatime)) {
         selected = 1;
         selectedid = t1;
+      } else {
+        selected = 0;
+        selectedid = t0;
+      }
+    } else {
+      selected = 1;
+      selectedid = t1;
     }
-    /* if no result yet, assign it */
-    if (res < 0) {
-        res = selectedid;
-        lasteventid = selectedid;
-      } else { /* otherwise attach the selected track to the last note, and update last pointer */
-        pullevent(lasteventid, &tmpevent);
-        tmpevent.next = selectedid;
-        pushevent(&tmpevent, lasteventid);
-        lasteventid = selectedid;
-    }
+    /* on first iteration, make sure to assign a result */
+    if (lasteventid < 0) {
+      res = selectedid;
+    } else if (lastevent.next != selectedid) { /* otherwise attach selected */
+      lastevent.next = selectedid;             /* track to last note, and   */
+      pushevent(&lastevent, lasteventid);      /* update last pointer (if   */
+    }                                          /* not good already)         */
+    /* save the last event into buffer for later, and remember its id */
+    lasteventid = selectedid;
+    memcpy(&lastevent, &(event[selected]), sizeof(struct midi_event_t));
     /* increment timer */
-    if (totlen != NULL) {
+    if ((totlen != NULL) && (event[selected].deltatime != 0)) {
       utotlen += event[selected].deltatime * curtempo / timeunitdiv;
       while (utotlen >= 1000000lu) {
         utotlen -= 1000000lu;
         *totlen += 1;
       }
-      if (event[selected].type == EVENT_TEMPO) curtempo = event[selected].data.tempoval;
     }
-    /* decrement timer on the non-selected track, and synch it to xms */
-    /* move along on the selected track, and fetch it from xms */
+    if (event[selected].type == EVENT_TEMPO) curtempo = event[selected].data.tempoval;
+    /* decrement timer on the non-selected track, and synch it to xms if needed */
+    /* then move along on the selected track, and fetch it from xms */
     if (selected == 0) {
-        if (t1 >= 0) {
-          event[1].deltatime -= event[0].deltatime;
-          pushevent(&event[1], t1);
-        }
-        t0 = event[0].next;
-        if (t0 >= 0) pullevent(t0, &event[0]);
-      } else { /* selected == 1 */
-        if (t0 >= 0) {
-          event[0].deltatime -= event[1].deltatime;
-          pushevent(&event[0], t0);
-        }
-        t1 = event[1].next;
-        if (t1 >= 0) pullevent(t1, &event[1]);
+      if ((t1 >= 0) && (event[0].deltatime != 0)) {
+        event[1].deltatime -= event[0].deltatime;
+        pushevent(&event[1], t1);
+      }
+      t0 = event[0].next;
+      if (t0 >= 0) pullevent(t0, &event[0]);
+    } else { /* selected == 1 */
+      if ((t0 >= 0) && (event[1].deltatime != 0)) {
+        event[0].deltatime -= event[1].deltatime;
+        pushevent(&event[0], t0);
+      }
+      t1 = event[1].next;
+      if (t1 >= 0) pullevent(t1, &event[1]);
     }
   }
   return(res);

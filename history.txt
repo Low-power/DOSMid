@@ -5,6 +5,7 @@
 DOSMid v0.7 [xx xxx xxxx]
  - native support for SB AWE32/AWE64 sound cards (no need for AWEUTIL),
  - support for *.MUS files (as used in many Doom-like games by Id Software),
+ - optimized MIDI loading routines - MIDI files are loading twice as fast now,
  - song's filename is displayed during load time,
  - /nodelay option is no longer default (use /delay to force),
  - ...

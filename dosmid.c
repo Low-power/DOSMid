@@ -542,13 +542,15 @@ static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struc
     if (params->logfd != NULL) fprintf(params->logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, chunkmap[i].offset);
     fseek(fd, chunkmap[i].offset, SEEK_SET);
     if (i == 0) {
-        newtrack = midi_track2events(fd, trackinfo->title, UI_TITLENODES, UI_TITLEMAXLEN, trackinfo->copyright, UI_COPYRIGHTMAXLEN, &(trackinfo->channelsusage), params->logfd);
-      } else {
-        newtrack = midi_track2events(fd, NULL, 0, UI_TITLEMAXLEN, NULL, 0, &(trackinfo->channelsusage), params->logfd);
+      newtrack = midi_track2events(fd, trackinfo->title, UI_TITLENODES, UI_TITLEMAXLEN, trackinfo->copyright, UI_COPYRIGHTMAXLEN, &(trackinfo->channelsusage), params->logfd);
+    } else {
+      newtrack = midi_track2events(fd, NULL, 0, UI_TITLEMAXLEN, NULL, 0, &(trackinfo->channelsusage), params->logfd);
+      if (params->logfd != NULL) fprintf(params->logfd, "TRACK %d LOADED (start id=%ld) -> MERGING NOW\n", i, newtrack);
     }
-    if (params->logfd != NULL) fprintf(params->logfd, "TRACK %d LOADED -> MERGING NOW\n", i);
-    *trackpos = midi_mergetrack(*trackpos, newtrack, &(trackinfo->totlen), trackinfo->miditimeunitdiv);
-    /* printf("merged track starts with %ld\n", trackpos); */
+    if (newtrack >= 0) {
+      *trackpos = midi_mergetrack(*trackpos, newtrack, &(trackinfo->totlen), trackinfo->miditimeunitdiv);
+      if (params->logfd != NULL) fprintf(params->logfd, "TRACK %d MERGED (start id=%ld) -> TOTAL TIME: %ld\n", i, *trackpos, trackinfo->totlen);
+    }
   }
   free(chunkmap);
 
@@ -561,7 +563,6 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
   unsigned char hdr[16];
   enum playactions res;
   enum fileformats fileformat;
-  time_t loadtime = time(NULL); /* TODO remove me */
 
   /* flush all MIDI events from memory for new events to have where to load */
   flushevents();
@@ -593,7 +594,6 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
     case FORMAT_MUS:
       /* memset(trackinfo, 0, sizeof(struct trackinfodata)); */ /* should I ? */
       *trackpos = mus_load(fd, &(trackinfo->totlen), &(trackinfo->miditimeunitdiv), &(trackinfo->channelsusage));
-      sleep(1);
       if (*trackpos < 0) {
         char msg[64];
         res = ACTION_ERR_SOFT;
@@ -610,9 +610,6 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
   }
 
   fclose(fd);
-
-  printf("LOAD TIME: %d s\n", time(NULL) - loadtime);
-  sleep(3);
 
   return(res);
 }
@@ -659,7 +656,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   exitaction = loadfile(params, trackinfo, &trackpos);
   if (exitaction != ACTION_NONE) return(exitaction);
 
-  if (params->logfd != NULL) fputs("RESET MPU-401", params->logfd);
+  if (params->logfd != NULL) fprintf(params->logfd, "RESET MPU-401\n");
   if (dev_init(params->device, params->devport) != 0) {
     ui_puterrmsg("Hardware error", "Error: Failed to initialize the sound device");
     return(ACTION_ERR_HARD);
@@ -712,6 +709,10 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
             volume -= 5;
             if (volume < 0) volume = 0;
             refreshflags |= UI_REFRESH_VOLUME;
+            break;
+          case ' ':  /* pause */
+            ui_puterrmsg("PAUSE", "-- Press any key --");
+            getkey();
             break;
         }
         /* do I need to refresh the screen now? if not, just call INT28h */
@@ -777,7 +778,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 
   }
 
-  if (params->logfd != NULL) fputs("Clear notes", params->logfd);
+  if (params->logfd != NULL) fprintf(params->logfd, "Clear notes\n");
 
   /* Look for notes that are still ON and turn them OFF */
   for (i = 0; i < 128; i++) {
@@ -792,7 +793,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     }
   }
 
-  if (params->logfd != NULL) fputs("Reset MPU", params->logfd);
+  if (params->logfd != NULL) fprintf(params->logfd, "Reset MPU\n");
   dev_clear(); /* reinit the device */
   dev_close();
 
@@ -914,13 +915,13 @@ int main(int argc, char **argv) {
   mem_close();
 
   /* free allocated heap memory */
-  if (params.logfd != NULL) fputs("Free heap memory", params.logfd);
+  if (params.logfd != NULL) fprintf(params.logfd, "Free heap memory\n");
   free(trackinfo);
   free(eventscache);
 
   /* if a verbose log file was used, close it now */
   if (params.logfd != NULL) {
-    fputs("Closing the log file", params.logfd);
+    fprintf(params.logfd, "Closing the log file\n");
     fclose(params.logfd);
   }
 
