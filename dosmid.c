@@ -615,6 +615,36 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
 }
 
 
+static void pauseplay(unsigned long *starttime, unsigned long *nexteventtime, struct trackinfodata *trackinfo) {
+  unsigned long beforepause, afterpause, deltaremainder;
+  int i;
+  /* save timing information */
+  timer_read(&beforepause);
+  deltaremainder = *nexteventtime - beforepause;
+  /* print a pause message on screen */
+  ui_puterrmsg("PAUSE", "[ Press any key ]");
+  /* turn off all notes before pausing */
+  for (i = 0; i < 128; i++) {
+    if (trackinfo->notestates[i] != 0) {
+      int c;
+      for (c = 0; c < 16; c++) {
+        if (trackinfo->notestates[i] & (1 << c)) {
+          /* printf("note #%d is still playing on channel %d\n", i, c); */
+          dev_noteoff(c, i);
+        }
+      }
+    }
+  }
+  /* wait for a key press */
+  getkey();
+  /* restore play timing */
+  timer_read(&afterpause);
+  *nexteventtime = afterpause + deltaremainder;  /* set nexteventtime to resync the song */
+  /* adapt starttime to keep the progress bar in sync */
+  *starttime += (afterpause - beforepause);
+}
+
+
 /* plays a file. returns 0 on success, non-zero if the program must exit */
 static enum playactions playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event_t *eventscache) {
   static int volume = 100; /* volume is static because it needs to be retained between songs */
@@ -711,21 +741,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
             refreshflags |= UI_REFRESH_VOLUME;
             break;
           case ' ':  /* pause */
-            ui_puterrmsg("PAUSE", "[ Press any key ]");
-            /* turn off all notes before pausing */
-            for (i = 0; i < 128; i++) {
-              if (trackinfo->notestates[i] != 0) {
-                int c;
-                for (c = 0; c < 16; c++) {
-                  if (trackinfo->notestates[i] & (1 << c)) {
-                    /* printf("note #%d is still playing on channel %d\n", i, c); */
-                    dev_noteoff(c, i);
-                  }
-                }
-              }
-            }
-            getkey();
-            timer_read(&nexteventtime); /* set nexteventtime to NOW to resync the song */
+            pauseplay(&midiplaybackstart, &nexteventtime, trackinfo);
             break;
         }
         /* do I need to refresh the screen now? if not, just call INT28h */
