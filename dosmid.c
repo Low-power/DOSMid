@@ -711,8 +711,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
             refreshflags |= UI_REFRESH_VOLUME;
             break;
           case ' ':  /* pause */
-            ui_puterrmsg("PAUSE", "-- Press any key --");
+            ui_puterrmsg("PAUSE", "[ Press any key ]");
             getkey();
+            timer_read(&nexteventtime); /* set nexteventtime to NOW to resync the song */
             break;
         }
         /* do I need to refresh the screen now? if not, just call INT28h */
