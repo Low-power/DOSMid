@@ -1,5 +1,5 @@
 /*
- * Library to access OPL2 hardware
+ * Library to access OPL2/OPL3 hardware (YM3812 / YMF262)
  *
  * Copyright (c) 2015, Mateusz Viste
  * All rights reserved.
@@ -30,6 +30,46 @@
 #ifndef opl_h_sentinel
 #define opl_h_sentinel
 
+struct timbre_t {
+  unsigned long modulator_E862, carrier_E862;
+  unsigned char modulator_40, carrier_40;
+  unsigned char feedconn;
+  signed char finetune;
+};
 
+/* Initialize hardware upon startup - positive on success, negative otherwise
+ * Returns 0 for OPL2 initialization, or 1 if OPL3 has been detected */
+int opl_init(unsigned short port);
+
+/* close OPL device */
+void opl_close(unsigned short port);
+
+/* turns off all notes */
+void opl_clear(unsigned short port);
+
+/* turn note 'on', on emulated MIDI channel */
+void opl_midi_noteon(unsigned short port, int channel, int note, int velocity);
+
+/* turn note 'off', on emulated MIDI channel */
+void opl_midi_noteoff(unsigned short port, int channel, int note);
+
+/* adjust the pitch wheel on emulated MIDI channel */
+void opl_midi_pitchwheel(unsigned short outport, int channel, int wheelvalue);
+
+/* assign a new instrument to emulated MIDI channel */
+void opl_midi_changeprog(int channel, int program);
+
+/* the functions below are not necessarily useful - if you want to play MIDI,
+ * you will probably prefer to use the opl_midi_* emulation layer instead of
+ * dealing with OPL's voices directly - in any case, do NOT mix calls to MIDI
+ * emulation functions (opl_midi_*) with any of the functions below! */
+
+void opl_loadinstrument(unsigned short port, unsigned short voice, struct timbre_t *timbre);
+
+/* turn off note on selected voice */
+void opl_noteoff(unsigned short port, unsigned short voice);
+
+/* turn on note on selected voice */
+void opl_noteon(unsigned short port, unsigned short voice, unsigned int note, int pitch);
 
 #endif

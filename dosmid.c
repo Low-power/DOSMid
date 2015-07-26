@@ -171,7 +171,9 @@ static char *devtoname(enum outdev_types device) {
   switch (device) {
     case DEV_MPU401: return("MPU");
     case DEV_AWE:    return("AWE");
-    case DEV_OPL2:   return("OPL");
+    case DEV_OPL:    return("OPL");
+    case DEV_OPL2:   return("OPL2");
+    case DEV_OPL3:   return("OPL3");
     default:         return("UNK");
   }
 }
@@ -263,6 +265,9 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       params->devport = params->port_mpu;
       /* if MPU port not found in BLASTER, use the default 0x330 */
       if (params->devport == 0) params->devport = 0x330;
+    } else if (strcmp(argv[i], "/opl") == 0) {
+      params->device = DEV_OPL;
+      params->devport = 0x388;
     } else if (stringstartswith(argv[i], "/awe=") == 0) {
       params->device = DEV_AWE;
       params->devport = hexstr2uint(argv[i] + 5);
@@ -271,6 +276,10 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       params->device = DEV_MPU401;
       params->devport = hexstr2uint(argv[i] + 5);
       if (params->devport < 1) return("Invalid MPU port provided. Example: /mpu=330");
+    } else if (stringstartswith(argv[i], "/opl=") == 0) {
+      params->device = DEV_OPL;
+      params->devport = hexstr2uint(argv[i] + 5);
+      if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388");
     } else if (stringstartswith(argv[i], "/log=") == 0) {
       params->logfd = fopen(argv[i] + 5, "wb");
       if (params->logfd == NULL) {
@@ -437,9 +446,9 @@ static void preload_outdev(struct clioptions *params) {
   } else if (params->port_mpu > 0) { /* then look for MPU */
     params->device = DEV_MPU401;
     params->devport = params->port_mpu;
-  } else { /* if all else fails, fallback to MPU401 on 0x330 */
-    params->device = DEV_MPU401;
-    params->devport = 0x330;
+  } else { /* if all else fails, fallback to OPL on 388h */
+    params->device = DEV_OPL;
+    params->devport = 0x388;
   }
 }
 
@@ -671,7 +680,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     params->midifile = getnextm3uitem(params->playlist);
     if (params->midifile == NULL) {
       ui_puterrmsg(params->playlist, "Error: Failed to fetch an entry from the playlist");
-      return(ACTION_ERR_SOFT);
+      return(ACTION_ERR_HARD); /* this must be a hard error otherwise DOSMid might be trapped into a loop */
     }
   }
 
@@ -691,6 +700,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     ui_puterrmsg("Hardware error", "Error: Failed to initialize the sound device");
     return(ACTION_ERR_HARD);
   }
+  /* refresh the outdev and its name (might have been changed due to OPL autodetection) */
+  params->device = dev_getcurdev();
+  params->devname = devtoname(params->device);
 
   /* save start time so we can compute elapsed time later */
   timer_read(&midiplaybackstart);
@@ -860,6 +872,7 @@ int main(int argc, char **argv) {
            "            be read from the BLASTER environment variable)\n"
            " /awe[=XXX] use the EMU8000 synth on AWE32/AWE64 SoundBlaster cards, you\n"
            "            can specify the port if needed (read from BLASTER otherwise)\n"
+           " /opl[=XXX] use a FM synthesis OPL2/OPL3 chip for sound output\n"
            " /log=FILE  write highly verbose logs about DOSMid's activity to FILE\n"
            " /fullcpu   do not let DOSMid trying to be CPU-friendly\n"
            " /dontstop  never wait for a keypress on error and continue the playlist\n"

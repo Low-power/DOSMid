@@ -160,7 +160,7 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, cha
   if (*refreshflags & UI_REFRESH_VOLUME) {
     char tempstr[16];
     sprintf(tempstr, "Volume: %d%%", volume);
-    ui_printstr(18, 45, tempstr, 20, COLOR_TEMPO);
+    ui_printstr(18, 45, tempstr, 23 - strlen(devname), COLOR_TEMPO);
   }
   /* title and copyright notice */
   if (*refreshflags & UI_REFRESH_TITLECOPYR) {

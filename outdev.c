@@ -30,6 +30,7 @@
 #include <conio.h> /* outp(), inp() */
 #include <dos.h>
 
+#include "opl.h"
 #include "mpu401.h"
 #include "awe32/ctaweapi.h"
 
@@ -49,12 +50,13 @@ static unsigned short outport = 0;
 /* inits the out device, also selects the out device, from one of these:
  *  DEV_MPU401
  *  DEV_AWE
- *  DEV_OPL2
+ *  DEV_OPL
  *  DEV_NONE
  *
  * This should be called only ONCE, when program starts.
  * Returns 0 on success, non-zero otherwise. */
 int dev_init(enum outdev_types dev, unsigned short port) {
+  int res;
   outdev = dev;
   outport = port;
   switch (outdev) {
@@ -65,7 +67,7 @@ int dev_init(enum outdev_types dev, unsigned short port) {
       mpu401_uart(outport);
       break;
     case DEV_AWE:
-      if (awe32Detect(port) != 0) return(-1);
+      if (awe32Detect(outport) != 0) return(-1);
       if (awe32InitHardware() != 0) return(-2);
       /* load GM samples from AWE's ROM */
       awe32SoundPad.SPad1 = awe32SPad1Obj;
@@ -75,17 +77,31 @@ int dev_init(enum outdev_types dev, unsigned short port) {
       awe32SoundPad.SPad5 = awe32SPad5Obj;
       awe32SoundPad.SPad6 = awe32SPad6Obj;
       awe32SoundPad.SPad7 = awe32SPad7Obj;
-      /* make use of all 32 oscillators on the EMU chip (possible as long as I don't want to use DRAM sound fonts) */
-      awe32NumG = 32;
       if (awe32InitMIDI() != 0) return(-3);
       break;
+    case DEV_OPL:
     case DEV_OPL2:
+    case DEV_OPL3:
+      res = opl_init(outport);
+      if (res < 0) return(res);
+      /* change the outdev device depending on OPL autodetection */
+      if (res == 0) {
+        outdev = DEV_OPL2;
+      } else {
+        outdev = DEV_OPL3;
+      }
       break;
     case DEV_NONE:
       break;
   }
   dev_clear();
   return(0);
+}
+
+
+/* returns the device that has been inited/selected */
+enum outdev_types dev_getcurdev(void) {
+  return(outdev);
 }
 
 
@@ -101,7 +117,10 @@ void dev_close(void) {
       awe32Terminate();
       _enable();
       break;
+    case DEV_OPL:
     case DEV_OPL2:
+    case DEV_OPL3:
+      opl_close(outport);
       break;
     case DEV_NONE:
       break;
@@ -123,7 +142,10 @@ void dev_clear(void) {
         dev_controller(i, 121, 0);   /* "all controllers off" */
       }
       break;
+    case DEV_OPL:
     case DEV_OPL2:
+    case DEV_OPL3:
+      opl_clear(outport);
       break;
     case DEV_NONE:
       break;
@@ -144,7 +166,10 @@ void dev_noteon(int channel, int note, int velocity) {
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, velocity);        /* Send velocity */
       break;
+    case DEV_OPL:
     case DEV_OPL2:
+    case DEV_OPL3:
+      opl_midi_noteon(outport, channel, note, velocity);
       break;
     case DEV_AWE:
       awe32NoteOn(channel, note, velocity);
@@ -166,7 +191,10 @@ void dev_noteoff(int channel, int note) {
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, 64);              /* Send velocity */
       break;
+    case DEV_OPL:
     case DEV_OPL2:
+    case DEV_OPL3:
+      opl_midi_noteoff(outport, channel, note);
       break;
     case DEV_AWE:
       awe32NoteOff(channel, note, 64);
@@ -188,7 +216,10 @@ void dev_pitchwheel(int channel, int wheelvalue) {
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, wheelvalue >> 7); /* Send the highest (most significant) 7 bits of the wheel value */
       break;
+    case DEV_OPL:
     case DEV_OPL2:
+    case DEV_OPL3:
+      opl_midi_pitchwheel(outport, channel, wheelvalue);
       break;
     case DEV_AWE:
       awe32PitchBend(channel, wheelvalue & 127, wheelvalue >> 7);
@@ -210,7 +241,9 @@ void dev_controller(int channel, int id, int val) {
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, val);             /* Send controller's value */
       break;
+    case DEV_OPL:
     case DEV_OPL2:
+    case DEV_OPL3:
       break;
     case DEV_AWE:
       awe32Controller(channel, id, val);
@@ -229,7 +262,9 @@ void dev_chanpressure(int channel, int pressure) {
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, pressure);        /* Send the pressure value */
       break;
+    case DEV_OPL:
     case DEV_OPL2:
+    case DEV_OPL3:
       break;
     case DEV_AWE:
       awe32ChannelPressure(channel, pressure);
@@ -250,7 +285,9 @@ void dev_keypressure(int channel, int note, int pressure) {
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, pressure);        /* Send the pressure value */
       break;
+    case DEV_OPL:
     case DEV_OPL2:
+    case DEV_OPL3:
       break;
     case DEV_AWE:
       awe32PolyKeyPressure(channel, note, pressure);
@@ -267,7 +304,9 @@ void dev_tick(void) {
     case DEV_MPU401:
       mpu401_flush(outport);
       break;
+    case DEV_OPL:
     case DEV_OPL2:
+    case DEV_OPL3:
       break;
     case DEV_NONE:
       break;
@@ -284,7 +323,10 @@ void dev_setprog(int channel, int program) {
       mpu401_waitwrite(outport);     /* Wait for port ready */
       outp(outport, program);        /* Send patch id */
       break;
+    case DEV_OPL:
     case DEV_OPL2:
+    case DEV_OPL3:
+      opl_midi_changeprog(channel, program);
       break;
     case DEV_AWE:
       awe32ProgramChange(channel, program);

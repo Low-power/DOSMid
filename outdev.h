@@ -34,7 +34,9 @@ enum outdev_types {
   DEV_NONE,
   DEV_MPU401,
   DEV_AWE,
-  DEV_OPL2
+  DEV_OPL,
+  DEV_OPL2,
+  DEV_OPL3
 };
 
 
@@ -48,6 +50,9 @@ enum outdev_types {
  * Returns 0 on success, non-zero otherwise.
  */
 int dev_init(enum outdev_types dev, unsigned short port);
+
+/* returns the device that has been inited/selected */
+enum outdev_types dev_getcurdev(void);
 
 /* close/deinitializes the out device */
 void dev_close(void);
