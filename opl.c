@@ -1,5 +1,5 @@
 /*
- * Library to access OPL2 hardware (YMF262 / YM3812)
+ * Library to access OPL2/OPL3 hardware (YM3812 / YMF262)
  *
  * Copyright (c) 2015, Mateusz Viste
  * All rights reserved.
@@ -114,40 +114,14 @@ static unsigned short pitchtable[256] = {                   /* pitch wheel */
          36254U,36286U,36319U,36352U,36385U,36417U,36450U,36483U,  /*  112 */
          36516U,36549U,36582U,36615U,36648U,36681U,36715U,36748U}; /*  120 */
 
-/* The next table looks magical, but it certainly is not. Its values have
- * been calculated as table[i]=8*log(i/64)/log(2) with an obvious exception
- * for i=0. This log-table converts a linear volume-scaling (0..127) to a
- * logarithmic scaling as present in the FM-synthesizer chips. so : Volume
- * 64 =  0 db = relative volume  0 and:    Volume 32 = -6 db = relative
- * volume -8 it was implemented as a table because it is only 128 bytes and
- * it saves a lot of log() calculations. (RH)
- * NOTE: This is copied from Linux source tree (/sound/oss/opl3.c) */
-static signed char fm_volume_table[128] = {
-  -64, -48, -40, -35, -32, -29, -27, -26,
-  -24, -23, -21, -20, -19, -18, -18, -17,
-  -16, -15, -15, -14, -13, -13, -12, -12,
-  -11, -11, -10, -10, -10,  -9,  -9,  -8,
-   -8,  -8,  -7,  -7,  -7,  -6,  -6,  -6,
-   -5,  -5,  -5,  -5,  -4,  -4,  -4,  -4,
-   -3,  -3,  -3,  -3,  -2,  -2,  -2,  -2,
-   -2,  -1,  -1,  -1,  -1,   0,   0,   0,
-    0,   0,   0,   1,   1,   1,   1,   1,
-    1,   2,   2,   2,   2,   2,   2,   2,
-    3,   3,   3,   3,   3,   3,   3,   4,
-    4,   4,   4,   4,   4,   4,   4,   5,
-    5,   5,   5,   5,   5,   5,   5,   5,
-    6,   6,   6,   6,   6,   6,   6,   6,
-    6,   7,   7,   7,   7,   7,   7,   7,
-    7,   7,   7,   8,   8,   8,   8,   8};
 
-
-/* tables below provides register offsets for each voice. note that these are
- * are NOT the registers IDs, but their direct offsets instead for simpler
- * computations. also, percussion channels have been skipped */
+/* tables below provide register offsets for each voice. note, that these are
+ * NOT the registers IDs, but their direct offsets instead - this for simpler
+ * and faster computations. */
 const unsigned short op1offsets[18] = {0x00,0x01,0x02,0x08,0x09,0x0a,0x10,0x11,0x12,0x100,0x101,0x102,0x108,0x109,0x10a,0x110,0x111,0x112};
 const unsigned short op2offsets[18] = {0x03,0x04,0x05,0x0b,0x0c,0x0d,0x13,0x14,0x15,0x103,0x104,0x105,0x10b,0x10c,0x10d,0x113,0x114,0x115};
 
-/* number of available voices: 9 by default (OPL2), can go up to 18 (OPL3) */
+/* number of supported voices: 9 by default (OPL2), can go up to 18 (OPL3) */
 static int voicescount = 9;
 
 
@@ -182,21 +156,23 @@ static void oplregwr(unsigned short port, unsigned short reg, unsigned char data
  * part of the register, and never touch the KSL bits */
 static void calc_vol(unsigned char *regbyte, int volume) {
   int level;
+  /* invert bits and strip out the KSL header */
   level = ~(*regbyte);
   level &= 0x3f;
 
-  /* adjust volume using the precomputed logarithmic volume table */
-  level += fm_volume_table[volume];
+  /* adjust volume */
+  level = (level * volume) / 127;
 
   /* boundaries check */
   if (level > 0x3f) level = 0x3f;
   if (level < 0) level = 0;
 
+  /* invert the bits, as expected by the OPL registers */
   level = ~level;
   level &= 0x3f;
 
   /* final result computation */
-  *regbyte &= 0xC0; /* zero out all attentuation bits */
+  *regbyte &= 0xC0;  /* zero out all attentuation bits */
   *regbyte |= level; /* fill in the new attentuation value */
 }
 
