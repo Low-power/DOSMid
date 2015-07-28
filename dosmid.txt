@@ -16,7 +16,7 @@ cards provide an MPU-401 interface natively, although many need an additional
 'wavetable' daughterboard to produce actual MIDI sound.
 Since DOSMid v0.7 it is also possible to somewhat emulate MIDI via FM
 synthesis using an OPL chip (that is one of the Yamaha YM3812 or YMF262 chips,
-found on most sound cards from the late nineties) - be warned however that
+found on most sound cards from the late nineties) - be warned however that,
 most of the time, such MIDI-over-OPL emulation will yeld less than desirable
 results, unless the MIDI file was specifically crafted for OPL.
 

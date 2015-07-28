@@ -1,7 +1,7 @@
 Begin3
 Title:           DOSMid
-Version:         0.6.1
-Entered-date:    01 Jul 2015
+Version:         0.7
+Entered-date:    29 Jul 2015
 Description:     a real mode MIDI player for AWE, MPU-401 and OPL synthesizers
 Keywords:        midi,player
 Author:          Mateusz Viste
