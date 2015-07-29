@@ -58,10 +58,12 @@ DOSMID [options] file.mid (or m3u playlist)
            means you can use "/mpu" to just force MPU usage.
  /awe=XXX  Use the EMU8000 synth chip found on SoundBlaster AWE32/AWE64 cards
            on port XXX (the port is optional, you can specify just "/awe").
-           Known bug: On some AWE cards, the FM music module becomes muted or
+           KNOWN BUG: On some AWE cards, the FM music module becomes muted or
            noisy after using the EMU8000 chip. This is not a bug in DOSMid,
            and happens with other applications using AWE as well. If you have
            this problem, execute AWEUTIL /S after using DOSMid to reinit FM.
+           I observed this problem on an AWE64 CT4390 ("Gold"), but not on an
+           AWE32 CT2760.
  /opl=XXX  Use an OPL2-compatible chip on port XXX. This should be a last
            resort option if you don't have a wavetable device. Do NOT expect
            pleasing results. The port part is optional ("/opl" will use port
