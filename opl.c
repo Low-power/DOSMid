@@ -351,6 +351,12 @@ void opl_midi_controller(unsigned short oplport, int channel, int id, int value)
     case 11: /* "Expression" (meaning "channel volume") */
       oplmem->channelvol[channel] = value;
       break;
+    case 123: /* 'all notes off' */
+      for (x = 0; x < voicescount; x++) {
+        if (oplmem->voices2notes[x].channel != channel) continue;
+        opl_midi_noteoff(oplport, channel, oplmem->voices2notes[x].note);
+      }
+      break;
   }
 }
 
