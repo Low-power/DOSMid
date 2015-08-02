@@ -352,6 +352,7 @@ void opl_midi_controller(unsigned short oplport, int channel, int id, int value)
       oplmem->channelvol[channel] = value;
       break;
     case 123: /* 'all notes off' */
+    case 120: /* 'all sound off' - I map it to 'all notes off' for now, not perfect but better than not handling it at all */
       for (x = 0; x < voicescount; x++) {
         if (oplmem->voices2notes[x].channel != channel) continue;
         opl_midi_noteoff(oplport, channel, oplmem->voices2notes[x].note);
