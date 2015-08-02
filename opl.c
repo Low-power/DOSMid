@@ -47,6 +47,7 @@ struct voicealloc_t {
 struct oplstate_t {
   signed char notes2voices[16][128];    /* keeps the map of channel:notes -> voice allocations */
   unsigned short channelpitch[16];      /* per-channel pitch level */
+  unsigned short channelvol[16];        /* per-channel pitch level */
   struct voicealloc_t voices2notes[18]; /* keeps the map of what voice is playing what note/channel currently */
   unsigned char channelprog[16];        /* programs (patches) assigned to channels */
   int opl3; /* flag indicating whether or not the sound module is OPL3-compatible or only OPL2 */
@@ -283,8 +284,12 @@ void opl_clear(unsigned short port) {
     for (y = 0; y < 128; y++) oplmem->notes2voices[x][y] = -1;
   }
 
-  /* pre-set emulated channel patches to default GM ids */
-  for (x = 0; x < 16; x++) opl_midi_changeprog(x, x);
+  /* pre-set emulated channel patches to default GM ids and reset all
+   * per-channel volumes */
+  for (x = 0; x < 16; x++) {
+    opl_midi_changeprog(x, x);
+    oplmem->channelvol[x] = 127;
+  }
 }
 
 
@@ -322,15 +327,31 @@ void opl_noteon(unsigned short port, unsigned short voice, unsigned int note, in
     voice |= 0x100;
   }
 
-  oplregwr(port, 0xA0 + voice, freq & 0xff);
-  oplregwr(port, 0xB0 + voice, (freq >> 8) | (octave << 2) | 32);
-
+  oplregwr(port, 0xA0 + voice, freq & 0xff); /* set lowfreq */
+  oplregwr(port, 0xB0 + voice, (freq >> 8) | (octave << 2) | 32); /* KEY ON + hifreq + octave */
 }
 
 
 void opl_midi_pitchwheel(unsigned short oplport, int channel, int pitchwheel) {
-  /* FIXME I think the pitch should impact currently playing notes, not only the new ones (?) */
+  /*int x;*/
+  /* update the new pitch value for channel (used by newly played notes) */
   oplmem->channelpitch[channel] = pitchwheel;
+  /* check all active voices to see who is playing on given channel now, and
+   * recompute all playing notes for this channel with the new pitch TODO */
+  /*for (x = 0; x < voicescount; x++) {
+    if (oplmem->voices2notes[x].channel != channel) continue;
+    opl_noteon(oplport, x, oplmem->voices2notes[x].note, pitchwheel + gmtimbres[oplmem->voices2notes[x].timbreid].finetune);
+  }*/
+}
+
+
+void opl_midi_controller(unsigned short oplport, int channel, int id, int value) {
+  int x;
+  switch (id) {
+    case 11: /* "Expression" (meaning "channel volume") */
+      oplmem->channelvol[channel] = value;
+      break;
+  }
 }
 
 
@@ -444,7 +465,7 @@ void opl_midi_noteon(unsigned short port, int channel, int note, int velocity) {
   oplmem->notes2voices[channel][note] = voice;
 
   /* set the requested velocity on the voice */
-  voicevolume(port, voice, oplmem->voices2notes[voice].timbreid, velocity);
+  voicevolume(port, voice, oplmem->voices2notes[voice].timbreid, velocity * oplmem->channelvol[channel] / 127);
 
   /* trigger NOTE_ON on the OPL, take care to apply the 'finetune' pitch correction, too */
   if (channel == 9) { /* percussion channel doesn't provide a real note (FIXME what should I use as the 'note'??) */

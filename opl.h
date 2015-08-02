@@ -56,6 +56,9 @@ void opl_midi_noteoff(unsigned short port, int channel, int note);
 /* adjust the pitch wheel on emulated MIDI channel */
 void opl_midi_pitchwheel(unsigned short outport, int channel, int wheelvalue);
 
+/* emulate MIDI 'controller' messages on the OPL */
+void opl_midi_controller(unsigned short oplport, int channel, int id, int value);
+
 /* assign a new instrument to emulated MIDI channel */
 void opl_midi_changeprog(int channel, int program);
 

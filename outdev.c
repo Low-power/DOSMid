@@ -244,6 +244,7 @@ void dev_controller(int channel, int id, int val) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
+      opl_midi_controller(outport, channel, id, val);
       break;
     case DEV_AWE:
       awe32Controller(channel, id, val);
