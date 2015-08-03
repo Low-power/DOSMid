@@ -38,10 +38,11 @@
 #include "midi.h"
 #include "mus.h"
 #include "outdev.h"
+#include "rs232.h"
 #include "timer.h"
 #include "ui.h"
 
-#define PVER "0.7"
+#define PVER "0.8"
 #define PDATE "2014-2015"
 
 #define MAXTRACKS 64
@@ -130,8 +131,8 @@ static int stringstartswith(char *str, char *start) {
 
 static int hexchar2int(char c) {
   if ((c >= '0') && (c <= '9')) return(c - '0');
-  if ((c >= 'a') && (c <= 'f')) return(c - 'a');
-  if ((c >= 'A') && (c <= 'F')) return(c - 'A');
+  if ((c >= 'a') && (c <= 'f')) return(10 + c - 'a');
+  if ((c >= 'A') && (c <= 'F')) return(10 + c - 'A');
   return(-1);
 }
 
@@ -174,6 +175,7 @@ static char *devtoname(enum outdev_types device) {
     case DEV_OPL:    return("OPL");
     case DEV_OPL2:   return("OPL2");
     case DEV_OPL3:   return("OPL3");
+    case DEV_RS232:  return("COM");
     default:         return("UNK");
   }
 }
@@ -280,6 +282,16 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       params->device = DEV_OPL;
       params->devport = hexstr2uint(argv[i] + 5);
       if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388");
+    } else if (stringstartswith(argv[i], "/com=") == 0) {
+      params->device = DEV_RS232;
+      params->devport = hexstr2uint(argv[i] + 5);
+      if (params->devport < 10) return("Invalid COM port provided. Example: /com=3f8");
+    } else if (stringstartswith(argv[i], "/com") == 0) {
+      params->device = DEV_RS232;
+      params->devport = hexstr2uint(argv[i] + 4);
+      if ((params->devport < 1) || (params->devport > 4)) return("Invalid COM port provided. Example: /com1");
+      params->devport = rs232_getport(params->devport);
+      if (params->devport < 1) return("Failed to autodetect the I/O address of this COM port.");
     } else if (stringstartswith(argv[i], "/log=") == 0) {
       params->logfd = fopen(argv[i] + 5, "wb");
       if (params->logfd == NULL) {
@@ -873,6 +885,9 @@ int main(int argc, char **argv) {
            " /awe[=XXX] use the EMU8000 synth on AWE32/AWE64 SoundBlaster cards, you\n"
            "            can specify the port if needed (read from BLASTER otherwise)\n"
            " /opl[=XXX] use a FM synthesis OPL2/OPL3 chip for sound output\n"
+           " /com[=XXX] output MIDI messages via the RS232 port at I/O address XXX\n"
+           " /comX      same as /com=XXX, but instead of an I/O address, it takes the\n"
+           "            human COM number from range 1..4 (example: /com1)\n"
            " /log=FILE  write highly verbose logs about DOSMid's activity to FILE\n"
            " /fullcpu   do not let DOSMid trying to be CPU-friendly\n"
            " /dontstop  never wait for a keypress on error and continue the playlist\n"

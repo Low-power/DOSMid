@@ -22,7 +22,8 @@ results, unless the MIDI file was specifically crafted for OPL.
 
 Minimal requirements:
  - a MPU-401 compatible sound card with a synthesizer (wavetable or external),
-   or a SoundBlaster AWE32/AWE64, or (if desperate) an OPL FM synth
+   or a SoundBlaster AWE32/AWE64, or a serial-attached synth, or (if
+   desperate) an OPL FM synth
  - an 8086 CPU or better
  - a video card able to display an 80x25 text mode (ie. CGA or better)
 
@@ -68,6 +69,16 @@ DOSMID [options] file.mid (or m3u playlist)
            resort option if you don't have a wavetable device. Do NOT expect
            pleasing results. The port part is optional ("/opl" will use port
            388h by default).
+ /com=XXX  Send MIDI messages out via the RS232 port at I/O port XXX. This can
+  or /com1 be used to hook a hardware synth to a computer with no MPU
+  or /com2 interface, only a standard serial port. DOSMid does NOT reconfigure
+  or /com3 the COM port, so you should take care of setting it correctly, for
+  or /com4 example using the 'MODE COM1: ...' command. The port part is not
+           optional, you are expected to pass the hexadecimal I/O address of
+           the RS232 port you wish to use (for example "/com=3f8" is pointing
+           to COM1 on most BIOS implementations).
+           It is also possible to use simpler "/com1", "/com2", "/com3" and
+           "/com3" switches. These will autodetect the correct I/O port.
  /log=FILE Logs all DOSMid activity to FILE. This is clearly a debugging
            option that you shouldn't be interested in. Beware, the log file
            can be pretty big (much bigger than the MIDI file you are playing).

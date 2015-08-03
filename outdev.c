@@ -32,6 +32,7 @@
 
 #include "opl.h"
 #include "mpu401.h"
+#include "rs232.h"
 #include "awe32/ctaweapi.h"
 
 #include "outdev.h" /* include self for control */
@@ -51,6 +52,7 @@ static unsigned short outport = 0;
  *  DEV_MPU401
  *  DEV_AWE
  *  DEV_OPL
+ *  DEV_RS232
  *  DEV_NONE
  *
  * This should be called only ONCE, when program starts.
@@ -91,6 +93,8 @@ int dev_init(enum outdev_types dev, unsigned short port) {
         outdev = DEV_OPL3;
       }
       break;
+    case DEV_RS232:
+      break;
     case DEV_NONE:
       break;
   }
@@ -122,6 +126,8 @@ void dev_close(void) {
     case DEV_OPL3:
       opl_close(outport);
       break;
+    case DEV_RS232:
+      break;
     case DEV_NONE:
       break;
   }
@@ -135,6 +141,7 @@ void dev_clear(void) {
   switch (outdev) {
     case DEV_MPU401:
     case DEV_AWE:
+    case DEV_RS232:
       /* iterate on MIDI channels and send messages */
       for (i = 0; i < 16; i++) {
         dev_controller(i, 123, 0);   /* "all notes off" */
@@ -160,9 +167,9 @@ void dev_noteon(int channel, int note, int velocity) {
   switch (outdev) {
     case DEV_MPU401:
       mpu401_waitwrite(outport);      /* Wait for port ready */
-      outp(outport, 0x90 | channel);  /* Send note ON code on selected channel */
+      outp(outport, 0x90 | channel);  /* Send note ON to selected channel */
       mpu401_waitwrite(outport);      /* Wait for port ready */
-      outp(outport, note);            /* Send note Number to turn ON */
+      outp(outport, note);            /* Send note number to turn ON */
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, velocity);        /* Send velocity */
       break;
@@ -173,6 +180,11 @@ void dev_noteon(int channel, int note, int velocity) {
       break;
     case DEV_AWE:
       awe32NoteOn(channel, note, velocity);
+      break;
+    case DEV_RS232:
+      rs232_write(outport, 0x90 | channel); /* Send note ON to selected channel */
+      rs232_write(outport, note);           /* Send note number to turn ON */
+      rs232_write(outport, velocity);       /* Send velocity */
       break;
     case DEV_NONE:
       break;
@@ -199,6 +211,11 @@ void dev_noteoff(int channel, int note) {
     case DEV_AWE:
       awe32NoteOff(channel, note, 64);
       break;
+    case DEV_RS232:
+      rs232_write(outport, 0x80 | channel); /* 'note off' + channel selector */
+      rs232_write(outport, note);           /* note number */
+      rs232_write(outport, 64);             /* velocity */
+      break;
     case DEV_NONE:
       break;
   }
@@ -223,6 +240,11 @@ void dev_pitchwheel(int channel, int wheelvalue) {
       break;
     case DEV_AWE:
       awe32PitchBend(channel, wheelvalue & 127, wheelvalue >> 7);
+      break;
+    case DEV_RS232:
+      rs232_write(outport, 0xE0 | channel);   /* Send selected channel */
+      rs232_write(outport, wheelvalue & 127); /* Send the lowest (least significant) 7 bits of the wheel value */
+      rs232_write(outport, wheelvalue >> 7);  /* Send the highest (most significant) 7 bits of the wheel value */
       break;
     case DEV_NONE:
       break;
@@ -249,6 +271,11 @@ void dev_controller(int channel, int id, int val) {
     case DEV_AWE:
       awe32Controller(channel, id, val);
       break;
+    case DEV_RS232:
+      rs232_write(outport, 0xB0 | channel);  /* Send selected channel */
+      rs232_write(outport, id);              /* Send the controller's id */
+      rs232_write(outport, val);             /* Send controller's value */
+      break;
     case DEV_NONE:
       break;
   }
@@ -269,6 +296,10 @@ void dev_chanpressure(int channel, int pressure) {
       break;
     case DEV_AWE:
       awe32ChannelPressure(channel, pressure);
+      break;
+    case DEV_RS232:
+      rs232_write(outport, 0xD0 | channel);  /* Send selected channel */
+      rs232_write(outport, pressure);        /* Send the pressure value */
       break;
     case DEV_NONE:
       break;
@@ -293,6 +324,11 @@ void dev_keypressure(int channel, int note, int pressure) {
     case DEV_AWE:
       awe32PolyKeyPressure(channel, note, pressure);
       break;
+    case DEV_RS232:
+      rs232_write(outport, 0xA0 | channel);  /* Send selected channel */
+      rs232_write(outport, note);            /* Send the note we target */
+      rs232_write(outport, pressure);        /* Send the pressure value */
+      break;
     case DEV_NONE:
       break;
   }
@@ -308,6 +344,9 @@ void dev_tick(void) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
+      break;
+    case DEV_RS232:
+      /*while (rs232_read(outport) >= 0); FIXME */
       break;
     case DEV_NONE:
       break;
@@ -331,6 +370,10 @@ void dev_setprog(int channel, int program) {
       break;
     case DEV_AWE:
       awe32ProgramChange(channel, program);
+      break;
+    case DEV_RS232:
+      rs232_write(outport, 0xC0 | channel); /* Send channel */
+      rs232_write(outport, program);        /* Send patch id */
       break;
     case DEV_NONE:
       break;

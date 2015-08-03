@@ -4,8 +4,8 @@ MODE = c
 
 all: dosmid.exe
 
-dosmid.exe: dosmid.c mem.c midi.c mpu401.c mus.c opl.c outdev.c timer.c ui.c xms.c
-	wcl -lr -we -d0 -0 -s -m$(MODE) -wx dosmid.c mem.c midi.c mpu401.c mus.c opl.c outdev.c timer.c ui.c xms.c awe32\rawe32$(MODE).lib
+dosmid.exe: dosmid.c mem.c midi.c mpu401.c mus.c opl.c outdev.c rs232.c timer.c ui.c xms.c
+	wcl -lr -we -d0 -0 -s -m$(MODE) -wx dosmid.c mem.c midi.c mpu401.c mus.c opl.c outdev.c rs232.c timer.c ui.c xms.c awe32\rawe32$(MODE).lib
 	upx --8086 --best dosmid.exe
 
 clean: .symbolic

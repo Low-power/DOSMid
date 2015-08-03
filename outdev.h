@@ -36,14 +36,16 @@ enum outdev_types {
   DEV_AWE,
   DEV_OPL,
   DEV_OPL2,
-  DEV_OPL3
+  DEV_OPL3,
+  DEV_RS232
 };
 
 
 /* inits the out device, also selects the out device, from one of these:
  *  DEV_MPU401
  *  DEV_AWE
- *  DEV_OPL2
+ *  DEV_OPL
+ *  DEV_RS232
  *  DEV_NONE
  *
  * This should be called only ONCE, when program starts.
