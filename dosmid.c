@@ -76,6 +76,7 @@ struct clioptions {
   int nopowersave;
   int dontstop;
   enum outdev_types device;
+  int devicesubtype;
   char *devname;    /* the human name of the out device (MPU, AWE..) */
   char *midifile;   /* MIDI filename to play */
   char *playlist;   /* the playlist to read files from */
@@ -168,14 +169,19 @@ static void udelay(unsigned long us) {
 }
 
 
-static char *devtoname(enum outdev_types device) {
+static char *devtoname(enum outdev_types device, int devicesubtype) {
   switch (device) {
     case DEV_MPU401: return("MPU");
     case DEV_AWE:    return("AWE");
     case DEV_OPL:    return("OPL");
     case DEV_OPL2:   return("OPL2");
     case DEV_OPL3:   return("OPL3");
-    case DEV_RS232:  return("COM");
+    case DEV_RS232:
+      if (devicesubtype == 1) return("COM1");
+      if (devicesubtype == 2) return("COM2");
+      if (devicesubtype == 3) return("COM3");
+      if (devicesubtype == 4) return("COM4");
+      return("COM");
     default:         return("UNK");
   }
 }
@@ -288,9 +294,9 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       if (params->devport < 10) return("Invalid COM port provided. Example: /com=3f8");
     } else if (stringstartswith(argv[i], "/com") == 0) {
       params->device = DEV_RS232;
-      params->devport = hexstr2uint(argv[i] + 4);
-      if ((params->devport < 1) || (params->devport > 4)) return("Invalid COM port provided. Example: /com1");
-      params->devport = rs232_getport(params->devport);
+      params->devicesubtype = hexstr2uint(argv[i] + 4);
+      if ((params->devicesubtype < 1) || (params->devicesubtype > 4)) return("Invalid COM port provided. Example: /com1");
+      params->devport = rs232_getport(params->devicesubtype);
       if (params->devport < 1) return("Failed to autodetect the I/O address of this COM port.");
     } else if (stringstartswith(argv[i], "/log=") == 0) {
       params->logfd = fopen(argv[i] + 5, "wb");
@@ -714,7 +720,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   }
   /* refresh the outdev and its name (might have been changed due to OPL autodetection) */
   params->device = dev_getcurdev();
-  params->devname = devtoname(params->device);
+  params->devname = devtoname(params->device, params->devicesubtype);
 
   /* save start time so we can compute elapsed time later */
   timer_read(&midiplaybackstart);
@@ -861,6 +867,8 @@ int main(int argc, char **argv) {
   struct trackinfodata *trackinfo;
   struct midi_event_t *eventscache;
 
+  memset(&params, 0, sizeof(params));
+
   /* preload the mpu port to be used (might be forced later via **argv) */
   preload_outdev(&params);
 
@@ -897,7 +905,7 @@ int main(int argc, char **argv) {
     return(1);
   }
 
-  params.devname = devtoname(params.device);
+  params.devname = devtoname(params.device, params.devicesubtype);
 
   /* allocate the work memory */
   if (mem_init(params.workmem, params.memmode) == 0) {
