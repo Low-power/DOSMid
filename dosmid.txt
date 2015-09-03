@@ -21,15 +21,15 @@ most of the time, such MIDI-over-OPL emulation will yeld less than desirable
 results, unless the MIDI file was specifically crafted for OPL.
 
 Minimal requirements:
- - a MPU-401 compatible sound card with a synthesizer (wavetable or external),
-   or a SoundBlaster AWE32/AWE64, or a serial-attached synth, or (if
-   desperate) an OPL FM synth
+ - a MPU-401 compatible sound card or SoundBlaster with a synthesizer
+   (wavetable or external), or a SoundBlaster AWE32/AWE64, or a
+   serial-attached synth, or (if desperate) an OPL FM synth
  - an 8086 CPU or better
  - a video card able to display an 80x25 text mode (ie. CGA or better)
 
 Highly recommended:
- - an 80386 CPU
- - VGA
+ - 80386+ CPU for a guaranteed lag-free experience even on complex MIDI files
+ - VGA graphic
  - 512K of available XMS memory
 
 
@@ -69,8 +69,11 @@ DOSMID [options] file.mid (or m3u playlist)
            resort option if you don't have a wavetable device. Do NOT expect
            pleasing results. The port part is optional ("/opl" will use port
            388h by default).
+ /sbmidi=XXX Drives an external synth connected to the gameport of your Sound
+           Blaster card.  The port part is optional ("/sbmidi" will use the
+           port read from BLASTER, or fallback to 220h).
  /com=XXX  Send MIDI messages out via the RS232 port at I/O port XXX. This can
-  or /com1 be used to hook a hardware synth to a computer with no MPU
+  or /com1 be used to hook a hardware synth to a computer with no MIDI
   or /com2 interface, only a standard serial port. DOSMid does NOT reconfigure
   or /com3 the COM port, so you should take care of setting it correctly, for
   or /com4 example using the 'MODE COM1: ...' command. The port part is not
@@ -78,7 +81,7 @@ DOSMID [options] file.mid (or m3u playlist)
            the RS232 port you wish to use (for example "/com=3f8" is pointing
            to COM1 on most BIOS implementations).
            It is also possible to use simpler "/com1", "/com2", "/com3" and
-           "/com3" switches. These will autodetect the correct I/O port.
+           "/com4" switches. These will autodetect the correct I/O port.
  /log=FILE Logs all DOSMid activity to FILE. This is clearly a debugging
            option that you shouldn't be interested in. Beware, the log file
            can be pretty big (much bigger than the MIDI file you are playing).
@@ -103,7 +106,7 @@ settings. A BLASTER environment variable usually looks similar to this:
 The bits DOSMid is interested in are "A220", "P330" and "E620". P330 provides
 the port address of the MPU-401 MIDI interface, while E620 tells the port
 address of the EMU8000 onboard synth (available only on 'AWE' models). A220,
-on the other hand, provides the base I/O port of the SoundBlaster card, so
+on the other hand, provides the base I/O address of the SoundBlaster card, so
 DOSMid can output directly to the card's MIDI port. If not instructed
 otherwise, DOSMid will always try to use the EMU8000 synth if found in the
 BLASTER string, and if not, it will use the MPU-401. If neither of them are
@@ -113,7 +116,25 @@ DOSMid will try to use FM synthesis on port 388h.
 
 *** Compatible hardware ***
 
-DOSMid supports a variety of MIDI hardware.
+DOSMid supports a variety of MIDI hardware. Here below I list the types of
+hardware that DOSMid can talk to, as well as a few examples.
+
+External MIDI synthesizers:
+ - Connected through a MIDI/game port: either using an industry standard
+   MPU-401 interface, or SoundBlaster MIDI port (pretty much all non-USB
+   external synthesizers have a 'MIDI IN' port),
+ - Connected through a RS232 ("COM") port: many synthesizers come with an
+   RS-232 port that can be used instead of the standard MIDI port, like
+   Roland SC-55, Yamaha PSR series, many Korg devices, or even software
+   solutions based on ttymidi...
+
+Internal MIDI synthesizers:
+ - Available through a virtual MPU-401 interface: some AzTech Waverider 32
+   models, some versions of the HighScreen SoundBoostar 16, SoundBlaster 64
+   cards using the 'AWEUTIL' MPU emulator,
+ - Based on the EMU8000 chip (SoundBlaster 32, SoundBlaster 64),
+ - Based on an OPL2 or OPL3-compatible chip (most sound cards from the
+   nineties: Adlib, all SoundBlaster models, Opti, AzTech...).
 
 
 *** LICENSE ***

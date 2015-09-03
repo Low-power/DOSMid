@@ -26,9 +26,9 @@ static void udelay(unsigned long us) {
   for (;;) {
     timer_read(&t2);
     if (t2 < t1) { /* detect timer wraparound */
-        break;
-      } else if (t2 - t1 >= us) {
-        break;
+      break;
+    } else if (t2 - t1 >= us) {
+      break;
     }
   }
 }
