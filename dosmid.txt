@@ -100,13 +100,20 @@ settings. A BLASTER environment variable usually looks similar to this:
 
   SET BLASTER=A220 I5 D1 T3 P330 H6 E620
 
-The bits DOSMid is interested in are "P330" and "E620". The former provides
-the port address of the MPU-401 MIDI interface, while the latter tells the
-port address of the EMU8000 onboard synth (available only on 'AWE' models). If
-not instructed otherwise, DOSMid will always try to use the EMU8000 synth if
-found in the BLASTER string, and if not, it will use the MPU-401. If neither
-of them are found in the BLASTER string, or if there is no BLASTER variable at
-all, then DOSMid will try to use FM synthesis on port 388h.
+The bits DOSMid is interested in are "A220", "P330" and "E620". P330 provides
+the port address of the MPU-401 MIDI interface, while E620 tells the port
+address of the EMU8000 onboard synth (available only on 'AWE' models). A220,
+on the other hand, provides the base I/O port of the SoundBlaster card, so
+DOSMid can output directly to the card's MIDI port. If not instructed
+otherwise, DOSMid will always try to use the EMU8000 synth if found in the
+BLASTER string, and if not, it will use the MPU-401. If neither of them are
+found in the BLASTER string, or if there is no BLASTER variable at all, then
+DOSMid will try to use FM synthesis on port 388h.
+
+
+*** Compatible hardware ***
+
+DOSMid supports a variety of MIDI hardware.
 
 
 *** LICENSE ***

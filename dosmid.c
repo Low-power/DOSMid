@@ -73,6 +73,7 @@ struct clioptions {
   unsigned short port_mpu;
   unsigned short port_awe;
   unsigned short port_opl;
+  unsigned short port_sb;
   int nopowersave;
   int dontstop;
   enum outdev_types device;
@@ -182,6 +183,7 @@ static char *devtoname(enum outdev_types device, int devicesubtype) {
       if (devicesubtype == 3) return("COM3");
       if (devicesubtype == 4) return("COM4");
       return("COM");
+    case DEV_SBMIDI: return("SBMIDI");
     default:         return("UNK");
   }
 }
@@ -292,12 +294,21 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       params->device = DEV_RS232;
       params->devport = hexstr2uint(argv[i] + 5);
       if (params->devport < 10) return("Invalid COM port provided. Example: /com=3f8");
-    } else if (stringstartswith(argv[i], "/com") == 0) {
+    } else if (strcmp(argv[i], "/com") == 0) {
       params->device = DEV_RS232;
       params->devicesubtype = hexstr2uint(argv[i] + 4);
       if ((params->devicesubtype < 1) || (params->devicesubtype > 4)) return("Invalid COM port provided. Example: /com1");
       params->devport = rs232_getport(params->devicesubtype);
       if (params->devport < 1) return("Failed to autodetect the I/O address of this COM port.");
+    } else if (strcmp(argv[i], "/sbmidi") == 0) {
+      params->device = DEV_SBMIDI;
+      params->devport = params->port_sb;
+      /* if SB port not found in BLASTER, use the default 0x220 */
+      if (params->devport == 0) params->devport = 0x220;
+    } else if (stringstartswith(argv[i], "/sbmidi=") == 0) {
+      params->device = DEV_SBMIDI;
+      params->devport = hexstr2uint(argv[i] + 5);
+      if (params->devport < 1) return("Invalid SBMIDI port provided. Example: /sbmidi=220");
     } else if (stringstartswith(argv[i], "/log=") == 0) {
       params->logfd = fopen(argv[i] + 5, "wb");
       if (params->logfd == NULL) {
@@ -417,6 +428,7 @@ static void preload_outdev(struct clioptions *params) {
   params->port_mpu = 0;
   params->port_awe = 0;
   params->port_opl = 0;
+  params->port_sb  = 0;
 
   /* check if a blaster variable is present */
   blaster = getenv("BLASTER");
@@ -444,11 +456,13 @@ static void preload_outdev(struct clioptions *params) {
       unsigned short *portptr;
       blaster = blasterptr[blastercount];
       /* have we found an interesting param? */
-      if ((*blaster != 'P') && (*blaster != 'E')) continue;
+      if ((*blaster != 'P') && (*blaster != 'E') && (*blaster != 'A')) continue;
       if (*blaster == 'E') {
         portptr = &(params->port_awe);
-      } else {
+      } else if (*blaster == 'P') {
         portptr = &(params->port_mpu);
+      } else {
+        portptr = &(params->port_sb);
       }
       /* read the param value into a variable */
       p = hexstr2uint(blaster + 1);
@@ -464,9 +478,9 @@ static void preload_outdev(struct clioptions *params) {
   } else if (params->port_mpu > 0) { /* then look for MPU */
     params->device = DEV_MPU401;
     params->devport = params->port_mpu;
-  } else { /* if all else fails, fallback to OPL on 388h */
-    params->device = DEV_OPL;
-    params->devport = 0x388;
+  } else { /* if all else fails, fallback to OPL on 388h (note that I ignore */
+    params->device = DEV_OPL;   /* the SBMIDI port, because it's unlikely    */
+    params->devport = 0x388;    /* there's something connected to it anyway) */
   }
 }
 
@@ -678,7 +692,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   int i;
   enum playactions exitaction;
   unsigned long nexteventtime;
-  int refreshflags;
+  int refreshflags = 0xff;
   long trackpos;
   unsigned long midiplaybackstart;
   struct midi_event_t *curevent;
@@ -702,8 +716,21 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     }
   }
 
-  /* draw the UI a first time, without data yet */
+  /* init the sound device */
+  sprintf(trackinfo->title[0], "Sound hardware initialization...");
+  filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
+  ui_draw(trackinfo, &refreshflags, PVER, params->devname, params->devport, volume);
   refreshflags = 0xff;
+  if (params->logfd != NULL) fprintf(params->logfd, "INIT SOUND HARDWARE\n");
+  if (dev_init(params->device, params->devport) != 0) {
+    ui_puterrmsg("Hardware error", "Error: Failed to initialize the sound device");
+    return(ACTION_ERR_HARD);
+  }
+  /* refresh the outdev and its name (might have been changed due to OPL autodetection) */
+  params->device = dev_getcurdev();
+  params->devname = devtoname(params->device, params->devicesubtype);
+
+  /* load the file into memory */
   sprintf(trackinfo->title[0], "Loading...");
   filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
   ui_draw(trackinfo, &refreshflags, PVER, params->devname, params->devport, volume);
@@ -712,15 +739,6 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 
   exitaction = loadfile(params, trackinfo, &trackpos);
   if (exitaction != ACTION_NONE) return(exitaction);
-
-  if (params->logfd != NULL) fprintf(params->logfd, "RESET MPU-401\n");
-  if (dev_init(params->device, params->devport) != 0) {
-    ui_puterrmsg("Hardware error", "Error: Failed to initialize the sound device");
-    return(ACTION_ERR_HARD);
-  }
-  /* refresh the outdev and its name (might have been changed due to OPL autodetection) */
-  params->device = dev_getcurdev();
-  params->devname = devtoname(params->device, params->devicesubtype);
 
   /* save start time so we can compute elapsed time later */
   timer_read(&midiplaybackstart);
@@ -885,19 +903,18 @@ int main(int argc, char **argv) {
            "Usage: dosmid [options] file.mid (or m3u playlist)\n"
            "\n"
            "options:\n"
-           " /noxms     use conventional memory instead of XMS\n"
+           " /noxms     use conventional memory instead of XMS (loads tiny files only)\n"
            " /delay     wait 2ms before accessing XMS memory (AWEUTIL compatibility)\n"
-           " /mpu[=XXX] forces DOSMid to use MPU-401 for MIDI output, you can\n"
-           "            optionally specify the port if needed (otherwise it will\n"
-           "            be read from the BLASTER environment variable)\n"
+           " /mpu[=XXX] forces DOSMid to use MPU-401 for MIDI output, you can specify\n"
+           "            the port if needed (otherwise it is read from BLASTER)\n"
            " /awe[=XXX] use the EMU8000 synth on AWE32/AWE64 SoundBlaster cards, you\n"
            "            can specify the port if needed (read from BLASTER otherwise)\n"
-           " /opl[=XXX] use a FM synthesis OPL2/OPL3 chip for sound output\n"
+           " /opl[=XXX] use an FM synthesis OPL2/OPL3 chip for sound output\n"
+           " /sbmidi[=XXX] outputs MIDI to the SoundBlaster MIDI port at I/O addr XXX\n"
            " /com[=XXX] output MIDI messages via the RS232 port at I/O address XXX\n"
-           " /comX      same as /com=XXX, but instead of an I/O address, it takes the\n"
-           "            human COM number from range 1..4 (example: /com1)\n"
+           " /comX      same as /com=XXX, but takes a COM port instead (example: /com1)\n"
            " /log=FILE  write highly verbose logs about DOSMid's activity to FILE\n"
-           " /fullcpu   do not let DOSMid trying to be CPU-friendly\n"
+           " /fullcpu   do not let DOSMid try to be CPU-friendly\n"
            " /dontstop  never wait for a keypress on error and continue the playlist\n"
            " /nosound   disable sound output\n"
       );

@@ -35,7 +35,7 @@
 
 #include "opl.h"
 
-#include "opl-gm.c"
+#include "opl-gm.h"
 
 struct voicealloc_t {
   unsigned short priority;

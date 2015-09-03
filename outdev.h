@@ -37,7 +37,8 @@ enum outdev_types {
   DEV_OPL,
   DEV_OPL2,
   DEV_OPL3,
-  DEV_RS232
+  DEV_RS232,
+  DEV_SBMIDI
 };
 
 
@@ -46,6 +47,7 @@ enum outdev_types {
  *  DEV_AWE
  *  DEV_OPL
  *  DEV_RS232
+ *  DEV_SBMIDI
  *  DEV_NONE
  *
  * This should be called only ONCE, when program starts.

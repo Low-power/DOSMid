@@ -33,6 +33,7 @@
 #include "opl.h"
 #include "mpu401.h"
 #include "rs232.h"
+#include "sbdsp.h"
 #include "awe32/ctaweapi.h"
 
 #include "outdev.h" /* include self for control */
@@ -53,6 +54,7 @@ static unsigned short outport = 0;
  *  DEV_AWE
  *  DEV_OPL
  *  DEV_RS232
+ *  DEV_SBMIDI
  *  DEV_NONE
  *
  * This should be called only ONCE, when program starts.
@@ -95,6 +97,13 @@ int dev_init(enum outdev_types dev, unsigned short port) {
       break;
     case DEV_RS232:
       break;
+    case DEV_SBMIDI:
+      /* The DSP has to be reset before it is first programmed. The reset
+       * causes it to perform an initialization and returns it to its default
+       * state. The DSP reset is done through the Reset port. */
+      if (dsp_reset(outport) != 0) return(-1);
+      dsp_write(outport, 0x30); /* switch the MIDI I/O into polling mode */
+      break;
     case DEV_NONE:
       break;
   }
@@ -128,7 +137,16 @@ void dev_close(void) {
       break;
     case DEV_RS232:
       break;
-    case DEV_NONE:
+    case DEV_SBMIDI:
+      /* To terminate UART mode, send a DSP reset command. The reset command
+       * behaves differently while the DSP is in MIDI UART mode. It terminates
+       * MIDI UART mode and restores all the DSP parameters to the states
+       * prior to entering MIDI UART mode. If your application was run in MIDI
+       * UART mode, it important that you send the DSP reset command to exit
+       * the MIDI UART mode when your application terminates. */
+      dsp_reset(outport); /* I don't use MIDI UART mode because it requires */
+      break;              /* DSP v2.x, but reseting the chip seems like a   */
+    case DEV_NONE:        /* good thing to do anyway                        */
       break;
   }
 }
@@ -142,6 +160,7 @@ void dev_clear(void) {
     case DEV_MPU401:
     case DEV_AWE:
     case DEV_RS232:
+    case DEV_SBMIDI:
       /* iterate on MIDI channels and send messages */
       for (i = 0; i < 16; i++) {
         dev_controller(i, 123, 0);   /* "all notes off" */
@@ -186,6 +205,14 @@ void dev_noteon(int channel, int note, int velocity) {
       rs232_write(outport, note);           /* Send note number to turn ON */
       rs232_write(outport, velocity);       /* Send velocity */
       break;
+    case DEV_SBMIDI:
+      dsp_write(outport, 0x38);             /* MIDI output */
+      dsp_write(outport, 0x90 | channel);   /* Send note ON to selected channel */
+      dsp_write(outport, 0x38);             /* MIDI output */
+      dsp_write(outport, note);             /* Send note number to turn ON */
+      dsp_write(outport, 0x38);             /* MIDI output */
+      dsp_write(outport, velocity);         /* Send velocity */
+      break;
     case DEV_NONE:
       break;
   }
@@ -215,6 +242,14 @@ void dev_noteoff(int channel, int note) {
       rs232_write(outport, 0x80 | channel); /* 'note off' + channel selector */
       rs232_write(outport, note);           /* note number */
       rs232_write(outport, 64);             /* velocity */
+      break;
+    case DEV_SBMIDI:
+      dsp_write(outport, 0x38);           /* MIDI output */
+      dsp_write(outport, 0x80 | channel); /* Send note OFF code on selected channel */
+      dsp_write(outport, 0x38);           /* MIDI output */
+      dsp_write(outport, note);           /* Send note number to turn OFF */
+      dsp_write(outport, 0x38);           /* MIDI output */
+      dsp_write(outport, 64);             /* Send velocity */
       break;
     case DEV_NONE:
       break;
@@ -246,6 +281,14 @@ void dev_pitchwheel(int channel, int wheelvalue) {
       rs232_write(outport, wheelvalue & 127); /* Send the lowest (least significant) 7 bits of the wheel value */
       rs232_write(outport, wheelvalue >> 7);  /* Send the highest (most significant) 7 bits of the wheel value */
       break;
+    case DEV_SBMIDI:
+      dsp_write(outport, 0x38);             /* MIDI output */
+      dsp_write(outport, 0xE0 | channel);   /* Send selected channel */
+      dsp_write(outport, 0x38);             /* MIDI output */
+      dsp_write(outport, wheelvalue & 127); /* Send the lowest (least significant) 7 bits of the wheel value */
+      dsp_write(outport, 0x38);             /* MIDI output */
+      dsp_write(outport, wheelvalue >> 7);  /* Send the highest (most significant) 7 bits of the wheel value */
+      break;
     case DEV_NONE:
       break;
   }
@@ -276,6 +319,14 @@ void dev_controller(int channel, int id, int val) {
       rs232_write(outport, id);              /* Send the controller's id */
       rs232_write(outport, val);             /* Send controller's value */
       break;
+    case DEV_SBMIDI:
+      dsp_write(outport, 0x38);            /* MIDI output */
+      dsp_write(outport, 0xB0 | channel);  /* Send selected channel */
+      dsp_write(outport, 0x38);            /* MIDI output */
+      dsp_write(outport, id);              /* Send the controller's id */
+      dsp_write(outport, 0x38);            /* MIDI output */
+      dsp_write(outport, val);             /* Send controller's value */
+      break;
     case DEV_NONE:
       break;
   }
@@ -300,6 +351,12 @@ void dev_chanpressure(int channel, int pressure) {
     case DEV_RS232:
       rs232_write(outport, 0xD0 | channel);  /* Send selected channel */
       rs232_write(outport, pressure);        /* Send the pressure value */
+      break;
+    case DEV_SBMIDI:
+      dsp_write(outport, 0x38);            /* MIDI output */
+      dsp_write(outport, 0xD0 | channel);  /* Send selected channel */
+      dsp_write(outport, 0x38);            /* MIDI output */
+      dsp_write(outport, pressure);        /* Send the pressure value */
       break;
     case DEV_NONE:
       break;
@@ -329,6 +386,14 @@ void dev_keypressure(int channel, int note, int pressure) {
       rs232_write(outport, note);            /* Send the note we target */
       rs232_write(outport, pressure);        /* Send the pressure value */
       break;
+    case DEV_SBMIDI:
+      dsp_write(outport, 0x38);            /* MIDI output */
+      dsp_write(outport, 0xA0 | channel);  /* Send selected channel */
+      dsp_write(outport, 0x38);            /* MIDI output */
+      dsp_write(outport, note);            /* Send the note we target */
+      dsp_write(outport, 0x38);            /* MIDI output */
+      dsp_write(outport, pressure);        /* Send the pressure value */
+      break;
     case DEV_NONE:
       break;
   }
@@ -347,6 +412,8 @@ void dev_tick(void) {
       break;
     case DEV_RS232:
       /*while (rs232_read(outport) >= 0); FIXME */
+      break;
+    case DEV_SBMIDI:
       break;
     case DEV_NONE:
       break;
@@ -374,6 +441,12 @@ void dev_setprog(int channel, int program) {
     case DEV_RS232:
       rs232_write(outport, 0xC0 | channel); /* Send channel */
       rs232_write(outport, program);        /* Send patch id */
+      break;
+    case DEV_SBMIDI:
+      dsp_write(outport, 0x38);           /* MIDI output */
+      dsp_write(outport, 0xC0 | channel); /* Send channel */
+      dsp_write(outport, 0x38);           /* MIDI output */
+      dsp_write(outport, program);        /* Send patch id */
       break;
     case DEV_NONE:
       break;

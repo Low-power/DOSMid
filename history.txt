@@ -3,7 +3,8 @@
 
 
 DOSMid v0.8 [xx xxx xxxx]
- - support for serial (RS232) output (/com=xxx or /com1..4),
+ - SBMIDI support (can drive MIDI synths attached to SB 1.x and 2.x cards),
+ - serial (RS232) output support (/com=xxx or /com1..4),
  - implemented 'controller' MIDI support on OPL output,
  - fixed parsing of hex I/O ports with non-numerical chars (like "3f8"),
  - ...
