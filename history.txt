@@ -7,6 +7,7 @@ DOSMid v0.8 [xx xxx xxxx]
  - serial (RS232) output support (/com=xxx or /com1..4),
  - implemented 'controller' MIDI support on OPL output,
  - fixed parsing of hex I/O ports with non-numerical chars (like "3f8"),
+ - DOSMid adds a 2s silence gap before each song,
  - ...
 
 DOSMid v0.7 [29 Jul 2015]

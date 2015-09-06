@@ -737,11 +737,17 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   memset(trackinfo->title[0], 0, 16);
   refreshflags = 0xff;
 
+  timer_read(&nexteventtime); /* save current time, to schedule when the song shall start */
+  nexteventtime += 2000000lu; /* playback should start no sooner than in 2s (for listening comfort) */
   exitaction = loadfile(params, trackinfo, &trackpos);
   if (exitaction != ACTION_NONE) return(exitaction);
-
-  /* save start time so we can compute elapsed time later */
-  timer_read(&midiplaybackstart);
+  /* draw the gui with track's data */
+  ui_draw(trackinfo, &refreshflags, PVER, params->devname, params->devport, volume);
+  for (;;) {
+    timer_read(&midiplaybackstart); /* save start time so we can compute elapsed time later */
+    if (midiplaybackstart >= nexteventtime) break; /* wait until the scheduled start time is met */
+    if (midiplaybackstart + 5000000lu < nexteventtime) break; /* do not freeze on timer wraparound */
+  }
   nexteventtime = midiplaybackstart;
 
   while (trackpos >= 0) {
@@ -980,7 +986,8 @@ int main(int argc, char **argv) {
         } else {
           sleep(2);
         }
-      case ACTION_NONE: /* choose an action depending of the mode we are in */
+      case ACTION_NONE: /* choose an action depending on the mode we are in */
+        udelay(1000000lu); /* no action has been user forced, wait 1s */
         if (params.playlist == NULL) {
           action = ACTION_EXIT;
         } else {
@@ -989,6 +996,9 @@ int main(int argc, char **argv) {
         break;
     }
   }
+
+  /* wait for 0.5s before quitting, so it doesn't seem that 'brutal' */
+  udelay(500000lu);
 
   /* reset screen (clears the screen and makes the cursor visible again) */
   ui_init();

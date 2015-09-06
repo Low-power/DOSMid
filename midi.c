@@ -151,8 +151,8 @@ int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned short *timeunitdiv
     return(-3);
   }
 
-  /*  default tempo -> quarter note (1 beat) == 500'000 microseconds (0.5s), ie 120 bpm.
-      a delta time unit is therefore (0.5s / DIV) long. */
+  /* default tempo -> quarter note (1 beat) == 500'000 microseconds (0.5s), ie 120 bpm.
+     a delta time unit is therefore (0.5s / DIV) long. */
   /* check the timeunit */
   if (chunk->data[4] & 128) {
     free(chunk);
