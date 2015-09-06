@@ -411,7 +411,12 @@ void dev_tick(void) {
     case DEV_OPL3:
       break;
     case DEV_RS232:
-      /*while (rs232_read(outport) >= 0); FIXME */
+      /* I do nothing here - although flushing any incoming bytes would seem
+       * to be the 'sane thing to do', it can lead sometimes to freezes on
+       * systems where the RS232 UART always reports a 'read ready' status.
+       * NOT flushing the UART, on the other hand, doesn't seem to affect
+       * anything. */
+      /* while (rs232_read(outport) >= 0); */
       break;
     case DEV_SBMIDI:
       break;
