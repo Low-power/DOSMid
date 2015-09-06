@@ -292,15 +292,37 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
             break;
           default:
             fseek(fd, metalen, SEEK_CUR);  /* skip the meta data */
-            if (logfd != NULL) fprintf(logfd, "%lu: UNHANDLED META EVENT [0x%02X] (ignored)\n", tracklen, subtype);
+            if (logfd != NULL) fprintf(logfd, "%lu: UNHANDLED META EVENT [0x%02Xh] (ignored)\n", tracklen, subtype);
             break;
         }
         if (endoftrack != 0) break;
       } else if ((statusbyte >= 0xF0) && (statusbyte <= 0xF7)) { /* SYSEX event */
-        unsigned long sysexlen;
+        unsigned long sysexlen = 0;
+        unsigned char *sysexbuff;
         midi_fetch_variablelen_fromfile(fd, &sysexlen); /* get length */
-        if (logfd != NULL) fprintf(logfd, "%lu: SYSEX EVENT OF %ld BYTES (ignored)\n", tracklen, sysexlen);
-        fseek(fd, sysexlen, SEEK_CUR);
+        if (logfd != NULL) fprintf(logfd, "%lu: SYSEX EVENT OF %ld BYTES ON CHAN #%d\n", tracklen, sysexlen, statusbyte & 0x0F);
+        if (sysexlen > 4096) { /* skip SYSEX events that are more than 4K big */
+          fseek(fd, sysexlen, SEEK_CUR);
+        } else { /* read the sysex string */
+          event.type = EVENT_SYSEX;
+          event.data.sysex.sysexlen = sysexlen;
+          event.data.sysex.chan = statusbyte & 0x0F;
+          sysexbuff = malloc(sysexlen);
+          if (sysexbuff != NULL) {
+            fread(sysexbuff, 1, sysexlen, fd);
+            event.data.sysex.sysexptr = mem_alloc(sysexlen);
+            if (event.data.sysex.sysexptr >= 0) {
+              mem_push(sysexbuff, event.data.sysex.sysexptr, sysexlen);
+            } else {
+              event.type = EVENT_NONE;
+              if (logfd != NULL) fprintf(logfd, "%lu: SYSEX MEM_ALLOC FAILED FOR %ld BYTES\n", tracklen, sysexlen);
+            }
+            free(sysexbuff);
+          } else {
+            event.type = EVENT_NONE;
+            if (logfd != NULL) fprintf(logfd, "%lu: SYSEX MALLOC FAILED FOR %ld BYTES\n", tracklen, sysexlen);
+          }
+        }
       } else if ((statusbyte >= 0x80) && (statusbyte <= 0xEF)) { /* else it's a note-related command */
         switch (statusbyte & 0xF0) { /* I care only about NoteOn/NoteOff events */
           case 0x80:  /* Note OFF */

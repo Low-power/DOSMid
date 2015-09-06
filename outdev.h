@@ -89,4 +89,7 @@ void dev_tick(void);
 /* sets a "program" (meaning an instrument) on a channel */
 void dev_setprog(int channel, int program);
 
+/* sends a raw sysex string to the device */
+void dev_sysex(int channel, char *buff, int bufflen);
+
 #endif

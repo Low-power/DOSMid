@@ -114,7 +114,7 @@ found in the BLASTER string, or if there is no BLASTER variable at all, then
 DOSMid will try to use FM synthesis on port 388h.
 
 
-*** Compatible hardware ***
+*** COMPATIBLE HARDWARE ***
 
 DOSMid supports a variety of MIDI hardware. Here below I list the types of
 hardware that DOSMid can talk to, as well as a few examples.
@@ -125,8 +125,8 @@ External MIDI synthesizers:
    external synthesizers have a 'MIDI IN' port),
  - Connected through a RS232 ("COM") port: many synthesizers come with an
    RS-232 port that can be used instead of the standard MIDI port, like
-   Roland SC-55, Yamaha PSR series, many Korg devices, or even software
-   solutions based on ttymidi...
+   Roland SoundCanvas models, Yamaha PSR series, the Miracle Piano, many Korg
+   devices, or even software solutions based on ttymidi...
 
 Internal MIDI synthesizers:
  - Available through a virtual MPU-401 interface: some AzTech Waverider 32

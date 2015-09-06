@@ -697,6 +697,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   unsigned long midiplaybackstart;
   struct midi_event_t *curevent;
   unsigned long elticks = 0;
+  unsigned char *sysexbuff;
 
   /* clear out trackinfo & cache data */
   memset(trackinfo, 0, sizeof(*trackinfo));
@@ -848,6 +849,26 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
       case EVENT_KEYPRESSURE:
         if (params->logfd != NULL) fprintf(params->logfd, "%lu: KEY PRESSURE %d ON CHAN #%d, KEY %d\n", trackinfo->elapsedsec, curevent->data.keypressure.pressure, curevent->data.keypressure.chan, curevent->data.keypressure.note);
         dev_keypressure(curevent->data.keypressure.chan, curevent->data.keypressure.note, curevent->data.keypressure.pressure);
+        break;
+      case EVENT_SYSEX:
+        if (params->logfd != NULL) {
+          fprintf(params->logfd, "%lu: SYSEX of %d bytes: F%Xh", trackinfo->elapsedsec, curevent->data.sysex.sysexlen, curevent->data.sysex.chan);
+        }
+        sysexbuff = malloc(curevent->data.sysex.sysexlen);
+        if (sysexbuff != NULL) {
+          int i;
+          mem_pull(curevent->data.sysex.sysexptr, sysexbuff, curevent->data.sysex.sysexlen);
+          dev_sysex(curevent->data.sysex.chan, sysexbuff, curevent->data.sysex.sysexlen);
+          if (params->logfd != NULL) {
+            for (i = 0; i < curevent->data.sysex.sysexlen; i++) {
+              fprintf(params->logfd, " %02Xh", sysexbuff[i]);
+            }
+            fprintf(params->logfd, "\n");
+          }
+          free(sysexbuff);
+        } else {
+          if (params->logfd != NULL) fprintf(params->logfd, " ERROR\n");
+        }
         break;
       default:
         if (params->logfd != NULL) {

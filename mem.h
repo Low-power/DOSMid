@@ -34,8 +34,8 @@
   #define MEM_XMS 1
 
   int mem_init(unsigned int memsize, int mode);
-  int mem_pull(long eventid, void far *ptr, int sz);
-  int mem_push(void far *ptr, long eventid, int sz);
+  int mem_pull(long addr, void far *ptr, int sz);
+  int mem_push(void far *ptr, long addr, int sz);
   void pusheventqueue(struct midi_event_t *event, long *root);
   long mem_alloc(int sz);
   void mem_close(void);
