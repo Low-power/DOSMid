@@ -40,6 +40,7 @@ static int memmode = 0;
 static struct xms_struct xms;
 static long nexteventid = 0;
 
+
 /* initializes the memory module using 'mode' method */
 int mem_init(unsigned int memsize, int mode) {
   memmode = mode;
@@ -57,23 +58,25 @@ int mem_init(unsigned int memsize, int mode) {
   }
 }
 
-/* pull the eventid event from xms memory into *ptr */
-int pullevent(long eventid, void far *ptr) {
+
+/* pull an xms memory block into *ptr */
+int mem_pull(long addr, void far *ptr, int sz) {
   if (memmode == MEM_XMS) {
-      return(xms_pull(&xms, eventid * sizeof(struct midi_event_t), ptr, sizeof(struct midi_event_t)));
-    } else {
-      _fmemcpy(ptr, mempool + eventid * sizeof(struct midi_event_t), sizeof(struct midi_event_t));
-      return(0);
+    return(xms_pull(&xms, addr, ptr, sz));
+  } else {
+    _fmemcpy(ptr, mempool + addr, sz);
+    return(0);
   }
 }
 
-/* push the event pointed by *ptr into xms */
-int pushevent(void far *ptr, long eventid) {
+
+/* push the memory block pointed by *ptr into xms */
+int mem_push(void far *ptr, long addr, int sz) {
   if (memmode == MEM_XMS) {
-      return(xms_push(&xms, ptr, sizeof(struct midi_event_t), eventid * sizeof(struct midi_event_t)));
-    } else {
-      _fmemcpy(mempool + eventid * sizeof(struct midi_event_t), ptr, sizeof(struct midi_event_t));
-      return(0);
+    return(xms_push(&xms, ptr, sz, addr));
+  } else {
+    _fmemcpy(mempool + addr, ptr, sz);
+    return(0);
   }
 }
 
@@ -86,7 +89,7 @@ void pusheventqueue(struct midi_event_t *event, long *root) {
   struct midi_event_t far *lasteventfarptr;
 
   if (root != NULL) {
-    lasteventid = newevent();
+    lasteventid = mem_alloc(sizeof(struct midi_event_t));
     *root = lasteventid;
     memcpy(&lastevent, event, sizeof(struct midi_event_t));
     return;
@@ -96,36 +99,38 @@ void pusheventqueue(struct midi_event_t *event, long *root) {
 
   if (event == NULL) {
     lastevent.next = -1;
-    pushevent(lasteventfarptr, lasteventid);
+    mem_push(lasteventfarptr, lasteventid, sizeof(struct midi_event_t));
     return;
   }
 
-  lastevent.next = newevent();
-  pushevent(lasteventfarptr, lasteventid);
+  lastevent.next = mem_alloc(sizeof(struct midi_event_t));
+  mem_push(lasteventfarptr, lasteventid, sizeof(struct midi_event_t));
   lasteventid = lastevent.next;
   memcpy(&lastevent, event, sizeof(struct midi_event_t));
 }
 
 
-/* returns a free eventid for a new event - if flushflag is non-zero, it means
- * I don't care about any previous events anymore */
-long newevent(void) {
-  if ((nexteventid + 1) * sizeof(struct midi_event_t) <= xms.memsize) return(nexteventid++);
+/* returns a free eventid for a new event of sz bytes */
+long mem_alloc(int sz) {
+  if ((nexteventid + sz) < xms.memsize) {
+    nexteventid += 1 + sz;
+    return(nexteventid);
+  }
   return(-1);
 }
 
 
-void flushevents(void) {
+void mem_clear(void) {
   nexteventid = 0;
 }
 
 
 /* closes / deallocates the memory module */
 void mem_close(void) {
+  xms.memsize = 0;
   if (memmode == MEM_XMS) {
-      xms_close(&xms);
-    } else {
-      xms.memsize = 0;
-      _ffree(mempool);
+    xms_close(&xms);
+  } else {
+    _ffree(mempool);
   }
 }

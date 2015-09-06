@@ -386,7 +386,7 @@ static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscac
         while ((itemsincache < EVENTSCACHESIZE - 1) && (nextevent >= 0)) {
           nextslot++;
           nextslot &= EVENTSCACHEMASK;
-          pullres = pullevent(nextevent, &eventscache[nextslot]);
+          pullres = mem_pull(nextevent, &eventscache[nextslot], sizeof(struct midi_event_t));
           if (pullres != 0) {
             /* printf("pullevent() ERROR: %u (eventid = %ld)\n", pullres, trackpos); */
             return(NULL);
@@ -404,7 +404,7 @@ static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscac
       nextevent = trackpos;
       curcachepos = 0;
       for (refillcount = 0; refillcount < EVENTSCACHESIZE; refillcount++) {
-        pullres = pullevent(nextevent, &eventscache[refillcount]);
+        pullres = mem_pull(nextevent, &eventscache[refillcount], sizeof(struct midi_event_t));
         if (pullres != 0) {
           /* printf("pullevent() ERROR: %u (eventid = %ld)\n", pullres, trackpos); */
           return(NULL);
@@ -606,7 +606,7 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
   enum fileformats fileformat;
 
   /* flush all MIDI events from memory for new events to have where to load */
-  flushevents();
+  mem_clear();
 
   /* (try to) open the music file */
   fd = fopen(params->midifile, "rb");

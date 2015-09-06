@@ -392,8 +392,8 @@ long midi_mergetrack(long t0, long t1, unsigned long *totlen, unsigned short tim
 
   if (totlen != NULL) *totlen = 0;
   /* fetch first events for both tracks */
-  if (t0 >= 0) pullevent(t0, &event[0]);
-  if (t1 >= 0) pullevent(t1, &event[1]);
+  if (t0 >= 0) mem_pull(t0, &event[0], sizeof(struct midi_event_t));
+  if (t1 >= 0) mem_pull(t1, &event[1], sizeof(struct midi_event_t));
   /* start looping */
   while ((t0 >= 0) || (t1 >= 0)) {
     /* compare both tracks, and select the soonest one */
@@ -412,10 +412,10 @@ long midi_mergetrack(long t0, long t1, unsigned long *totlen, unsigned short tim
     /* on first iteration, make sure to assign a result */
     if (lasteventid < 0) {
       res = selectedid;
-    } else if (lastevent.next != selectedid) { /* otherwise attach selected */
-      lastevent.next = selectedid;             /* track to last note, and   */
-      pushevent(&lastevent, lasteventid);      /* update last pointer (if   */
-    }                                          /* not good already)         */
+    } else if (lastevent.next != selectedid) {                        /* otherwise attach selected */
+      lastevent.next = selectedid;                                    /* track to last note, and   */
+      mem_push(&lastevent, lasteventid, sizeof(struct midi_event_t)); /* update last pointer (if   */
+    }                                                                 /* not good already)         */
     /* save the last event into buffer for later, and remember its id */
     lasteventid = selectedid;
     memcpy(&lastevent, &(event[selected]), sizeof(struct midi_event_t));
@@ -433,17 +433,17 @@ long midi_mergetrack(long t0, long t1, unsigned long *totlen, unsigned short tim
     if (selected == 0) {
       if ((t1 >= 0) && (event[0].deltatime != 0)) {
         event[1].deltatime -= event[0].deltatime;
-        pushevent(&event[1], t1);
+        mem_push(&event[1], t1, sizeof(struct midi_event_t));
       }
       t0 = event[0].next;
-      if (t0 >= 0) pullevent(t0, &event[0]);
+      if (t0 >= 0) mem_pull(t0, &event[0], sizeof(struct midi_event_t));
     } else { /* selected == 1 */
       if ((t0 >= 0) && (event[1].deltatime != 0)) {
         event[0].deltatime -= event[1].deltatime;
-        pushevent(&event[0], t0);
+        mem_push(&event[0], t0, sizeof(struct midi_event_t));
       }
       t1 = event[1].next;
-      if (t1 >= 0) pullevent(t1, &event[1]);
+      if (t1 >= 0) mem_pull(t1, &event[1], sizeof(struct midi_event_t));
     }
   }
   return(res);
