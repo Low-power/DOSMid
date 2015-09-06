@@ -35,8 +35,11 @@ struct trackinfodata {
   char filename[UI_FILENAMEMAXLEN + 1];
 };
 
-/* inits ui */
+/* inits ui, sets colorflag (0=mono ; non-zero=color) */
 void ui_init(void);
+
+/* cleanup and restores initial video mode */
+void ui_close(void);
 
 /* hides the blinking cursor */
 void ui_hidecursor(void);

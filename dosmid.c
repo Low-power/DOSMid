@@ -1021,7 +1021,7 @@ int main(int argc, char **argv) {
   }
 
   /* reset screen (clears the screen and makes the cursor visible again) */
-  ui_init();
+  ui_close();
 
   /* unload XMS memory */
   mem_close();

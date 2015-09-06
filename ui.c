@@ -21,12 +21,14 @@
 #define COLOR_PROGRESS2 0x8000u /* not yet elapsed */
 #define COLOR_ERRMSG    0x4700u
 
+unsigned short far *screenptr = NULL;
+static int oldmode = 0;
+static int colorflag = 0;
 
 /* prints a character on screen, at position [x,y]. charbyte is a 16bit
    value where higher 8 bits contain the attributes (colors) and lower
    8bits contain the actual character to draw. */
 static void ui_printchar(int y, int x, unsigned short charbyte) {
-  unsigned short far *screenptr = MK_FP(0xB800, 0);
   screenptr[(y << 6) + (y << 4) + x] = charbyte;
 }
 
@@ -40,9 +42,21 @@ static void ui_printstr(int y, int x, char *string, int staticlen, unsigned shor
 
 void ui_init(void) {
   union REGS regs;
+  /* remember the current mode */
+  regs.h.ah = 0x0F; /* get current video mode */
+  int86(0x10, &regs, &regs);
+  oldmode = regs.h.al;
   /* set text mode 80x25 */
   regs.h.ah = 0x00;  /* set video mode */
-  regs.h.al = 0x03;  /* 80x25 */
+  if ((oldmode == 0) || (oldmode == 7)) { /* 0=40x25 BW ; 7=80x25 BW */
+    colorflag = 0;
+    regs.h.al = 0x07;  /* 80x25, mono */
+    screenptr = MK_FP(0xB000, 0);
+  } else {
+    colorflag = 1;
+    regs.h.al = 0x03;  /* 80x25, 16 colors */
+    screenptr = MK_FP(0xB800, 0);
+  }
   int86(0x10, &regs, &regs);
   /* disable blinking effect (enables the use of high-intensity backgrounds).
    * This doesn't change anything on DOSemu nor VBox, but DOSbox is unable to
@@ -50,6 +64,13 @@ void ui_init(void) {
   regs.x.ax = 0x1003;  /* toggle intensity/blinking */
   regs.h.bl = 0;       /* enable intensive colors (1 would enable blinking) */
   regs.h.bh = 0;       /* to avoid problems on some adapters */
+  int86(0x10, &regs, &regs);
+}
+
+void ui_close(void) {
+  union REGS regs;
+  regs.h.ah = 0x00;  /* set video mode */
+  regs.h.al = oldmode;
   int86(0x10, &regs, &regs);
 }
 
