@@ -990,15 +990,14 @@ int main(int argc, char **argv) {
         udelay(1000000lu); /* no action has been user forced, wait 1s */
         if (params.playlist == NULL) {
           action = ACTION_EXIT;
+          /* wait for 0.75s before quitting, so it doesn't seem that 'brutal' */
+          udelay(750000lu);
         } else {
           action = ACTION_NEXT;
         }
         break;
     }
   }
-
-  /* wait for 0.5s before quitting, so it doesn't seem that 'brutal' */
-  udelay(500000lu);
 
   /* reset screen (clears the screen and makes the cursor visible again) */
   ui_init();
