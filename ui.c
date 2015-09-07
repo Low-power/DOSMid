@@ -1,6 +1,6 @@
 /*
  * User interface routines of DOSMid.
- * Copyright (C) Mateusz Viste
+ * Copyright (C) Mateusz Viste 2014, 2015
  */
 
 #include <dos.h>
@@ -10,16 +10,17 @@
 
 #include "ui.h"  /* include self for control */
 
-/* color scheme 0xBF00 (Background/Foreground/0/0) */
-#define COLOR_TUI       0x1700u
-#define COLOR_NOTES     0x1E00u
-#define COLOR_TEXT      0x1700u
-#define COLOR_TEMPO     0x1300u
-#define COLOR_CHANS     0x1200u
-#define COLOR_CHANS_DIS 0x1800u
-#define COLOR_PROGRESS1 0x2000u /* elapsed time */
-#define COLOR_PROGRESS2 0x8000u /* not yet elapsed */
-#define COLOR_ERRMSG    0x4700u
+/* color scheme 0xBF00 (Background/Foreground/0/0): mono, color */
+static unsigned int COLOR_TUI[2]       = {0x0700u, 0x1700u};
+static unsigned int COLOR_NOTES[2]     = {0x0700u, 0x1E00u};
+static unsigned int COLOR_NOTES_HI[2]  = {0x0000u, 0x8000u}; /* a bit mask for highlighten columns */
+static unsigned int COLOR_TEXT[2]      = {0x0700u, 0x1700u};
+static unsigned int COLOR_TEMPO[2]     = {0x0700u, 0x1300u};
+static unsigned int COLOR_CHANS[2]     = {0x0700u, 0x1200u};
+static unsigned int COLOR_CHANS_DIS[2] = {0x0000u, 0x1800u};
+static unsigned int COLOR_PROGRESS1[2] = {0x7000u, 0x2000u}; /* elapsed time */
+static unsigned int COLOR_PROGRESS2[2] = {0x0700u, 0x8000u}; /* not yet elapsed */
+static unsigned int COLOR_ERRMSG[2]    = {0x7000u, 0x4700u};
 
 unsigned short far *screenptr = NULL;
 static int oldmode = 0;
@@ -96,12 +97,12 @@ void ui_puterrmsg(char *title, char *errmsg) {
   /* draw a red 'box' first */
   for (y = 8; y < 13; y++) {
     for (x = maxlen + 3; x >= 0; x--) {
-      ui_printchar(y, xstart + x - 2, ' ' | COLOR_ERRMSG);
+      ui_printchar(y, xstart + x - 2, ' ' | COLOR_ERRMSG[colorflag]);
     }
   }
   /* print out the title (if any), and the actual error string */
-  if (title != NULL) ui_printstr(8, 40 - (titlelen >> 1), title, titlelen, COLOR_ERRMSG);
-  ui_printstr(10, 40 - (msglen >> 1), errmsg, msglen, COLOR_ERRMSG);
+  if (title != NULL) ui_printstr(8, 40 - (titlelen >> 1), title, titlelen, COLOR_ERRMSG[colorflag]);
+  ui_printstr(10, 40 - (msglen >> 1), errmsg, msglen, COLOR_ERRMSG[colorflag]);
 }
 
 /* draws the UI screen */
@@ -112,25 +113,25 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, cha
   if (*refreshflags & UI_REFRESH_TUI) {
     char tempstr[32];
     for (x = 0; x < 80; x++) {
-      ui_printchar(0, x, 205 | COLOR_TUI);
-      ui_printchar(17, x, 205 | COLOR_TUI);
-      ui_printchar(24, x, 205 | COLOR_TUI);
+      ui_printchar(0, x, 205 | COLOR_TUI[colorflag]);
+      ui_printchar(17, x, 205 | COLOR_TUI[colorflag]);
+      ui_printchar(24, x, 205 | COLOR_TUI[colorflag]);
     }
-    for (y = 1; y < 17; y++) ui_printchar(y, 15, 179 | COLOR_TUI);
+    for (y = 1; y < 17; y++) ui_printchar(y, 15, 179 | COLOR_TUI[colorflag]);
     for (y = 18; y < 24; y++) {
-      ui_printchar(y, 0, 186 | COLOR_TUI);
-      ui_printchar(y, 79, 186 | COLOR_TUI);
+      ui_printchar(y, 0, 186 | COLOR_TUI[colorflag]);
+      ui_printchar(y, 79, 186 | COLOR_TUI[colorflag]);
     }
-    ui_printchar(0, 15, 209 | COLOR_TUI);
-    ui_printchar(17, 15, 207 | COLOR_TUI);
-    ui_printchar(17, 0, 201 | COLOR_TUI);
-    ui_printchar(17, 79, 187 | COLOR_TUI);
-    ui_printchar(24, 0, 200 | COLOR_TUI);
-    ui_printchar(24, 79, 188 | COLOR_TUI);
+    ui_printchar(0, 15, 209 | COLOR_TUI[colorflag]);
+    ui_printchar(17, 15, 207 | COLOR_TUI[colorflag]);
+    ui_printchar(17, 0, 201 | COLOR_TUI[colorflag]);
+    ui_printchar(17, 79, 187 | COLOR_TUI[colorflag]);
+    ui_printchar(24, 0, 200 | COLOR_TUI[colorflag]);
+    ui_printchar(24, 79, 188 | COLOR_TUI[colorflag]);
     sprintf(tempstr, "[ DOSMid v%s ]", pver);
-    ui_printstr(24, 78 - strlen(tempstr), tempstr, -1, COLOR_TUI);
+    ui_printstr(24, 78 - strlen(tempstr), tempstr, -1, COLOR_TUI[colorflag]);
     sprintf(tempstr, "%s port: %03Xh", devname, mpuport);
-    ui_printstr(18, 79 - strlen(tempstr), tempstr, -1, COLOR_TEMPO);
+    ui_printstr(18, 79 - strlen(tempstr), tempstr, -1, COLOR_TEMPO[colorflag]);
   }
   /* print notes states on every channel */
   if (*refreshflags & UI_REFRESH_NOTES) {
@@ -141,16 +142,16 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, cha
         if (trackinfo->notestates[1 + (x << 1)] & (1 << y)) noteflag |= 1;
         switch (noteflag) {
           case 0:
-            ui_printchar(1 + y, 16 + x, ' ' | COLOR_NOTES | ((~x << 13) & 0x8000u));
+            ui_printchar(1 + y, 16 + x, ' ' | COLOR_NOTES[colorflag] | ((~x << 13) & COLOR_NOTES_HI[colorflag]));
             break;
           case 1:
-            ui_printchar(1 + y, 16 + x, 0xde | COLOR_NOTES | ((~x << 13) & 0x8000u));
+            ui_printchar(1 + y, 16 + x, 0xde | COLOR_NOTES[colorflag] | ((~x << 13) & COLOR_NOTES_HI[colorflag]));
             break;
           case 2:
-            ui_printchar(1 + y, 16 + x, 0xdd | COLOR_NOTES | ((~x << 13) & 0x8000u));
+            ui_printchar(1 + y, 16 + x, 0xdd | COLOR_NOTES[colorflag] | ((~x << 13) & COLOR_NOTES_HI[colorflag]));
             break;
           case 3:
-            ui_printchar(1 + y, 16 + x, 0xdb | COLOR_NOTES | ((~x << 13) & 0x8000u));
+            ui_printchar(1 + y, 16 + x, 0xdb | COLOR_NOTES[colorflag] | ((~x << 13) & COLOR_NOTES_HI[colorflag]));
             break;
         }
       }
@@ -161,11 +162,11 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, cha
     char tempstr[16];
     unsigned long miditempo;
     /* print filename */
-    ui_printstr(18, 1, trackinfo->filename, 16, COLOR_TEMPO);
+    ui_printstr(18, 1, trackinfo->filename, 16, COLOR_TEMPO[colorflag]);
     /* print format */
     itoa(trackinfo->midiformat, tempstr, 10);
-    ui_printstr(18, 17, "Format:", 8, COLOR_TEMPO);
-    ui_printstr(18, 25, tempstr, 4, COLOR_TEMPO);
+    ui_printstr(18, 17, "Format:", 8, COLOR_TEMPO[colorflag]);
+    ui_printstr(18, 25, tempstr, 4, COLOR_TEMPO[colorflag]);
     /* print tempo */
     if (trackinfo->tempo > 0) {
       miditempo = 60000000lu / trackinfo->tempo;
@@ -174,32 +175,32 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, cha
     }
     ultoa(miditempo, tempstr, 10);
     strcat(tempstr, " bpm");
-    ui_printstr(18, 29, "Tempo:", 7, COLOR_TEMPO);
-    ui_printstr(18, 36, tempstr, 9, COLOR_TEMPO);
+    ui_printstr(18, 29, "Tempo:", 7, COLOR_TEMPO[colorflag]);
+    ui_printstr(18, 36, tempstr, 9, COLOR_TEMPO[colorflag]);
   }
   /* volume */
   if (*refreshflags & UI_REFRESH_VOLUME) {
     char tempstr[16];
     sprintf(tempstr, "Volume: %d%%", volume);
-    ui_printstr(18, 45, tempstr, 23 - strlen(devname), COLOR_TEMPO);
+    ui_printstr(18, 45, tempstr, 23 - strlen(devname), COLOR_TEMPO[colorflag]);
   }
   /* title and copyright notice */
   if (*refreshflags & UI_REFRESH_TITLECOPYR) {
-    ui_printstr(19, 1, trackinfo->title[0], 78, COLOR_TEXT);
-    ui_printstr(20, 1, trackinfo->title[1], 78, COLOR_TEXT);
-    ui_printstr(21, 1, trackinfo->title[2], 78, COLOR_TEXT);
-    ui_printstr(22, 1, trackinfo->copyright, 78, COLOR_TEXT);
+    ui_printstr(19, 1, trackinfo->title[0], 78, COLOR_TEXT[colorflag]);
+    ui_printstr(20, 1, trackinfo->title[1], 78, COLOR_TEXT[colorflag]);
+    ui_printstr(21, 1, trackinfo->title[2], 78, COLOR_TEXT[colorflag]);
+    ui_printstr(22, 1, trackinfo->copyright, 78, COLOR_TEXT[colorflag]);
   }
   /* programs (patches) names */
   if (*refreshflags & UI_REFRESH_PROGS) {
     unsigned int color;
     for (y = 0; y < 16; y++) {
-      color = COLOR_CHANS_DIS;
-      if (trackinfo->channelsusage & (1 << y)) color = COLOR_CHANS;
+      color = COLOR_CHANS_DIS[colorflag];
+      if (trackinfo->channelsusage & (1 << y)) color = COLOR_CHANS[colorflag];
       if (y == 9) {
-          ui_printstr(y + 1, 0, "Percussion", 15, color);
-        } else {
-          ui_printstr(y + 1, 0, gmset[trackinfo->chanprogs[y]], 15, color);
+        ui_printstr(y + 1, 0, "Percussion", 15, color);
+      } else {
+        ui_printstr(y + 1, 0, gmset[trackinfo->chanprogs[y]], 15, color);
       }
     }
   }
@@ -225,9 +226,9 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, cha
     }
     for (x = 0; x < 78; x++) {
       if (x < perc) {
-        curcol = COLOR_PROGRESS1;
+        curcol = COLOR_PROGRESS1[colorflag];
       } else {
-        curcol = COLOR_PROGRESS2;
+        curcol = COLOR_PROGRESS2[colorflag];
       }
       if (x < 15) {
         ui_printchar(23, 1 + x, tempstr1[x] | curcol);
@@ -266,8 +267,8 @@ int getkey_ifany(void) {
   regs.h.ah = 0x0B;
   int86(0x21, &regs, &regs);
   if (regs.h.al == 0xFF) {
-      return(getkey());
-    } else {
-      return(-1);
+    return(getkey());
+  } else {
+    return(-1);
   }
 }
