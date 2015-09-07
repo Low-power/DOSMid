@@ -26,8 +26,9 @@
 #define disable _disable
 #define enable _enable
 
-static unsigned long nowtime = 0;        /* Current time counter */
+static unsigned long nowtime = 0;        /* current time counter */
 static void interrupt (*oldfunc)(void);  /* interrupt function pointer */
+
 
 /* This routine will handle the clock interrupt at its higher rate. It will
  * call the DOS handler every 64 times it is called, to maintain the 18.2
@@ -51,6 +52,13 @@ static void interrupt handle_clock(void) {
     } else {  /* Otherwise, clear the interrupt controller */
       outp(0x20, 0x20);  /* End of interrupt */
   }
+}
+
+
+/* reset the timer value, this can be used by the application to make sure
+ * no timer wrap occurs during critical parts of the code flow */
+void timer_reset(void) {
+  nowtime = 0;
 }
 
 

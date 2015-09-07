@@ -15,6 +15,10 @@
 #ifndef timer_h_sentinel
 #define timer_h_sentinel
 
+/* reset the timer value, this can be used by the application to make sure
+ * no timer wrap occurs during critical parts of the code flow */
+void timer_reset(void);
+
 /* This routine will stop the fast clock if it is going. It has void return
  * value so that it can be an exit procedure. */
 void timer_stop(void);
