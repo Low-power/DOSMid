@@ -304,15 +304,17 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
         if (sysexlen > 4096) { /* skip SYSEX events that are more than 4K big */
           fseek(fd, sysexlen, SEEK_CUR);
         } else { /* read the sysex string */
+          int sysexleneven = sysexlen;
           event.type = EVENT_SYSEX;
           event.data.sysex.sysexlen = sysexlen;
           event.data.sysex.chan = statusbyte & 0x0F;
-          sysexbuff = malloc(sysexlen);
+          if ((sysexleneven & 1) != 0) sysexleneven++; /* make sysexleneven an even number (XMS moves MUST occur on even numbers of bytes) */
+          sysexbuff = malloc(sysexleneven);
           if (sysexbuff != NULL) {
             fread(sysexbuff, 1, sysexlen, fd);
-            event.data.sysex.sysexptr = mem_alloc(sysexlen);
+            event.data.sysex.sysexptr = mem_alloc(sysexleneven);
             if (event.data.sysex.sysexptr >= 0) {
-              mem_push(sysexbuff, event.data.sysex.sysexptr, sysexlen);
+              mem_push(sysexbuff, event.data.sysex.sysexptr, sysexleneven);
             } else {
               event.type = EVENT_NONE;
               if (logfd != NULL) fprintf(logfd, "%lu: SYSEX MEM_ALLOC FAILED FOR %ld BYTES\n", tracklen, sysexlen);

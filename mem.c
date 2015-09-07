@@ -112,9 +112,10 @@ void pusheventqueue(struct midi_event_t *event, long *root) {
 
 /* returns a free eventid for a new event of sz bytes */
 long mem_alloc(int sz) {
+  long res = nexteventid;
   if ((nexteventid + sz) < xms.memsize) {
-    nexteventid += 1 + sz;
-    return(nexteventid);
+    nexteventid += sz;
+    return(res);
   }
   return(-1);
 }

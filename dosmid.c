@@ -679,6 +679,7 @@ static void pauseplay(unsigned long *starttime, unsigned long *nexteventtime, st
   /* wait for a key press */
   getkey();
   /* restore play timing */
+  /* FIXME if paused for a long time (over a hour and some), the timer might wrap, leading to very bad things */
   timer_read(&afterpause);
   *nexteventtime = afterpause + deltaremainder;  /* set nexteventtime to resync the song */
   /* adapt starttime to keep the progress bar in sync */
@@ -737,6 +738,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   ui_draw(trackinfo, &refreshflags, PVER, params->devname, params->devport, volume);
   memset(trackinfo->title[0], 0, 16);
   refreshflags = 0xff;
+
+  /* reset the timer, to make sure it doesn't wrap around during playback */
+  timer_reset();
 
   timer_read(&nexteventtime); /* save current time, to schedule when the song shall start */
   nexteventtime += 2000000lu; /* playback should start no sooner than in 2s (for listening comfort) */
@@ -854,10 +858,11 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         if (params->logfd != NULL) {
           fprintf(params->logfd, "%lu: SYSEX of %d bytes: F%Xh", trackinfo->elapsedsec, curevent->data.sysex.sysexlen, curevent->data.sysex.chan);
         }
-        sysexbuff = malloc(curevent->data.sysex.sysexlen);
+        i = curevent->data.sysex.sysexlen;
+        if ((i & 1) != 0) i++; /* XMS moves MUST occur on even-aligned data only */
+        sysexbuff = malloc(i);
         if (sysexbuff != NULL) {
-          int i;
-          mem_pull(curevent->data.sysex.sysexptr, sysexbuff, curevent->data.sysex.sysexlen);
+          mem_pull(curevent->data.sysex.sysexptr, sysexbuff, i);
           dev_sysex(curevent->data.sysex.chan, sysexbuff, curevent->data.sysex.sysexlen);
           if (params->logfd != NULL) {
             for (i = 0; i < curevent->data.sysex.sysexlen; i++) {
