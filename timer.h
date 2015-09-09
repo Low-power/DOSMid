@@ -1,9 +1,12 @@
 /*
- * This file contains the implementation of a more precise time than that
- * provided by DOS.  Routines are provided to increase the clock rate to
+ * This file is part of the DOSMid project.
+ * Copyright (C) Mateusz Viste 2014-2015
+ *
+ * This file contains the implementation of a more precise timer than that
+ * provided by DOS. Routines are provided to increase the PIT clock rate to
  * around 1165 interrupts per second, for a granularity of close to 858
  * microseconds between clock pulses, rather than the 55 milliseconds between
- * normal PC clock pulses (18.2 times/second).
+ * standard PC clock pulses (18.2 times/second).
  *
  * Note that the timer_start() routine must be called before the timer_read()
  * routines will work, and that the timer_stop() routine MUST be called
@@ -32,7 +35,7 @@ void timer_stop(void);
 void timer_init(void);
 
 /* This routine will return the present value of the time, which is
- * read from the nowtime structure.  Interrupts are disabled during this
+ * read from the nowtime structure. Interrupts are disabled during this
  * time to prevent the clock from changing while it is being read. */
 void timer_read(unsigned long *res);
 

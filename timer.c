@@ -17,8 +17,34 @@
 #include <conio.h> /* outp() */
 #include "timer.h" /* include self for control */
 
+
+/* 1165.215 hz */
+#define DIV_MSB   0x04 /* a divisor of 1024 gives: */
+#define DIV_LSB   0x00 /* 1193180 / 1024 = 1165 Hz */
+#define ORIG_INTR_MASK 63 /* call the original clock INT every 64 calls */
+#define USEC_INC  858 /* one cycle is 858.21us to be exact */
+#define USEC_COMP 13  /* how many us to compensate for every ORIG_INTR_MASK+1 call */
+
+/* 582.607 hz */
+#ifndef DIV_MSB
+#define DIV_MSB   0x08
+#define DIV_LSB   0x00
+#define ORIG_INTR_MASK 31
+#define USEC_INC  1716 /* 1716.42 to be exact */
+#define USEC_COMP 13   /* how many us to compensate for every ORIG_INTR_MASK+1 call */
+#endif
+
+/* 291.304 hz */
+#ifndef DIV_MSB
+#define DIV_MSB   0x10
+#define DIV_LSB   0x00
+#define ORIG_INTR_MASK 15
+#define USEC_INC  3433 /* 3432.84 to be exact */
+#define USEC_COMP -2
+#endif
+
+
 #define CLOCK_INT 0x08
-#define USEC_INC  858
 
 /* redefine a few functions, as needed by OpenWatcom */
 #define setvect _dos_setvect
@@ -31,26 +57,27 @@ static void interrupt (*oldfunc)(void);  /* interrupt function pointer */
 
 
 /* This routine will handle the clock interrupt at its higher rate. It will
- * call the DOS handler every 64 times it is called, to maintain the 18.2
- * times per second that DOS needs to be called. Each time through, it adds
- * to the nowtime value.
+ * call the DOS handler every ORIG_INTR_MASK times it is called, to maintain
+ * the 18.2 times per second that DOS needs to be called. Each time through,
+ * it adds to the nowtime value.
  * When it is not calling the DOS handler, this routine must reset the 8259A
  * interrupt controller before returning. */
 static void interrupt handle_clock(void) {
   static int callmod = 0;
 
-  /* Increment the time */
+  /* increment the time */
   nowtime += USEC_INC;
 
-  /* Increment the callmod */
+  /* increment the callmod */
   callmod++;
-  callmod &= 63;
+  callmod &= ORIG_INTR_MASK;
 
-  /* If this is the 64th call, then call handler */
+  /* if this is the 64th call, then call handler */
   if (callmod == 0) {
-      _chain_intr(oldfunc);
-    } else {  /* Otherwise, clear the interrupt controller */
-      outp(0x20, 0x20);  /* End of interrupt */
+    nowtime += USEC_COMP; /* compensate for integer division inaccuracy */
+    _chain_intr(oldfunc);
+  } else {  /* otherwise, clear the interrupt controller */
+    outp(0x20, 0x20);  /* end of interrupt */
   }
 }
 
@@ -71,7 +98,7 @@ void timer_stop(void) {
   /* Reinstate the old interrupt handler */
   setvect(CLOCK_INT, oldfunc);
 
-  /* Reinstate the clock rate to 18.2 Hz */
+  /* Reinstate the clock rate to standard 18.2 Hz */
   outp(0x43, 0x36);       /* Set up for count to be sent          */
   outp(0x40, 0x00);       /* LSB = 00  \_together make 65536 (0)  */
   outp(0x40, 0x00);       /* MSB = 00  /                          */
@@ -99,9 +126,9 @@ void timer_init(void) {
   setvect(CLOCK_INT, handle_clock);
 
   /* Increase the clock rate */
-  outp(0x43, 0x36);   /* Set up for count to be sent            */
-  outp(0x40, 0x00);   /* LSB = 00  \_together make 2^10 = 1024  */
-  outp(0x40, 0x04);   /* MSB = 04  /                            */
+  outp(0x43, 0x36);     /* Set up for count to be sent            */
+  outp(0x40, DIV_LSB);  /* LSB = 00  \_together make 2^10 = 1024  */
+  outp(0x40, DIV_MSB);  /* MSB = 04  /                            */
 
   /* Enable interrupts */
   enable();
