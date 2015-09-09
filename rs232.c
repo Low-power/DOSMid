@@ -40,6 +40,14 @@ unsigned short rs232_getport(int x) {
   if (x < 1) return(0);
   if (x > 4) return(0);
   res = bioscomtable[x - 1];
+  if (res == 0) {
+    switch (x) {
+      case 1: return(0x3f8); /* very old BIOSes might not provide the list  */
+      case 2: return(0x2f8); /* of ports at 0400:0000 (example: the Toshiba */
+      case 3: return(0x3e8); /* T1100 Plus). in such situation, fallback to */
+      case 4: return(0x2e8); /* 'standard' (usual) values.                  */
+    }
+  }
   return(res);
 }
 
