@@ -45,6 +45,7 @@ void mpu401_flush(int mpuport);
 /* resets the MPU-401. returns 0 on success, non-zero otherwise. */
 int mpu401_rst(int mpuport);
 
+/* switches the MPU-401 into 'dumb UART' mode */
 void mpu401_uart(int mpuport);
 
 #endif

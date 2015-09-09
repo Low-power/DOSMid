@@ -46,15 +46,15 @@ int mem_init(unsigned int memsize, int mode) {
   memmode = mode;
   nexteventid = 0;
   if (memmode == MEM_XMS) {
-      return(xms_init(&xms, memsize));
-    } else {
-      unsigned long bytesize;
-      bytesize = memsize;
-      bytesize <<= 10;  /* KiBs to bytes */
-      mempool = _fmalloc(bytesize);
-      if (mempool == NULL) return(0);
-      xms.memsize = bytesize;
-      return(bytesize);
+    return(xms_init(&xms, memsize));
+  } else {
+    unsigned long bytesize;
+    bytesize = memsize;
+    bytesize <<= 10;  /* KiBs to bytes */
+    mempool = _fmalloc(bytesize);
+    if (mempool == NULL) return(0);
+    xms.memsize = bytesize;
+    return(bytesize);
   }
 }
 
