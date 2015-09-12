@@ -51,6 +51,7 @@ static int midi_fetch_variablelen_fromfile(FILE *fd, unsigned long *result) {
   return(offset);
 }
 
+
 /* reads a MIDI file and computes a map of chunks (ie a list of offsets) */
 static int midi_getchunkmap(FILE *fd, struct midi_chunkmap_t *chunklist, int maxchunks) {
   int chunkid, i;
@@ -112,6 +113,7 @@ struct midi_chunk_t *midi_readchunk(FILE *fd) {
   return(res);
 }
 
+
 int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned short *timeunitdiv, struct midi_chunkmap_t *chunklist, int maxchunks) {
   struct midi_chunk_t *chunk;
   unsigned char rmidbuff[12];
@@ -168,8 +170,10 @@ int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned short *timeunitdiv
   return(0);
 }
 
+
 /* parse a track object and returns the id of the first events in the linked
- * list. channelsusage contains 16 flags indicating what channels are used. */
+ * list. channelsusage contains 16 flags indicating what channels are used.
+ * returns MIDI_OUTOFMEM if faild to store events in memory. */
 long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, char *copyright, int copyrightmaxlen, unsigned short *channelsusage, FILE *logfd) {
   unsigned long deltatime;
   unsigned char statusbyte = 0, tmp;
@@ -317,12 +321,16 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
               mem_push(sysexbuff, event.data.sysex.sysexptr, sysexleneven);
             } else {
               event.type = EVENT_NONE;
+              free(sysexbuff);
+              sysexbuff = NULL;
               if (logfd != NULL) fprintf(logfd, "%lu: SYSEX MEM_ALLOC FAILED FOR %ld BYTES\n", tracklen, sysexlen);
+              return(MIDI_OUTOFMEM);
             }
             free(sysexbuff);
           } else {
             event.type = EVENT_NONE;
             if (logfd != NULL) fprintf(logfd, "%lu: SYSEX MALLOC FAILED FOR %ld BYTES\n", tracklen, sysexlen);
+            return(MIDI_OUTOFMEM);
           }
         }
       } else if ((statusbyte >= 0x80) && (statusbyte <= 0xEF)) { /* else it's a note-related command */
@@ -390,19 +398,26 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
     if (event.type == EVENT_NONE) {
       ignoreddeltas += event.deltatime;
     } else {
+      int pusheventres;
       event.deltatime += ignoreddeltas; /* add any previously ignored delta times */
       ignoreddeltas = 0;
       /* add the event to the queue */
       if (result < 0) {
-        pusheventqueue(&event, &result);
+        pusheventres = pusheventqueue(&event, &result);
       } else {
-        pusheventqueue(&event, NULL);
+        pusheventres = pusheventqueue(&event, NULL);
+      }
+      if (pusheventres != 0) {
+        return(MIDI_OUTOFMEM);
       }
     }
   }
-  if (result >= 0) pusheventqueue(NULL, NULL); /* flush last event in buffer to memory */
+  if (result >= 0) {
+    if (pusheventqueue(NULL, NULL) != 0) return(MIDI_OUTOFMEM); /* flush last event in buffer to memory */
+  }
   return(result);
 }
+
 
 /* merge two MIDI tracks into a single (serialized) one. returns a "pointer"
  * to the unique track. I take care not to allocate/free memory here.

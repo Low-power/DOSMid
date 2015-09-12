@@ -32,6 +32,8 @@
 #ifndef midi_h_sentinel
 #define midi_h_sentinel
 
+#define MIDI_OUTOFMEM -10
+
 enum midi_midievents {
   EVENT_NOTEOFF = 0,
   EVENT_NOTEON = 1,

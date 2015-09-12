@@ -588,6 +588,11 @@ static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struc
       newtrack = midi_track2events(fd, NULL, 0, UI_TITLEMAXLEN, NULL, 0, &(trackinfo->channelsusage), params->logfd);
       if (params->logfd != NULL) fprintf(params->logfd, "TRACK %d LOADED (start id=%ld) -> MERGING NOW\n", i, newtrack);
     }
+    if (newtrack == MIDI_OUTOFMEM) {
+      ui_puterrmsg(params->midifile, "Error: Out of memory");
+      free(chunkmap);
+      return(ACTION_ERR_SOFT);
+    }
     if (newtrack >= 0) {
       *trackpos = midi_mergetrack(*trackpos, newtrack, &(trackinfo->totlen), trackinfo->miditimeunitdiv);
       if (params->logfd != NULL) fprintf(params->logfd, "TRACK %d MERGED (start id=%ld) -> TOTAL TIME: %ld\n", i, *trackpos, trackinfo->totlen);
@@ -635,12 +640,15 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
     case FORMAT_MUS:
       /* memset(trackinfo, 0, sizeof(struct trackinfodata)); */ /* should I ? */
       *trackpos = mus_load(fd, &(trackinfo->totlen), &(trackinfo->miditimeunitdiv), &(trackinfo->channelsusage));
-      if (*trackpos < 0) {
+      if (*trackpos == MUS_OUTOFMEM) { /* detect out of memory */
+        res = ACTION_ERR_SOFT;
+        ui_puterrmsg(params->midifile, "Error: Out of memory");
+      } else if (*trackpos < 0) { /* detect any other problems */
         char msg[64];
         res = ACTION_ERR_SOFT;
         snprintf(msg, 64, "Error: Failed to load the MUS file (%ld)", *trackpos);
         ui_puterrmsg(params->midifile, msg);
-      } else {
+      } else { /* all right, now we're talking */
         res = ACTION_NONE;
       }
       break;

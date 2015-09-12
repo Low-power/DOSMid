@@ -69,7 +69,7 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
   midievent.type = EVENT_TEMPO;
   *timeunitdiv = TIMEUNITDIV;
   midievent.data.tempoval = TICKLEN;
-  pusheventqueue(&midievent, &res);
+  if (pusheventqueue(&midievent, &res) != 0) return(MUS_OUTOFMEM);
 
   /* since now on, hdr_or_chanvol is used to store volume of channels */
   memset(hdr_or_chanvol, 0, 16);
@@ -148,7 +148,7 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
         }
         break;
       case 6: /* end of song (no byte follow) */
-        pusheventqueue(NULL, NULL);
+        if (pusheventqueue(NULL, NULL) != 0) return(MUS_OUTOFMEM);
         loadflag = 1;
         break;
       default: /* unknown event type - abort */
@@ -169,7 +169,7 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
       nextwait |= (bytebuff & 127);
     }
     /* push the event into memory */
-    pusheventqueue(&midievent, NULL);
+    if (pusheventqueue(&midievent, NULL) != 0) return(MUS_OUTOFMEM);
     /* recompute total song's length */
     tickduration += nextwait;
     while (tickduration >= TIMEUNITDIV) {

@@ -82,17 +82,19 @@ int mem_push(void far *ptr, long addr, int sz) {
 
 
 /* pushes an event to memory, and link events as they come. take care to call
- * this with event == NULL to close the song. */
-void pusheventqueue(struct midi_event_t *event, long *root) {
+ * this with event == NULL to close the song. returns 0 on success, non-zero
+ * otherwise */
+int pusheventqueue(struct midi_event_t *event, long *root) {
   static struct midi_event_t lastevent;
   static long lasteventid;
   struct midi_event_t far *lasteventfarptr;
 
   if (root != NULL) {
     lasteventid = mem_alloc(sizeof(struct midi_event_t));
+    if (lasteventid < 0) return(-1);
     *root = lasteventid;
     memcpy(&lastevent, event, sizeof(struct midi_event_t));
-    return;
+    return(0);
   }
 
   lasteventfarptr = &lastevent;
@@ -100,13 +102,15 @@ void pusheventqueue(struct midi_event_t *event, long *root) {
   if (event == NULL) {
     lastevent.next = -1;
     mem_push(lasteventfarptr, lasteventid, sizeof(struct midi_event_t));
-    return;
+    return(0);
   }
 
   lastevent.next = mem_alloc(sizeof(struct midi_event_t));
+  if (lastevent.next < 0) return(-1);
   mem_push(lasteventfarptr, lasteventid, sizeof(struct midi_event_t));
   lasteventid = lastevent.next;
   memcpy(&lastevent, event, sizeof(struct midi_event_t));
+  return(0);
 }
 
 
