@@ -245,7 +245,7 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
   params->midifile = NULL;
   params->playlist = NULL;
   params->memmode = MEM_XMS;
-  params->workmem = 16384;  /* try to use 16M of XMS memory by default */
+  params->workmem = 16384;  /* try to use 16M of XMS memory by default (the XMS allocator will provide less anyway if that much memory is not available) */
   params->delay = 0;
   params->logfd = NULL;
   params->nopowersave = 0;
@@ -294,12 +294,12 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       params->device = DEV_RS232;
       params->devport = hexstr2uint(argv[i] + 5);
       if (params->devport < 10) return("Invalid COM port provided. Example: /com=3f8");
-    } else if (strcmp(argv[i], "/com") == 0) {
+    } else if (stringstartswith(argv[i], "/com") == 0) { /* must be compared AFTER "/com=" */
       params->device = DEV_RS232;
-      params->devicesubtype = hexstr2uint(argv[i] + 4);
+      params->devicesubtype = argv[i][4] - '0';
       if ((params->devicesubtype < 1) || (params->devicesubtype > 4)) return("Invalid COM port provided. Example: /com1");
       params->devport = rs232_getport(params->devicesubtype);
-      if (params->devport < 1) return("Failed to autodetect the I/O address of this COM port.");
+      if (params->devport < 1) return("Failed to autodetect the I/O address of this COM port. Try using the /com=XXX option.");
     } else if (strcmp(argv[i], "/sbmidi") == 0) {
       params->device = DEV_SBMIDI;
       params->devport = params->port_sb;
@@ -925,7 +925,7 @@ int main(int argc, char **argv) {
   errstr = parseargv(argc, argv, &params);
   if (errstr != NULL) {
     if (*errstr != 0) {
-      printf("Error: %s\nRun DOSMID /? for some help", errstr);
+      printf("Error: %s\nRun DOSMID /? for additional help", errstr);
     } else {
       puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste\n"
            "\n"
