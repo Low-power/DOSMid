@@ -49,7 +49,7 @@ void ui_init(void) {
   oldmode = regs.h.al;
   /* set text mode 80x25 */
   regs.h.ah = 0x00;  /* set video mode */
-  if ((oldmode == 0) || (oldmode == 7)) { /* 0=40x25 BW ; 7=80x25 BW */
+  if ((oldmode == 0) || (oldmode == 2) || (oldmode == 7)) { /* 0=40x25 BW ; 2=80x25 BW ; 7=80x25 HGC */
     colorflag = 0;
     regs.h.al = 0x07;  /* 80x25, mono */
     screenptr = MK_FP(0xB000, 0);
