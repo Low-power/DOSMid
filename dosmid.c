@@ -1021,11 +1021,10 @@ int main(int argc, char **argv) {
           sleep(2);
         }
       case ACTION_NONE: /* choose an action depending on the mode we are in */
-        udelay(1000000lu); /* no action has been user forced, wait 1s */
         if (params.playlist == NULL) {
+          /* wait 1s before quit, so it doesn't feel 'brutal', but don't if */
+          if (action == ACTION_NONE) udelay(1000000lu); /* an error occured */
           action = ACTION_EXIT;
-          /* wait for 0.75s before quitting, so it doesn't seem that 'brutal' */
-          udelay(750000lu);
         } else {
           action = ACTION_NEXT;
         }
