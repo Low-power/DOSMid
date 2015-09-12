@@ -40,15 +40,19 @@ unsigned short rs232_getport(int x) {
   if (x < 1) return(0);
   if (x > 4) return(0);
   res = bioscomtable[x - 1];
-  if (res == 0) {
-    switch (x) {
-      case 1: return(0x3f8); /* very old BIOSes might not provide the list  */
-      case 2: return(0x2f8); /* of ports at 0400:0000 (example: the Toshiba */
-      case 3: return(0x3e8); /* T1100 Plus). in such situation, fallback to */
-      case 4: return(0x2e8); /* 'standard' (usual) values.                  */
-    }
-  }
   return(res);
+}
+
+/* check if the COM port is ready for write. loops for some time waiting.
+ * returns 0 if port seems ready eventually, non-zero otherwise. can be used
+ * to verify the rs232 presence */
+int rs232_check(unsigned short port) {
+  int i = 4096; /* cycles up to 4K times (should be enough for any UART) */
+  while (i-- > 0) {
+    if ((inp(port + 5) & 0x20) != 0) return(0);
+  }
+  /* the port wouldn't become ready - exit with error */
+  return(-1);
 }
 
 /* write a byte to the COM port at 'port'. this function will block if the

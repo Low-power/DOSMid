@@ -96,6 +96,7 @@ int dev_init(enum outdev_types dev, unsigned short port) {
       }
       break;
     case DEV_RS232:
+      if (rs232_check(outport) != 0) return(-1);
       break;
     case DEV_SBMIDI:
       /* The DSP has to be reset before it is first programmed. The reset

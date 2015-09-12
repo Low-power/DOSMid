@@ -34,6 +34,11 @@
 /* get the I/O port for COMx (1..4) */
 unsigned short rs232_getport(int x);
 
+/* check if the COM port is ready for write. loops for some time waiting.
+ * returns 0 if port seems ready eventually, non-zero otherwise. can be used
+ * to verify the rs232 presence */
+int rs232_check(unsigned short port);
+
 /* write a byte to the COM port at 'port'. this function will block if the
  * UART is not ready to transmit yet. */
 void rs232_write(unsigned short port, int data);
