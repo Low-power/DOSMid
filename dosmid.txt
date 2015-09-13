@@ -23,10 +23,11 @@ unless the MIDI file was specifically crafted for OPL.
 Minimum requirements:
  - a compatible synthesizer (wavetable, OPL or external - see the compat list)
  - an 8086-compatible CPU
+ - ca 200K of available conventional memory
  - a video card able to display an 80x25 monochrome text mode
 
 Highly recommended:
- - 80386+ CPU for a guaranteed lag-free experience even on complex MIDI files
+ - 80286 CPU for a guaranteed lag-free experience even on complex MIDI files
  - VGA graphic with a color monitor
  - 512K of available XMS memory
 
