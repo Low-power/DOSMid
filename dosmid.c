@@ -965,7 +965,8 @@ int main(int argc, char **argv) {
   params.devname = devtoname(params.device, params.devicesubtype);
 
   /* allocate the work memory */
-  if (mem_init(params.workmem, params.memmode) == 0) {
+  params.workmem = mem_init(params.workmem, params.memmode);
+  if (params.workmem == 0) {
     puts("ERROR: Memory init failed!");
     return(1);
   }

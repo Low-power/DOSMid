@@ -35,26 +35,34 @@
 #include "midi.h"
 #include "mem.h" /* include self for control */
 
-static unsigned char far *mempool = NULL;
+
+#define LOWMEMBUFCOUNT 10    /* how many memory pools to allocate for 'noxms' allocations */
+#define LOWMEMBUFSIZE 32768u /* how big each memory pool is, in bytes */
+
+static unsigned char far *mempool[LOWMEMBUFCOUNT];
 static int memmode = 0;
 static struct xms_struct xms;
 static long nexteventid = 0;
 
 
-/* initializes the memory module using 'mode' method */
+/* initializes the memory module using 'mode' method, returns the number of
+ * memory kilobytes allocated */
 int mem_init(unsigned int memsize, int mode) {
   memmode = mode;
   nexteventid = 0;
   if (memmode == MEM_XMS) {
     return(xms_init(&xms, memsize));
   } else {
-    unsigned long bytesize;
-    bytesize = memsize;
-    bytesize <<= 10;  /* KiBs to bytes */
-    mempool = _fmalloc(bytesize);
-    if (mempool == NULL) return(0);
-    xms.memsize = bytesize;
-    return(bytesize);
+    int i;
+    xms.memsize = 0;
+    for (i = 0; i < LOWMEMBUFCOUNT; i++) {
+      mempool[i] = _fmalloc(LOWMEMBUFSIZE);
+      if (mempool[i] == NULL) { /* malloc() failed, stop allocating */
+        return(xms.memsize >> 10);
+      }
+      xms.memsize += LOWMEMBUFSIZE;
+    }
+    return(xms.memsize >> 10);
   }
 }
 
@@ -64,7 +72,7 @@ int mem_pull(long addr, void far *ptr, int sz) {
   if (memmode == MEM_XMS) {
     return(xms_pull(&xms, addr, ptr, sz));
   } else {
-    _fmemcpy(ptr, mempool + addr, sz);
+    _fmemcpy(ptr, mempool[addr >> 16] + (addr & 0xffffl), sz);
     return(0);
   }
 }
@@ -75,7 +83,7 @@ int mem_push(void far *ptr, long addr, int sz) {
   if (memmode == MEM_XMS) {
     return(xms_push(&xms, ptr, sz, addr));
   } else {
-    _fmemcpy(mempool + addr, ptr, sz);
+    _fmemcpy(mempool[addr >> 16] + (addr & 0xffffl), ptr, sz);
     return(0);
   }
 }
@@ -115,13 +123,29 @@ int pusheventqueue(struct midi_event_t *event, long *root) {
 
 
 /* returns a free eventid for a new event of sz bytes */
+/* TODO handle allocation of LOW MEM in different 'pools' */
 long mem_alloc(int sz) {
-  long res = nexteventid;
-  if ((nexteventid + sz) < xms.memsize) {
+  long res;
+  if (memmode == MEM_XMS) {
+    res = nexteventid;
+    if ((nexteventid + sz) > xms.memsize) return(-1);
     nexteventid += sz;
     return(res);
+  } else {
+    long seg, offset;
+    seg = nexteventid >> 16;
+    offset = nexteventid & 0xffffl;
+    /* detect segment boundaries */
+    if (offset + sz > LOWMEMBUFSIZE) {
+      seg += 1;
+      offset = 0;
+      if ((seg * LOWMEMBUFSIZE) + sz > xms.memsize) return(-1);
+    }
+    res = (seg << 16) | offset;
+    /* */
+    nexteventid = (seg << 16) | (offset + sz);
+    return(res);
   }
-  return(-1);
 }
 
 
@@ -136,6 +160,10 @@ void mem_close(void) {
   if (memmode == MEM_XMS) {
     xms_close(&xms);
   } else {
-    _ffree(mempool);
+    int i;
+    for (i = 0; i < LOWMEMBUFCOUNT; i++) {
+      if (mempool[i] == NULL) break; /* stop at first NULL mempool */
+      _ffree(mempool[i]);
+    }
   }
 }

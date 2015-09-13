@@ -13,6 +13,7 @@ DOSMid v0.8 [xx xxx xxxx]
  - reduced timing inaccuracy from ~0.02% to <0.005% (relies on PIT's quality),
  - restoring initial video mode after DOSMid quits,
  - reliable detection of out of memory conditions,
+ - /noxms handles more than 64K of memory (bigger files can be played),
  - ...
 
 DOSMid v0.7 [29 Jul 2015]
