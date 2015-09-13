@@ -278,17 +278,19 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       params->devport = params->port_mpu;
       /* if MPU port not found in BLASTER, use the default 0x330 */
       if (params->devport == 0) params->devport = 0x330;
+#ifdef OPL
     } else if (strcmp(argv[i], "/opl") == 0) {
       params->device = DEV_OPL;
       params->devport = 0x388;
-    } else if (stringstartswith(argv[i], "/mpu=") == 0) {
-      params->device = DEV_MPU401;
-      params->devport = hexstr2uint(argv[i] + 5);
-      if (params->devport < 1) return("Invalid MPU port provided. Example: /mpu=330");
     } else if (stringstartswith(argv[i], "/opl=") == 0) {
       params->device = DEV_OPL;
       params->devport = hexstr2uint(argv[i] + 5);
       if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388");
+#endif
+    } else if (stringstartswith(argv[i], "/mpu=") == 0) {
+      params->device = DEV_MPU401;
+      params->devport = hexstr2uint(argv[i] + 5);
+      if (params->devport < 1) return("Invalid MPU port provided. Example: /mpu=330");
     } else if (stringstartswith(argv[i], "/com=") == 0) {
       params->device = DEV_RS232;
       params->devport = hexstr2uint(argv[i] + 5);
@@ -471,19 +473,30 @@ static void preload_outdev(struct clioptions *params) {
   }
 
   /* look at what we got, and choose in order of preference */
-  if (0) { /* fake choice, just so I can #ifdef SBAWE */
-#ifdef SBAWE
-  } else if (params->port_awe > 0) { /* AWE is the most desirable, if present */
-    params->device = DEV_AWE;
-    params->devport = params->port_awe;
+
+  /* set NONE, just so we have anything */
+  params->device = DEV_NONE;
+  params->devport = 0;
+
+  /* use OPL on port 0x388, if OPL output is compiled in */
+#ifdef OPL
+  params->device = DEV_OPL;   /* the SBMIDI port, because it's unlikely    */
+  params->devport = 0x388;    /* there's something connected to it anyway) */
 #endif
-  } else if (params->port_mpu > 0) { /* then look for MPU */
+
+  /* is there an MPU? if so, take it */
+  if (params->port_mpu > 0) {
     params->device = DEV_MPU401;
     params->devport = params->port_mpu;
-  } else { /* if all else fails, fallback to OPL on 388h (note that I ignore */
-    params->device = DEV_OPL;   /* the SBMIDI port, because it's unlikely    */
-    params->devport = 0x388;    /* there's something connected to it anyway) */
   }
+
+  /* AWE is the most desirable, if present */
+#ifdef SBAWE
+  if (params->port_awe > 0) { /* AWE is the most desirable, if present */
+    params->device = DEV_AWE;
+    params->devport = params->port_awe;
+  }
+#endif
 }
 
 
@@ -955,7 +968,9 @@ int main(int argc, char **argv) {
            " /awe[=XXX] use the EMU8000 synth on AWE32/AWE64 SoundBlaster cards, you\n"
            "            can specify the port if needed (read from BLASTER otherwise)\n"
 #endif
+#ifdef OPL
            " /opl[=XXX] use an FM synthesis OPL2/OPL3 chip for sound output\n"
+#endif
            " /sbmidi[=XXX] outputs MIDI to the SoundBlaster MIDI port at I/O addr XXX\n"
            " /com[=XXX] output MIDI messages via the RS232 port at I/O address XXX\n"
            " /comX      same as /com=XXX, but takes a COM port instead (example: /com1)\n"

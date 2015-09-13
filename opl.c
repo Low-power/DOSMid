@@ -27,6 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef OPL
+
 #include <conio.h> /* inp(), out() */
 #include <dos.h>
 #include <stdio.h>
@@ -499,3 +501,5 @@ void opl_midi_noteoff(unsigned short port, int channel, int note) {
     oplmem->notes2voices[channel][note] = -1;
   }
 }
+
+#endif /* #ifdef OPL */

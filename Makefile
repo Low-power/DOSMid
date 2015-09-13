@@ -4,7 +4,8 @@
 
 # you can control the availability of some features with the FEATURES string:
 #  -DSBAWE    enables SoundBlaster AWE drivers (adds bloat to the binary)
-FEATURES = -DSBAWE
+#  -DOPL      enables MIDI emulation over OPL output
+FEATURES = -DSBAWE -DOPL
 
 # memory segmentation mode (s = small ; c = compact ; m = medium ; l = large)
 MODE = c

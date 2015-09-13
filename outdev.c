@@ -30,7 +30,10 @@
 #include <conio.h> /* outp(), inp() */
 #include <dos.h>
 
+#ifdef OPL
 #include "opl.h"
+#endif
+
 #include "mpu401.h"
 #include "rs232.h"
 #include "sbdsp.h"
@@ -63,7 +66,6 @@ static unsigned short outport = 0;
  * This should be called only ONCE, when program starts.
  * Returns 0 on success, non-zero otherwise. */
 int dev_init(enum outdev_types dev, unsigned short port) {
-  int res;
   outdev = dev;
   outport = port;
   switch (outdev) {
@@ -91,6 +93,9 @@ int dev_init(enum outdev_types dev, unsigned short port) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
+#ifdef OPL
+    {
+      int res;
       res = opl_init(outport);
       if (res < 0) return(res);
       /* change the outdev device depending on OPL autodetection */
@@ -99,6 +104,8 @@ int dev_init(enum outdev_types dev, unsigned short port) {
       } else {
         outdev = DEV_OPL3;
       }
+    }
+#endif
       break;
     case DEV_RS232:
       if (rs232_check(outport) != 0) return(-1);
@@ -141,7 +148,9 @@ void dev_close(void) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
+#ifdef OPL
       opl_close(outport);
+#endif
       break;
     case DEV_RS232:
       break;
@@ -179,7 +188,9 @@ void dev_clear(void) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
+#ifdef OPL
       opl_clear(outport);
+#endif
       break;
     case DEV_NONE:
       break;
@@ -203,7 +214,9 @@ void dev_noteon(int channel, int note, int velocity) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
+#ifdef OPL
       opl_midi_noteon(outport, channel, note, velocity);
+#endif
       break;
     case DEV_AWE:
 #ifdef SBAWE
@@ -243,7 +256,9 @@ void dev_noteoff(int channel, int note) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
+#ifdef OPL
       opl_midi_noteoff(outport, channel, note);
+#endif
       break;
     case DEV_AWE:
 #ifdef SBAWE
@@ -283,7 +298,9 @@ void dev_pitchwheel(int channel, int wheelvalue) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
+#ifdef OPL
       opl_midi_pitchwheel(outport, channel, wheelvalue);
+#endif
       break;
     case DEV_AWE:
 #ifdef SBAWE
@@ -323,7 +340,9 @@ void dev_controller(int channel, int id, int val) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
+#ifdef OPL
       opl_midi_controller(outport, channel, id, val);
+#endif
       break;
     case DEV_AWE:
 #ifdef SBAWE
@@ -360,6 +379,9 @@ void dev_chanpressure(int channel, int pressure) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
+#ifdef OPL
+      /* nothing to do */
+#endif
       break;
     case DEV_AWE:
 #ifdef SBAWE
@@ -395,6 +417,9 @@ void dev_keypressure(int channel, int note, int pressure) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
+#ifdef OPL
+      /* nothing to do */
+#endif
       break;
     case DEV_AWE:
 #ifdef SBAWE
@@ -460,7 +485,9 @@ void dev_setprog(int channel, int program) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
+#ifdef OPL
       opl_midi_changeprog(channel, program);
+#endif
       break;
     case DEV_AWE:
 #ifdef SBAWE
@@ -498,7 +525,9 @@ void dev_sysex(int channel, char *buff, int bufflen) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
+#ifdef OPL
       /* SYSEX is unsupported on OPL output */
+#endif
       break;
     case DEV_AWE:
 #ifdef SBAWE
