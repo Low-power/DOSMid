@@ -47,7 +47,7 @@ static long nexteventid = 0;
 
 /* initializes the memory module using 'mode' method, returns the number of
  * memory kilobytes allocated */
-int mem_init(unsigned int memsize, int mode) {
+unsigned int mem_init(unsigned int memsize, int mode) {
   memmode = mode;
   nexteventid = 0;
   if (memmode == MEM_XMS) {

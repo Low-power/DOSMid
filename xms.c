@@ -44,6 +44,7 @@ struct xms_move {
   long dstoffset;         /* destination offset (or far pointer) */
 };
 
+
 /* used by xms_push() and xms_pull() to call the xms driver for data copy.
    returns 0 on success, non-zero otherwise */
 static int xms_move(struct xms_move far *xmove) {
@@ -79,6 +80,7 @@ static unsigned int xms_memfree(void) {
   return(res);
 }
 
+
 /* checks if a XMS driver is installed, inits it and allocates a memory block of memsize K-bytes.
  * if memsize is 0, then the maximum possible block will be allocated.
  * returns the amount of allocated memory (in K-bytes) on success, 0 otherwise. */
@@ -90,7 +92,7 @@ unsigned int xms_init(struct xms_struct *xms, unsigned int memsize) {
   /* check that an XMS driver is present */
   regs.x.ax = 0x4300;
   int86(0x2F, &regs, &regs);
-  if (regs.h.al != 0x80) return(-1);
+  if (regs.h.al != 0x80) return(0);
   /* fetch the driver's API address */
   regs.x.ax = 0x4310;
   int86x(0x2F, &regs, &regs, &sregs);
@@ -116,6 +118,7 @@ unsigned int xms_init(struct xms_struct *xms, unsigned int memsize) {
   return(memsize);
 }
 
+
 /* free XMS memory */
 void xms_close(struct xms_struct *xms) {
   unsigned int handle;
@@ -128,6 +131,7 @@ void xms_close(struct xms_struct *xms) {
     pop dx;                   ; restore original DX
   }
 }
+
 
 /* copies a chunk of memory from conventional memory into the XMS block.
    returns 0 on sucess, non-zero otherwise. */
@@ -145,6 +149,7 @@ int xms_push(struct xms_struct *xms, void far *src, unsigned int len, long xmsof
   res = xms_move(ptr);
   return(res);
 }
+
 
 /* copies a chunk of memory from the XMS block into conventional memory.
    returns 0 on success, non-zero otherwise. */

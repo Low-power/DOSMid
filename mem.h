@@ -33,7 +33,7 @@
   #define MEM_MALLOC 0
   #define MEM_XMS 1
 
-  int mem_init(unsigned int memsize, int mode);
+  unsigned int mem_init(unsigned int memsize, int mode);
   int mem_pull(long addr, void far *ptr, int sz);
   int mem_push(void far *ptr, long addr, int sz);
   int pusheventqueue(struct midi_event_t *event, long *root);
