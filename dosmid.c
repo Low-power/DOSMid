@@ -66,8 +66,7 @@ enum fileformats {
 };
 
 struct clioptions {
-  int memmode;      /* type of memory to use: MEM_XMS or MEM_MALLOC */
-  int workmem;      /* amount of work memory to allocate, in KiBs */
+  int memmode;          /* type of memory to use: MEM_XMS or MEM_MALLOC */
   int delay;
   unsigned short devport;
   unsigned short port_mpu;
@@ -245,7 +244,6 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
   params->midifile = NULL;
   params->playlist = NULL;
   params->memmode = MEM_XMS;
-  params->workmem = 16384;  /* try to use 16M of XMS memory by default (the XMS allocator will provide less anyway if that much memory is not available) */
   params->delay = 0;
   params->logfd = NULL;
   params->nopowersave = 0;
@@ -256,7 +254,6 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
   for (i = 1; i < argc; i++) {
     if (strcmp(argv[i], "/noxms") == 0) {
       params->memmode = MEM_MALLOC;
-      params->workmem = 63; /* using 'normal' malloc, fallback to 63K */
     } else if (strcmp(argv[i], "/delay") == 0) {
       params->delay = 1;
     } else if (strcmp(argv[i], "/fullcpu") == 0) {
@@ -974,9 +971,12 @@ int main(int argc, char **argv) {
   params.devname = devtoname(params.device, params.devicesubtype);
 
   /* allocate the work memory */
-  params.workmem = mem_init(params.workmem, params.memmode);
-  if (params.workmem == 0) {
-    puts("ERROR: Memory init failed!");
+  if (mem_init(params.memmode) == 0) {
+    if (params.memmode == MEM_XMS) {
+      puts("ERROR: Memory init failed! No XMS maybe? Try /noxms.");
+    } else {
+      puts("ERROR: Memory init failed!");
+    }
     return(1);
   }
 
