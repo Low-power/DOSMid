@@ -17,16 +17,22 @@
 #include <conio.h> /* outp() */
 #include "timer.h" /* include self for control */
 
+/* selects timer's resolution */
+#define TIMER_1165_HZ
+/*#define TIMER_582_HZ*/
+/*#define TIMER_291_HZ*/
 
 /* 1165.215 hz */
+#ifdef TIMER_1165_HZ
 #define DIV_MSB   0x04 /* a divisor of 1024 gives: */
 #define DIV_LSB   0x00 /* 1193180 / 1024 = 1165 Hz */
 #define ORIG_INTR_MASK 63 /* call the original clock INT every 64 calls */
 #define USEC_INC  858 /* one cycle is 858.21us to be exact */
 #define USEC_COMP 13  /* how many us to compensate for every ORIG_INTR_MASK+1 call */
+#endif
 
 /* 582.607 hz */
-#ifndef DIV_MSB
+#ifdef TIMER_582_HZ
 #define DIV_MSB   0x08
 #define DIV_LSB   0x00
 #define ORIG_INTR_MASK 31
@@ -35,7 +41,7 @@
 #endif
 
 /* 291.304 hz */
-#ifndef DIV_MSB
+#ifdef TIMER_291_HZ
 #define DIV_MSB   0x10
 #define DIV_LSB   0x00
 #define ORIG_INTR_MASK 15
