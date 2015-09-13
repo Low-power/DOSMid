@@ -265,11 +265,17 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       params->dontstop = 1;
     } else if (strcmp(argv[i], "/nosound") == 0) {
       params->device = DEV_NONE;
+#ifdef SBAWE
     } else if (strcmp(argv[i], "/awe") == 0) {
       params->device = DEV_AWE;
       params->devport = params->port_awe;
       /* if AWE port not found in BLASTER, use the default 0x620 */
       if (params->devport == 0) params->devport = 0x620;
+    } else if (stringstartswith(argv[i], "/awe=") == 0) {
+      params->device = DEV_AWE;
+      params->devport = hexstr2uint(argv[i] + 5);
+      if (params->devport < 1) return("Invalid AWE port provided. Example: /awe=620");
+#endif
     } else if (strcmp(argv[i], "/mpu") == 0) {
       params->device = DEV_MPU401;
       params->devport = params->port_mpu;
@@ -278,10 +284,6 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
     } else if (strcmp(argv[i], "/opl") == 0) {
       params->device = DEV_OPL;
       params->devport = 0x388;
-    } else if (stringstartswith(argv[i], "/awe=") == 0) {
-      params->device = DEV_AWE;
-      params->devport = hexstr2uint(argv[i] + 5);
-      if (params->devport < 1) return("Invalid AWE port provided. Example: /awe=620");
     } else if (stringstartswith(argv[i], "/mpu=") == 0) {
       params->device = DEV_MPU401;
       params->devport = hexstr2uint(argv[i] + 5);
@@ -343,9 +345,9 @@ static int compute_elapsed_time(unsigned long starttime, unsigned long *elapsed)
   unsigned long curtime, res;
   timer_read(&curtime);
   if (curtime < starttime) { /* wraparound detected */
-      res = (ULONG_MAX - starttime) + curtime;
-    } else {
-      res = curtime - starttime;
+    res = (ULONG_MAX - starttime) + curtime;
+  } else {
+    res = curtime - starttime;
   }
   res /= 1000000lu; /* microseconds to seconds */
   if (res == *elapsed) return(0);
@@ -472,9 +474,12 @@ static void preload_outdev(struct clioptions *params) {
   }
 
   /* look at what we got, and choose in order of preference */
-  if (params->port_awe > 0) { /* AWE is the most desirable, if present */
+  if (0) { /* fake choice, just so I can #ifdef SBAWE */
+#ifdef SBAWE
+  } else if (params->port_awe > 0) { /* AWE is the most desirable, if present */
     params->device = DEV_AWE;
     params->devport = params->port_awe;
+#endif
   } else if (params->port_mpu > 0) { /* then look for MPU */
     params->device = DEV_MPU401;
     params->devport = params->port_mpu;
@@ -701,7 +706,8 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   int i;
   enum playactions exitaction;
   unsigned long nexteventtime;
-  int refreshflags = 0xff;
+  unsigned short refreshflags = 0xffffu;
+  unsigned short refreshchans = 0xffffu;
   long trackpos;
   unsigned long midiplaybackstart;
   struct midi_event_t *curevent;
@@ -729,7 +735,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   /* init the sound device */
   sprintf(trackinfo->title[0], "Sound hardware initialization...");
   filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
-  ui_draw(trackinfo, &refreshflags, PVER, params->devname, params->devport, volume);
+  ui_draw(trackinfo, &refreshflags, &refreshchans, PVER, params->devname, params->devport, volume);
   refreshflags = 0xff;
   if (params->logfd != NULL) fprintf(params->logfd, "INIT SOUND HARDWARE\n");
   if (dev_init(params->device, params->devport) != 0) {
@@ -743,7 +749,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   /* load the file into memory */
   sprintf(trackinfo->title[0], "Loading...");
   filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
-  ui_draw(trackinfo, &refreshflags, PVER, params->devname, params->devport, volume);
+  ui_draw(trackinfo, &refreshflags, &refreshchans, PVER, params->devname, params->devport, volume);
   memset(trackinfo->title[0], 0, 16);
   refreshflags = 0xff;
 
@@ -755,7 +761,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   exitaction = loadfile(params, trackinfo, &trackpos);
   if (exitaction != ACTION_NONE) return(exitaction);
   /* draw the gui with track's data */
-  ui_draw(trackinfo, &refreshflags, PVER, params->devname, params->devport, volume);
+  ui_draw(trackinfo, &refreshflags, &refreshchans, PVER, params->devname, params->devport, volume);
   for (;;) {
     timer_read(&midiplaybackstart); /* save start time so we can compute elapsed time later */
     if (midiplaybackstart >= nexteventtime) break; /* wait until the scheduled start time is met */
@@ -813,7 +819,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         }
         /* do I need to refresh the screen now? if not, just call INT28h */
         if (refreshflags != 0) {
-          ui_draw(trackinfo, &refreshflags, PVER, params->devname, params->devport, volume);
+          ui_draw(trackinfo, &refreshflags, &refreshchans, PVER, params->devname, params->devport, volume);
         } else if (params->nopowersave == 0) { /* if no screen refresh is     */
           union REGS regs;                     /* needed, and power saver not */
           int86(0x28, &regs, &regs);           /* disabled, then call INT 28h */
@@ -828,12 +834,14 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         dev_noteon(curevent->data.note.chan, curevent->data.note.note, (volume * curevent->data.note.velocity) / 100);
         trackinfo->notestates[curevent->data.note.note] |= (1 << curevent->data.note.chan);
         refreshflags |= UI_REFRESH_NOTES;
+        refreshchans |= (1 << curevent->data.note.chan);
         break;
       case EVENT_NOTEOFF:
         if (params->logfd != NULL) fprintf(params->logfd, "%lu: NOTE OFF chan: %d / note: %d\n", trackinfo->elapsedsec, curevent->data.note.chan, curevent->data.note.note);
         dev_noteoff(curevent->data.note.chan, curevent->data.note.note);
         trackinfo->notestates[curevent->data.note.note] &= (0xFFFF ^ (1 << curevent->data.note.chan));
         refreshflags |= UI_REFRESH_NOTES;
+        refreshchans |= (1 << curevent->data.note.chan);
         break;
       case EVENT_TEMPO:
         if (params->logfd != NULL) fprintf(params->logfd, "%lu (%lu): TEMPO change from %lu to %lu\n", trackinfo->elapsedsec, elticks, trackinfo->tempo, curevent->data.tempoval);
@@ -937,8 +945,7 @@ int main(int argc, char **argv) {
     } else {
       puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste\n"
            "\n"
-           "DOSMid is a MIDI player that reads *.MID or *.RMI files and drives a MIDI\n"
-           "synthesizer, either via MPU-401 or an \"AWE\" EMU8000 chip.\n"
+           "DOSMid is a MIDI player that reads *.MID or *.RMI files to drive a MIDI synth.\n"
            "\n"
            "Usage: dosmid [options] file.mid (or m3u playlist)\n"
            "\n"
@@ -947,8 +954,10 @@ int main(int argc, char **argv) {
            " /delay     wait 2ms before accessing XMS memory (AWEUTIL compatibility)\n"
            " /mpu[=XXX] forces DOSMid to use MPU-401 for MIDI output, you can specify\n"
            "            the port if needed (otherwise it is read from BLASTER)\n"
+#ifdef SBAWE
            " /awe[=XXX] use the EMU8000 synth on AWE32/AWE64 SoundBlaster cards, you\n"
            "            can specify the port if needed (read from BLASTER otherwise)\n"
+#endif
            " /opl[=XXX] use an FM synthesis OPL2/OPL3 chip for sound output\n"
            " /sbmidi[=XXX] outputs MIDI to the SoundBlaster MIDI port at I/O addr XXX\n"
            " /com[=XXX] output MIDI messages via the RS232 port at I/O address XXX\n"
@@ -1050,7 +1059,7 @@ int main(int argc, char **argv) {
     fclose(params.logfd);
   }
 
-  puts("DOSMid v" PVER " Copyright (C) Mateusz Viste " PDATE);
+  puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste ");
 
   return(0);
 }

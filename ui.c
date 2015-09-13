@@ -1,6 +1,6 @@
 /*
- * User interface routines of DOSMid.
- * Copyright (C) Mateusz Viste 2014, 2015
+ * User interface routines of DOSMid
+ * Copyright (C) 2014-2015 Mateusz Viste
  */
 
 #include <dos.h>
@@ -49,14 +49,27 @@ void ui_init(void) {
   oldmode = regs.h.al;
   /* set text mode 80x25 */
   regs.h.ah = 0x00;  /* set video mode */
-  if ((oldmode == 0) || (oldmode == 2) || (oldmode == 7)) { /* 0=40x25 BW ; 2=80x25 BW ; 7=80x25 HGC */
-    colorflag = 0;
-    regs.h.al = 0x07;  /* 80x25, mono */
-    screenptr = MK_FP(0xB000, 0);
-  } else {
-    colorflag = 1;
-    regs.h.al = 0x03;  /* 80x25, 16 colors */
-    screenptr = MK_FP(0xB800, 0);
+  switch (oldmode) {
+    case 0: /* 40x25 BW */
+      colorflag = 0;
+      regs.h.al = 0x02;  /* 80x25 BW */
+      screenptr = MK_FP(0xB800, 0);
+      break;
+    case 2: /* 80x25 BW */
+      colorflag = 0;
+      regs.h.al = 0x02;  /* 80x25 BW */
+      screenptr = MK_FP(0xB800, 0);
+      break;
+    case 7: /* 80x25 BW HGC */
+      colorflag = 0;
+      regs.h.al = 0x07;  /* 80x25 BW HGC */
+      screenptr = MK_FP(0xB000, 0);
+      break;
+    default:
+      colorflag = 1;
+      regs.h.al = 0x03;  /* 80x25, 16 colors */
+      screenptr = MK_FP(0xB800, 0);
+      break;
   }
   int86(0x10, &regs, &regs);
   /* disable blinking effect (enables the use of high-intensity backgrounds).
@@ -106,7 +119,7 @@ void ui_puterrmsg(char *title, char *errmsg) {
 }
 
 /* draws the UI screen */
-void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, char *devname, unsigned int mpuport, int volume) {
+void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsigned short *refreshchans, char *pver, char *devname, unsigned int mpuport, int volume) {
   #include "gm.h"  /* GM instruments names */
   int x, y;
   /* draw ascii graphic frames, etc */
@@ -136,6 +149,7 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, cha
   /* print notes states on every channel */
   if (*refreshflags & UI_REFRESH_NOTES) {
     for (y = 0; y < 16; y++) {
+      if ((*refreshchans & (1 << y)) == 0) continue; /* skip channels that haven't changed */
       for (x = 0; x < 64; x++) {
         int noteflag = 0;
         if (trackinfo->notestates[x << 1] & (1 << y)) noteflag = 2;
@@ -156,6 +170,7 @@ void ui_draw(struct trackinfodata *trackinfo, int *refreshflags, char *pver, cha
         }
       }
     }
+    *refreshchans = 0;
   }
   /* tempo */
   if (*refreshflags & UI_REFRESH_TEMPO) {

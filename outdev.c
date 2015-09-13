@@ -34,7 +34,10 @@
 #include "mpu401.h"
 #include "rs232.h"
 #include "sbdsp.h"
+
+#ifdef SBAWE
 #include "awe32/ctaweapi.h"
+#endif
 
 #include "outdev.h" /* include self for control */
 
@@ -71,6 +74,7 @@ int dev_init(enum outdev_types dev, unsigned short port) {
       mpu401_uart(outport);
       break;
     case DEV_AWE:
+#ifdef SBAWE
       if (awe32Detect(outport) != 0) return(-1);
       if (awe32InitHardware() != 0) return(-2);
       /* load GM samples from AWE's ROM */
@@ -82,6 +86,7 @@ int dev_init(enum outdev_types dev, unsigned short port) {
       awe32SoundPad.SPad6 = awe32SPad6Obj;
       awe32SoundPad.SPad7 = awe32SPad7Obj;
       if (awe32InitMIDI() != 0) return(-3);
+#endif
       break;
     case DEV_OPL:
     case DEV_OPL2:
@@ -126,10 +131,12 @@ void dev_close(void) {
       mpu401_rst(outport); /* resets it to intelligent mode */
       break;
     case DEV_AWE:
+#ifdef SBAWE
       /* Creative recommends to disable interrupts during AWE shutdown */
       _disable();
       awe32Terminate();
       _enable();
+#endif
       break;
     case DEV_OPL:
     case DEV_OPL2:
@@ -199,7 +206,9 @@ void dev_noteon(int channel, int note, int velocity) {
       opl_midi_noteon(outport, channel, note, velocity);
       break;
     case DEV_AWE:
+#ifdef SBAWE
       awe32NoteOn(channel, note, velocity);
+#endif
       break;
     case DEV_RS232:
       rs232_write(outport, 0x90 | channel); /* Send note ON to selected channel */
@@ -237,7 +246,9 @@ void dev_noteoff(int channel, int note) {
       opl_midi_noteoff(outport, channel, note);
       break;
     case DEV_AWE:
+#ifdef SBAWE
       awe32NoteOff(channel, note, 64);
+#endif
       break;
     case DEV_RS232:
       rs232_write(outport, 0x80 | channel); /* 'note off' + channel selector */
@@ -275,7 +286,9 @@ void dev_pitchwheel(int channel, int wheelvalue) {
       opl_midi_pitchwheel(outport, channel, wheelvalue);
       break;
     case DEV_AWE:
+#ifdef SBAWE
       awe32PitchBend(channel, wheelvalue & 127, wheelvalue >> 7);
+#endif
       break;
     case DEV_RS232:
       rs232_write(outport, 0xE0 | channel);   /* Send selected channel */
@@ -313,7 +326,9 @@ void dev_controller(int channel, int id, int val) {
       opl_midi_controller(outport, channel, id, val);
       break;
     case DEV_AWE:
+#ifdef SBAWE
       awe32Controller(channel, id, val);
+#endif
       break;
     case DEV_RS232:
       rs232_write(outport, 0xB0 | channel);  /* Send selected channel */
@@ -347,7 +362,9 @@ void dev_chanpressure(int channel, int pressure) {
     case DEV_OPL3:
       break;
     case DEV_AWE:
+#ifdef SBAWE
       awe32ChannelPressure(channel, pressure);
+#endif
       break;
     case DEV_RS232:
       rs232_write(outport, 0xD0 | channel);  /* Send selected channel */
@@ -380,7 +397,9 @@ void dev_keypressure(int channel, int note, int pressure) {
     case DEV_OPL3:
       break;
     case DEV_AWE:
+#ifdef SBAWE
       awe32PolyKeyPressure(channel, note, pressure);
+#endif
       break;
     case DEV_RS232:
       rs232_write(outport, 0xA0 | channel);  /* Send selected channel */
@@ -410,6 +429,8 @@ void dev_tick(void) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
+      break;
+    case DEV_AWE:
       break;
     case DEV_RS232:
       /* I do nothing here - although flushing any incoming bytes would seem
@@ -442,7 +463,9 @@ void dev_setprog(int channel, int program) {
       opl_midi_changeprog(channel, program);
       break;
     case DEV_AWE:
+#ifdef SBAWE
       awe32ProgramChange(channel, program);
+#endif
       break;
     case DEV_RS232:
       rs232_write(outport, 0xC0 | channel); /* Send channel */
@@ -478,7 +501,9 @@ void dev_sysex(int channel, char *buff, int bufflen) {
       /* SYSEX is unsupported on OPL output */
       break;
     case DEV_AWE:
+#ifdef SBAWE
       awe32Sysex(channel, buff, bufflen);
+#endif
       break;
     case DEV_RS232:
       rs232_write(outport, 0xF0 | channel); /* Send channel */

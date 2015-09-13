@@ -1,3 +1,10 @@
+#
+# DOSMid Makefile for OpenWatcom
+#
+
+# you can control the availability of some features with the FEATURES string:
+#  -DSBAWE    enables SoundBlaster AWE drivers (adds bloat to the binary)
+FEATURES = -DSBAWE
 
 # memory segmentation mode (s = small ; c = compact ; m = medium ; l = large)
 MODE = c
@@ -5,7 +12,7 @@ MODE = c
 all: dosmid.exe
 
 dosmid.exe: dosmid.c mem.c midi.c mpu401.c mus.c opl.c outdev.c rs232.c sbdsp.c timer.c ui.c xms.c
-	wcl -lr -we -d0 -0 -s -m$(MODE) -wx -fe=dosmid.exe *.c awe32\rawe32$(MODE).lib
+	wcl -lr -we -d0 -0 -s -m$(MODE) $(FEATURES) -wx -fe=dosmid.exe *.c awe32\rawe32$(MODE).lib
 	upx --8086 -9 dosmid.exe
 
 clean: .symbolic
