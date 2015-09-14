@@ -36,7 +36,7 @@
 #include "mem.h" /* include self for control */
 
 
-#define LOWMEMBUFCOUNT 10    /* how many memory pools to allocate for 'noxms' allocations */
+#define LOWMEMBUFCOUNT 16    /* how many memory pools I can try using for 'noxms' allocations */
 #define LOWMEMBUFSIZE 32768u /* how big each memory pool is, in bytes */
 
 static unsigned char far *mempool[LOWMEMBUFCOUNT];
@@ -53,16 +53,12 @@ unsigned int mem_init(int mode) {
   if (memmode == MEM_XMS) {
     return(xms_init(&xms, 16384));
   } else {
-    int i;
-    xms.memsize = 0;
-    for (i = 0; i < LOWMEMBUFCOUNT; i++) {
-      mempool[i] = _fmalloc(LOWMEMBUFSIZE);
-      if (mempool[i] == NULL) { /* malloc() failed, stop allocating */
-        return(xms.memsize >> 10);
-      }
-      xms.memsize += LOWMEMBUFSIZE;
+    /* try to allocate one mem pool so we have anything to start */
+    mempool[0] = _fmalloc(LOWMEMBUFSIZE);
+    if (mempool[0] == NULL) { /* if malloc() failed, then abort */
+      return(0);
     }
-    return(xms.memsize >> 10);
+    return(LOWMEMBUFSIZE >> 10);
   }
 }
 
@@ -137,9 +133,13 @@ long mem_alloc(int sz) {
     offset = nexteventid & 0xffffl;
     /* detect segment boundaries */
     if (offset + sz > LOWMEMBUFSIZE) {
+      if (sz > LOWMEMBUFSIZE) return(-1); /* don't bother if requested data is bigger than a single mem pool, we're fucked anyway */
+      /* otherwise try using a new mem pool */
       seg += 1;
       offset = 0;
-      if ((seg * LOWMEMBUFSIZE) + sz > xms.memsize) return(-1);
+      if (seg >= LOWMEMBUFCOUNT) return(-1);
+      mempool[seg] = _fmalloc(LOWMEMBUFSIZE); /* try to alloc the extra mem pool */
+      if (mempool[seg] == NULL) return(-1); /* abort if alloc failed */
     }
     res = (seg << 16) | offset;
     /* */
@@ -151,6 +151,15 @@ long mem_alloc(int sz) {
 
 void mem_clear(void) {
   nexteventid = 0;
+  /* if using low mem, then leave only one buffer */
+  if (memmode != MEM_XMS) {
+    int i;
+    for (i = 1; i < LOWMEMBUFCOUNT; i++) {
+      if (mempool[i] == NULL) break;
+      _ffree(mempool[i]);
+      mempool[i] = NULL;
+    }
+  }
 }
 
 
@@ -164,6 +173,7 @@ void mem_close(void) {
     for (i = 0; i < LOWMEMBUFCOUNT; i++) {
       if (mempool[i] == NULL) break; /* stop at first NULL mempool */
       _ffree(mempool[i]);
+      mempool[i] = NULL;
     }
   }
 }
