@@ -825,6 +825,8 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
             break;
           case ' ':  /* pause */
             pauseplay(&midiplaybackstart, &nexteventtime, trackinfo);
+            refreshflags = 0xffffu; /* force a full-screen refresh to wipe */
+            refreshchans = 0xffffu; /* the pause message out of the screen */
             break;
         }
         /* do I need to refresh the screen now? if not, just call INT28h */
