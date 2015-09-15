@@ -305,6 +305,7 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
         unsigned char *sysexbuff;
         midi_fetch_variablelen_fromfile(fd, &sysexlen); /* get length */
         if (logfd != NULL) fprintf(logfd, "%lu: SYSEX EVENT OF %ld BYTES ON CHAN #%d\n", tracklen, sysexlen, statusbyte & 0x0F);
+        sysexlen += 1; /* add one byte for the status byte that is not counted, but that we will add to the top of the buffer later */
         if (sysexlen > 4096) { /* skip SYSEX events that are more than 4K big */
           fseek(fd, sysexlen, SEEK_CUR);
         } else { /* read the sysex string */
@@ -315,7 +316,8 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
           if ((sysexleneven & 1) != 0) sysexleneven++; /* make sysexleneven an even number (XMS moves MUST occur on even numbers of bytes) */
           sysexbuff = malloc(sysexleneven);
           if (sysexbuff != NULL) {
-            fread(sysexbuff, 1, sysexlen, fd);
+            sysexbuff[0] = statusbyte; /* I store the entire sysex string in memory */
+            fread(sysexbuff + 1, 1, sysexlen - 1, fd); /* read sysexlen-1 because we already read the status byte */
             event.data.sysex.sysexptr = mem_alloc(sysexleneven);
             if (event.data.sysex.sysexptr >= 0) {
               mem_push(sysexbuff, event.data.sysex.sysexptr, sysexleneven);

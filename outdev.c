@@ -515,8 +515,6 @@ void dev_sysex(int channel, char *buff, int bufflen) {
   int x;
   switch (outdev) {
     case DEV_MPU401:
-      mpu401_waitwrite(outport);     /* Wait for port ready */
-      outp(outport, 0xF0 | channel); /* Send channel */
       for (x = 0; x < bufflen; x++) {
         mpu401_waitwrite(outport);     /* Wait for port ready */
         outp(outport, buff[x]);        /* Send sysex data byte */
@@ -535,14 +533,11 @@ void dev_sysex(int channel, char *buff, int bufflen) {
 #endif
       break;
     case DEV_RS232:
-      rs232_write(outport, 0xF0 | channel); /* Send channel */
       for (x = 0; x < bufflen; x++) {
         rs232_write(outport, buff[x]);        /* Send sysex data byte */
       }
       break;
     case DEV_SBMIDI:
-      dsp_write(outport, 0x38);           /* MIDI output */
-      dsp_write(outport, 0xF0 | channel); /* Send channel */
       for (x = 0; x < bufflen; x++) {
         dsp_write(outport, 0x38);           /* MIDI output */
         dsp_write(outport, buff[x]);        /* Send sysex data byte */

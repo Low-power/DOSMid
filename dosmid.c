@@ -39,6 +39,7 @@
 #include "mus.h"
 #include "outdev.h"
 #include "rs232.h"
+#include "syx.h"
 #include "timer.h"
 #include "ui.h"
 
@@ -79,6 +80,7 @@ struct clioptions {
   int devicesubtype;
   char *devname;    /* the human name of the out device (MPU, AWE..) */
   char *midifile;   /* MIDI filename to play */
+  char *syxrst;     /* syx file to use for MIDI resets */
   char *playlist;   /* the playlist to read files from */
   FILE *logfd;      /* an open file descriptor to the debug log file */
 };
@@ -161,9 +163,9 @@ static void udelay(unsigned long us) {
   for (;;) {
     timer_read(&t2);
     if (t2 < t1) { /* detect timer wraparound */
-        break;
-      } else if (t2 - t1 >= us) {
-        break;
+      break;
+    } else if (t2 - t1 >= us) {
+      break;
     }
   }
 }
@@ -171,6 +173,7 @@ static void udelay(unsigned long us) {
 
 static char *devtoname(enum outdev_types device, int devicesubtype) {
   switch (device) {
+    case DEV_NONE:   return("NONE");
     case DEV_MPU401: return("MPU");
     case DEV_AWE:    return("AWE");
     case DEV_OPL:    return("OPL");
@@ -315,6 +318,8 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       if (params->logfd == NULL) {
         return("Failed to open the debug log file.");
       }
+    } else if (stringstartswith(argv[i], "/syx=") == 0) {
+      params->syxrst = argv[i] + 5;
     } else if ((strcmp(argv[i], "/?") == 0) || (strcmp(argv[i], "/h") == 0) || (strcmp(argv[i], "/help") == 0)) {
       return("");
     } else if ((argv[i][0] != '/') && (params->midifile == NULL) && (params->playlist == NULL)) {
@@ -755,6 +760,41 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   /* refresh the outdev and its name (might have been changed due to OPL autodetection) */
   params->device = dev_getcurdev();
   params->devname = devtoname(params->device, params->devicesubtype);
+  /* if a SYX init file is provided, feed it to the MIDI synth now */
+  if (params->syxrst != NULL) {
+    int syxlen;
+    FILE *syxfd;
+    /* open the syx file */
+    syxfd = fopen(params->syxrst, "rb");
+    if (syxfd == NULL) {
+      ui_puterrmsg(params->syxrst, "Error: Failed to open the SYX file");
+      return(ACTION_ERR_HARD);
+    }
+    /* alloc a temporary buffer to hold sysex messages */
+    sysexbuff = malloc(8192);
+    if (sysexbuff == NULL) {
+      fclose(syxfd);
+      ui_puterrmsg(params->syxrst, "Error: Out of memory");
+      return(ACTION_ERR_HARD);
+    }
+    /* read SYSEX messages until EOF */
+    for (;;) {
+      syxlen = syx_fetchnext(syxfd, sysexbuff, 8192);
+      if (syxlen == 0) break; /* EOF */
+      if (syxlen < 0) { /* error condition */
+        fclose(syxfd); /* close the syx file */
+        free(sysexbuff);
+        ui_puterrmsg(params->syxrst, "Error: Failed to process the SYX file");
+        return(ACTION_ERR_HARD);
+      }
+      /* send the SYSEX message to the MIDI device, and wait a short moment
+       * between messages so the device has time to digest them */
+      dev_sysex(sysexbuff[0] & 0x0F, sysexbuff, syxlen);
+      udelay(5000); /* 5ms should be plenty of time */
+    }
+    fclose(syxfd); /* close the syx file */
+    free(sysexbuff);
+  }
 
   /* load the file into memory */
   sprintf(trackinfo->title[0], "Loading...");
@@ -945,6 +985,7 @@ int main(int argc, char **argv) {
   struct trackinfodata *trackinfo;
   struct midi_event_t *eventscache;
 
+  /* make sure to init all CLI params to empty values */
   memset(&params, 0, sizeof(params));
 
   /* preload the mpu port to be used (might be forced later via **argv) */
@@ -964,18 +1005,18 @@ int main(int argc, char **argv) {
            "options:\n"
            " /noxms     use conventional memory instead of XMS (loads tiny files only)\n"
            " /delay     wait 2ms before accessing XMS memory (AWEUTIL compatibility)\n"
-           " /mpu[=XXX] forces DOSMid to use MPU-401 for MIDI output, you can specify\n"
-           "            the port if needed (otherwise it is read from BLASTER)\n"
+           " /mpu[=XXX] use MPU-401 on I/O port XXX. /mpu reads port address from BLASTER\n"
 #ifdef SBAWE
-           " /awe[=XXX] use the EMU8000 synth on AWE32/AWE64 SoundBlaster cards, you\n"
-           "            can specify the port if needed (read from BLASTER otherwise)\n"
+           " /awe[=XXX] use the EMU8000 synth on SoundBlaster AWE cards, you can specify\n"
+           "            the port if needed (read from BLASTER otherwise)\n"
 #endif
 #ifdef OPL
            " /opl[=XXX] use an FM synthesis OPL2/OPL3 chip for sound output\n"
 #endif
            " /sbmidi[=XXX] outputs MIDI to the SoundBlaster MIDI port at I/O addr XXX\n"
-           " /com[=XXX] output MIDI messages via the RS232 port at I/O address XXX\n"
+           " /com[=XXX] output MIDI messages to the RS-232 port at I/O address XXX\n"
            " /comX      same as /com=XXX, but takes a COM port instead (example: /com1)\n"
+           " /syx=FILE  use SYSEX instructions from FILE for MIDI initialization\n"
            " /log=FILE  write highly verbose logs about DOSMid's activity to FILE\n"
            " /fullcpu   do not let DOSMid try to be CPU-friendly\n"
            " /dontstop  never wait for a keypress on error and continue the playlist\n"

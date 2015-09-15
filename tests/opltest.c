@@ -1,7 +1,7 @@
 
 #include <unistd.h>
 
-#include "opl.h"
+#include "..\opl.h"
 
 #define PORT 0x388
 

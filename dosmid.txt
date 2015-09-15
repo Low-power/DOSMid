@@ -81,6 +81,9 @@ DOSMID [options] file.mid (or m3u playlist)
            to COM1 on most BIOS implementations).
            It is also possible to use simpler "/com1", "/com2", "/com3" and
            "/com4" switches. These will autodetect the correct I/O port.
+ /syx=FILE Uses SYSEX instructions stored in FILE for initializing the MIDI
+           device. FILE must be in "SYX" format, and can contain one or more
+           SYSEX messages.
  /log=FILE Logs all DOSMid activity to FILE. This is clearly a debugging
            option that you shouldn't be interested in. Beware, the log file
            can be pretty big (much bigger than the MIDI file you are playing).
