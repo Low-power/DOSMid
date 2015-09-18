@@ -2,19 +2,20 @@
 * DOSMid history file *
 
 
-DOSMid v0.8 [xx xxx xxxx]
+DOSMid v0.8 [18 Sep 2015]
  - SBMIDI support (can drive MIDI synths attached to SB 1.x and 2.x cards),
  - serial (RS-232) output support (/com=xxx or /com1..4),
  - implemented 'controller' MIDI support on OPL output,
  - added support for relaying SYSEX messages to the MIDI device,
  - DOSMid adds a 2s silence gap before each song,
- - support for monochrome video modes,
+ - support for monochrome video modes (autodetected),
  - fixed parsing of hex I/O ports with non-numerical chars (like "3f8"),
  - reduced timing inaccuracy from ~0.02% to <0.005% (relies on PIT's quality),
  - restoring initial video mode after DOSMid quits,
- - reliable detection of out of memory conditions,
+ - reliable detection and reporting of out of memory conditions,
  - /noxms handles more than 64K of memory (bigger files can be played),
- - support for custom SYSEX initializations via a SYX file (/syx=FILE),
+ - support for custom SYSEX initialization via a SYX file (/syx=FILE),
+ - "expensive" features can be easily disabled at compile-time (AWE, OPL),
  - screen refresh optimizations - runs without lagging on my 8086 now.
 
 DOSMid v0.7 [29 Jul 2015]

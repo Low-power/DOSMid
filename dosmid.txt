@@ -9,11 +9,11 @@ DOSMid is a MIDI and MUS player for DOS. It's a real mode application designed
 to run on very modest hardware configurations. It plays standard MIDI files,
 as well as MIDI in RIFF (ie. RMID), and MUS tunes (as used by Id Software in
 numerous games like Doom, Heretic, Hexen, etc).
-DOSMid is not a software MIDI emulator, hence it requires a MIDI-capable
-hardware available either via the standard MPU-401 interface, or an EMU8000
-engine (as found on SoundBlaster 32/64 AWE series). Note, that some sound
-cards provide an MPU-401 interface natively, although many need an additional
-'wavetable' daughterboard to produce actual MIDI sound.
+DOSMid requires a MIDI-capable hardware available either via the standard
+MPU-401 interface, or an RS-232 port, or an EMU8000 engine (as found on
+SoundBlaster 32/64 AWE series). Note, that some sound cards provide an MPU-401
+interface natively, although many need an additional 'wavetable' daughterboard
+to produce actual MIDI sound.
 Since DOSMid v0.7 it is also possible to somewhat emulate MIDI via FM
 synthesis using an OPL chip (that is one of the Yamaha YM3812 or YMF262 chips,
 found on most sound cards from the nineties) - be warned however that, most of
@@ -23,7 +23,7 @@ unless the MIDI file was specifically crafted for OPL.
 Minimum requirements:
  - a compatible synthesizer (wavetable, OPL or external - see the compat list)
  - an 8086-compatible CPU
- - ca. 200K of available conventional memory
+ - ca. 200K of available conventional memory (less if you have XMS)
  - a video card able to display an 80x25 monochrome text mode
 
 Highly recommended:
@@ -143,7 +143,7 @@ Internal MIDI synthesizers:
 
 DOSMid is compiled with OpenWatcom. The entire build process is automated via
 a Makefile file, so if you wish to rebuild DOSMid, all you have to do is type
-"wmake". When building, a few compile-time options are available. To fine-tune
+"wmake". When building, a few compile-time options are available: to fine-tune
 DOSMid to your needs, edit the Makefile and adapt FEATURES to your likeness.
 The FEATURES list is documented in the Makefile.
 
