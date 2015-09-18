@@ -1,3 +1,7 @@
+/*
+ * Simple test routine for DOSMid's OPL output
+ * Copyright (C) 2015 Mateusz Viste
+ */
 
 #include <unistd.h>
 

@@ -1,8 +1,12 @@
+/*
+ * Test program for DOSMid's SYX parsing routine.
+ * Copyright (C) 2015 Mateusz Viste
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "..\syx.c"
+#include "..\syx.h"
 
 
 int main(int argc, char **argv) {
