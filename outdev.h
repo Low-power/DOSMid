@@ -90,6 +90,6 @@ void dev_tick(void);
 void dev_setprog(int channel, int program);
 
 /* sends a raw sysex string to the device */
-void dev_sysex(int channel, char *buff, int bufflen);
+void dev_sysex(int channel, unsigned char *buff, int bufflen);
 
 #endif

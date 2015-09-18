@@ -511,7 +511,7 @@ void dev_setprog(int channel, int program) {
 
 
 /* sends a raw sysex string to the device */
-void dev_sysex(int channel, char *buff, int bufflen) {
+void dev_sysex(int channel, unsigned char *buff, int bufflen) {
   int x;
   switch (outdev) {
     case DEV_MPU401:
@@ -529,7 +529,7 @@ void dev_sysex(int channel, char *buff, int bufflen) {
       break;
     case DEV_AWE:
 #ifdef SBAWE
-      awe32Sysex(channel, buff, bufflen);
+      awe32Sysex(channel, (unsigned char far *)buff, bufflen);
 #endif
       break;
     case DEV_RS232:
