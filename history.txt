@@ -2,6 +2,10 @@
 * DOSMid history file *
 
 
+DOSMid v0.9 [xx xxx xxxx]
+ - Increased SYX delaying to 40ms (solves buffering troubles with MT-32 gears),
+ - ...
+
 DOSMid v0.8 [18 Sep 2015]
  - SBMIDI support (can drive MIDI synths attached to SB 1.x and 2.x cards),
  - serial (RS-232) output support (/com=xxx or /com1..4),

@@ -43,8 +43,8 @@
 #include "timer.h"
 #include "ui.h"
 
-#define PVER "0.8"
-#define PDATE "2014-2015"
+#define PVER "0.9"
+#define PDATE "2014-2016"
 
 #define MAXTRACKS 64
 #define EVENTSCACHESIZE 64 /* *must* be a power of 2 !!! */
@@ -760,6 +760,11 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   /* refresh the outdev and its name (might have been changed due to OPL autodetection) */
   params->device = dev_getcurdev();
   params->devname = devtoname(params->device, params->devicesubtype);
+
+  /* reset the timer, to make sure it doesn't wrap around during playback */
+  timer_reset();
+  timer_read(&nexteventtime); /* save current time, to schedule when the song shall start */
+
   /* if a SYX init file is provided, feed it to the MIDI synth now */
   if (params->syxrst != NULL) {
     int syxlen;
@@ -790,7 +795,11 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
       /* send the SYSEX message to the MIDI device, and wait a short moment
        * between messages so the device has time to digest them */
       dev_sysex(sysexbuff[0] & 0x0F, sysexbuff, syxlen);
-      udelay(5000); /* 5ms should be plenty of time */
+      udelay(40000); /* 40ms should be enough time for the MPU interface   */
+                     /* note that MT32 rev00 are *very* sensitive to this! */
+      if (sysexbuff[0] == 0x7F) {  /* the 'all parameters reset' sysex takes */
+        udelay(250000lu);          /* a very long time to be processed on    */
+      }                            /* MT32 rev00 gears.                      */
     }
     fclose(syxfd); /* close the syx file */
     free(sysexbuff);
@@ -803,10 +812,6 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   memset(trackinfo->title[0], 0, 16);
   refreshflags = 0xff;
 
-  /* reset the timer, to make sure it doesn't wrap around during playback */
-  timer_reset();
-
-  timer_read(&nexteventtime); /* save current time, to schedule when the song shall start */
   nexteventtime += 2000000lu; /* playback should start no sooner than in 2s (for listening comfort) */
   exitaction = loadfile(params, trackinfo, &trackpos);
   if (exitaction != ACTION_NONE) return(exitaction);
