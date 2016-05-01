@@ -62,12 +62,16 @@ void opl_midi_controller(unsigned short oplport, int channel, int id, int value)
 /* assign a new instrument to emulated MIDI channel */
 void opl_midi_changeprog(int channel, int program);
 
+void opl_loadinstrument(unsigned short port, unsigned short voice, struct timbre_t *timbre);
+
+/* loads an IBK bank from file into an array of 128 timbre_t structures.
+ * returns 0 on success, non-zero otherwise */
+int opl_loadbank(char *file);
+
 /* the functions below are not necessarily useful - if you want to play MIDI,
  * you will probably prefer to use the opl_midi_* emulation layer instead of
  * dealing with OPL's voices directly - in any case, do NOT mix calls to MIDI
  * emulation functions (opl_midi_*) with any of the functions below! */
-
-void opl_loadinstrument(unsigned short port, unsigned short voice, struct timbre_t *timbre);
 
 /* turn off note on selected voice */
 void opl_noteoff(unsigned short port, unsigned short voice);

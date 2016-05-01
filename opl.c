@@ -502,4 +502,58 @@ void opl_midi_noteoff(unsigned short port, int channel, int note) {
   }
 }
 
+
+int opl_loadbank(char *file) {
+  unsigned char buff[16];
+  int i;
+  FILE *fd;
+  /* open the IBK file */
+  fd = fopen(file, "rb");
+  if (fd == NULL) return(-1);
+  /* file must be exactly 3204 bytes long */
+  fseek(fd, 0, SEEK_END);
+  if (ftell(fd) != 3204) {
+    fclose(fd);
+    return(-2);
+  }
+  rewind(fd);
+  /* file must start with an IBK header */
+  if ((fread(buff, 1, 4, fd) != 4) || (buff[0] != 'I') || (buff[1] != 'B') || (buff[2] != 'K') || (buff[3] != 0x1A)) {
+    fclose(fd);
+    return(-3);
+  }
+  for (i = 0; i < 128; i++) {
+    /* load instruments */
+    if (fread(buff, 1, 16, fd) != 16) {
+      fclose(fd);
+      return(-4);
+    }
+    /* load modulator */
+    gmtimbres[i].modulator_E862 = buff[8]; /* wave select */
+    gmtimbres[i].modulator_E862 <<= 8;
+    gmtimbres[i].modulator_E862 |= buff[6]; /* sust/release */
+    gmtimbres[i].modulator_E862 <<= 8;
+    gmtimbres[i].modulator_E862 |= buff[4]; /* attack/decay */
+    gmtimbres[i].modulator_E862 <<= 8;
+    gmtimbres[i].modulator_E862 |= buff[0]; /* AM/VIB... flags */
+    /* load carrier */
+    gmtimbres[i].carrier_E862 = buff[9]; /* wave select */
+    gmtimbres[i].carrier_E862 <<= 8;
+    gmtimbres[i].carrier_E862 |= buff[7]; /* sust/release */
+    gmtimbres[i].carrier_E862 <<= 8;
+    gmtimbres[i].carrier_E862 |= buff[5]; /* attack/decay */
+    gmtimbres[i].carrier_E862 <<= 8;
+    gmtimbres[i].carrier_E862 |= buff[1]; /* AM/VIB... flags */
+    /* load KSL */
+    gmtimbres[i].modulator_40 = buff[2];
+    gmtimbres[i].carrier_40 = buff[3];
+    /* feedconn & finetune */
+    gmtimbres[i].feedconn = buff[10];
+    gmtimbres[i].finetune = 0;
+  }
+  /* close file and return success */
+  fclose(fd);
+  return(0);
+}
+
 #endif /* #ifdef OPL */
