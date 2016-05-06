@@ -1,7 +1,7 @@
 /*
  * Library to access OPL2/OPL3 hardware (YM3812 / YMF262)
  *
- * Copyright (c) 2015, Mateusz Viste
+ * Copyright (C) 2015-2016 Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

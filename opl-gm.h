@@ -19,7 +19,7 @@
  * > everyone's free use.
  */
 
-static struct timbre_t gmtimbres[128 + 52] = {
+static struct timbre_t gmtimbres[256] = {
   /*    ,---------+-------- Wave select settings                           *
    *    | ,-------÷-+------ Sustain/release rates                          *
    *    | | ,-----÷-÷-+---- Attack/decay rates                             *
@@ -157,8 +157,43 @@ static struct timbre_t gmtimbres[128 + 52] = {
     { 0x001FF26,0x11612E4, 0x00,0x00, 0xE,+0 }, /* 126: GM126; HMIGM126; b13M126; b7M126; b8M123; f17GM126; f34GM126; f35GM126; fat2M126; mGM126; sGM126; Applause/Noise; am126; am126.in; applaus */
     { 0x0F0F300,0x2C9F600, 0x00,0x00, 0xE,+0 }, /* 127: GM127; HMIGM127; b13M127; b7M127; f17GM127; f34GM127; fat2M127; mGM127; sGM127; Gunshot; am127; am127.in */
 
-    /* 52 percussions follow (known by MIDI as the channel's #9 [35..86] keys range) */
+    /* 128 percussions follow (known by MIDI as channel #9) */
 
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
+    { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 },
     { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 }, /* 35: BisqP0; BisqP11; BisqP12; BisqP36; BisqP4; GP35; GP36; b13P0; b13P1; b13P10; b13P11; b13P12; b13P13; b13P14; b13P15; b13P16; b13P17; b13P18; b13P19; b13P2; b13P20; b13P21; b13P22; b13P23; b13P24; b13P25; b13P26; b13P27; b13P28; b13P29; b13P3; b13P30; b13P31; b13P32; b13P33; b13P34; b13P35; b13P36; b13P4; b13P5; b13P6; b13P7; b13P8; b13P9; b50P35; b6P34; b6P35; b6P92; b7P0; b7P1; b7P10; b7P11; b7P12; b7P13; b7P14; b7P15; b7P16; b7P17; b7P18; b7P19; b7P2; b7P20; b7P21; b7P22; b7P23; b7P24; b7P25; b7P26; b7P27; b7P28; b7P29; b7P3; b7P30; b7P31; b7P32; b7P33; b7P34; b7P35; b7P36; b7P4; b7P5; b7P6; b7P7; b7P8; b7P9; b8P34; f17GP35; f17GP36; f20GP35; f20GP36; f29GP35; f29GP36; f30GP35; f30GP36; f31GP31; f31GP35; f31GP36; f34GP35; f34GP36; f35GP35; f42GP36; fat2P35; fat2P36; hamP11; hamP34; hamP35; intP34; intP35; mGP35; mGP36; qGP35; qGP36; rickP14; rickP34; rickP35; Ac Bass Drum; Bass Drum 1; Rkick2; apo035; apo035.i; aps035; aps035.i; gps035; kick2; kick2.in */
     { 0x277F810,0x006F311, 0x44,0x00, 0x8,+0 }, /* 36: BisqP0; BisqP11; BisqP12; BisqP36; BisqP4; GP35; GP36; b13P0; b13P1; b13P10; b13P11; b13P12; b13P13; b13P14; b13P15; b13P16; b13P17; b13P18; b13P19; b13P2; b13P20; b13P21; b13P22; b13P23; b13P24; b13P25; b13P26; b13P27; b13P28; b13P29; b13P3; b13P30; b13P31; b13P32; b13P33; b13P34; b13P35; b13P36; b13P4; b13P5; b13P6; b13P7; b13P8; b13P9; b50P35; b6P34; b6P35; b6P92; b7P0; b7P1; b7P10; b7P11; b7P12; b7P13; b7P14; b7P15; b7P16; b7P17; b7P18; b7P19; b7P2; b7P20; b7P21; b7P22; b7P23; b7P24; b7P25; b7P26; b7P27; b7P28; b7P29; b7P3; b7P30; b7P31; b7P32; b7P33; b7P34; b7P35; b7P36; b7P4; b7P5; b7P6; b7P7; b7P8; b7P9; b8P34; f17GP35; f17GP36; f20GP35; f20GP36; f29GP35; f29GP36; f30GP35; f30GP36; f31GP31; f31GP35; f31GP36; f34GP35; f34GP36; f35GP35; f42GP36; fat2P35; fat2P36; hamP11; hamP34; hamP35; intP34; intP35; mGP35; mGP36; qGP35; qGP36; rickP14; rickP34; rickP35; Ac Bass Drum; Bass Drum 1; Rkick2; apo035; apo035.i; aps035; aps035.i; gps035; kick2; kick2.in */
     { 0x0FFF902,0x0FFF811, 0x07,0x00, 0x8,+0 }, /* 37: GP37; b13P37; b7P37; f17GP37; f23GP54; f29GP37; f30GP37; f34GP37; f49GP37; fat2P37; mGP37; Side Stick; Tambourine; aps037; aps037.i */

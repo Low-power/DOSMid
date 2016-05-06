@@ -1,7 +1,7 @@
 /*
  * Library to access OPL2/OPL3 hardware (YM3812 / YMF262)
  *
- * Copyright (c) 2015, Mateusz Viste
+ * Copyright (C) 2015-2016 Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -124,7 +124,7 @@ static unsigned short pitchtable[256] = {                   /* pitch wheel */
 const unsigned short op1offsets[18] = {0x00,0x01,0x02,0x08,0x09,0x0a,0x10,0x11,0x12,0x100,0x101,0x102,0x108,0x109,0x10a,0x110,0x111,0x112};
 const unsigned short op2offsets[18] = {0x03,0x04,0x05,0x0b,0x0c,0x0d,0x13,0x14,0x15,0x103,0x104,0x105,0x10b,0x10c,0x10d,0x113,0x114,0x115};
 
-/* number of supported voices: 9 by default (OPL2), can go up to 18 (OPL3) */
+/* number of melodic voices: 9 by default (OPL2), can go up to 18 (OPL3) */
 static int voicescount = 9;
 
 
@@ -420,13 +420,11 @@ static void voicevolume(unsigned short port, unsigned short voice, int program, 
 
 /* get the id of the instrument that relates to channel/note pair */
 static int getinstrument(int channel, int note) {
-  int res;
-  res = oplmem->channelprog[channel];
+  if ((note < 0) || (note > 127) || (channel > 15)) return(-1);
   if (channel == 9) { /* the percussion channel requires special handling */
-    if ((note < 35) || (note > 86)) return(-1); /* ignore unsupported notes */
-    res = (128 - 35) + note;
+    return(128 | note);
   }
-  return(res);
+  return(oplmem->channelprog[channel]);
 }
 
 
@@ -477,8 +475,9 @@ void opl_midi_noteon(unsigned short port, int channel, int note, int velocity) {
   voicevolume(port, voice, oplmem->voices2notes[voice].timbreid, velocity * oplmem->channelvol[channel] / 127);
 
   /* trigger NOTE_ON on the OPL, take care to apply the 'finetune' pitch correction, too */
-  if (channel == 9) { /* percussion channel doesn't provide a real note (FIXME what should I use as the 'note'??) */
-    opl_noteon(port, voice, 64, oplmem->channelpitch[channel] + gmtimbres[instrument].finetune);
+  if (channel == 9) { /* percussion channel doesn't provide a real note, so I */
+                      /* use a static one (MUSPLAYER uses C-5 (60), why not.  */
+    opl_noteon(port, voice, 60, oplmem->channelpitch[channel] + gmtimbres[instrument].finetune);
   } else {
     opl_noteon(port, voice, note, oplmem->channelpitch[channel] + gmtimbres[instrument].finetune);
   }
@@ -503,7 +502,7 @@ void opl_midi_noteoff(unsigned short port, int channel, int note) {
 }
 
 
-int opl_loadbank(char *file) {
+static int opl_loadbank_internal(char *file, int offset) {
   unsigned char buff[16];
   int i;
   FILE *fd;
@@ -522,7 +521,8 @@ int opl_loadbank(char *file) {
     fclose(fd);
     return(-3);
   }
-  for (i = 0; i < 128; i++) {
+  /* load 128 instruments from the IBK file */
+  for (i = offset; i < 128 + offset; i++) {
     /* load instruments */
     if (fread(buff, 1, 16, fd) != 16) {
       fclose(fd);
@@ -549,11 +549,34 @@ int opl_loadbank(char *file) {
     gmtimbres[i].carrier_40 = buff[3];
     /* feedconn & finetune */
     gmtimbres[i].feedconn = buff[10];
-    gmtimbres[i].finetune = 0;
+    gmtimbres[i].finetune = buff[12]; /* used only in some IBK files */
   }
   /* close file and return success */
   fclose(fd);
   return(0);
+}
+
+
+int opl_loadbank(char *file) {
+  char *instruments = NULL, *percussion = NULL;
+  int i, res;
+  instruments = strdup(file); /* duplicate the string so we can modify it */
+  if (instruments == NULL) return(-64); /* out of mem */
+  /* if a second file is provided, it's for percussion */
+  for (i = 0; instruments[i] != 0; i++) {
+    if (instruments[i] == ',') {
+      instruments[i] = 0;
+      percussion = instruments + i + 1;
+      break;
+    }
+  }
+  /* load the file(s) */
+  res = opl_loadbank_internal(instruments, 0);
+  if ((res == 0) && (percussion != NULL)) {
+    res = opl_loadbank_internal(percussion, 128);
+  }
+  free(instruments);
+  return(res);
 }
 
 #endif /* #ifdef OPL */
