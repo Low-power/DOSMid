@@ -1,7 +1,7 @@
 /*
  * Wrapper for outputing MIDI commands to different devices.
  *
- * Copyright (c) 2015, Mateusz Viste
+ * Copyright (C) 2014-2016, Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,6 +29,8 @@
 
 #include <conio.h> /* outp(), inp() */
 #include <dos.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #ifdef OPL
 #include "opl.h"
@@ -40,6 +42,7 @@
 
 #ifdef SBAWE
 #include "awe32/ctaweapi.h"
+static char *presetbuf = NULL; /* used to allocate presets for custom sound banks */
 #endif
 
 #include "outdev.h" /* include self for control */
@@ -55,6 +58,63 @@ static enum outdev_types outdev = DEV_NONE;
 static unsigned short outport = 0;
 
 
+/* loads a SBK sound font to AWE hardware */
+#ifdef SBAWE
+static int awe_loadfont(char *filename) {
+  FILE *fd;
+  SOUND_PACKET sp;
+  long banks[1];
+  int i;
+  char buffer[PACKETSIZE];
+  awe32TotalPatchRam(&sp); /* get available patch DRAM */
+  if (sp.total_patch_ram < 512*1024) return(-1);
+  /* Setup bank sizes with all available RAM */
+  banks[0] = sp.total_patch_ram;
+  sp.banksizes = banks;
+  sp.total_banks = 1; /* total number of banks */
+  if (awe32DefineBankSizes(&sp) != 0) return(-1);
+  /* Open SoundFont Bank */
+  fd = fopen(filename, "rb");
+  fread(buffer, 1, PACKETSIZE, fd); /* read sf header */
+  /* prepare stuff */
+  sp.bank_no = 0;
+  sp.data = buffer;
+  if (awe32SFontLoadRequest(&sp) != 0) {
+    fclose(fd);
+    return(-1); /* invalid soundfont file */
+  }
+  /* stream sound samples into the hardware */
+  if (sp.no_sample_packets > 0) {
+    fseek(fd, sp.sample_seek, SEEK_SET); /* move pointer to where instruments begin */
+    for (i = 0; i < sp.no_sample_packets; i++) {
+      if ((fread(sp.data, 1, PACKETSIZE, fd) != PACKETSIZE) || (awe32StreamSample(&sp) != 0)) {
+        fclose(fd);
+        return(-1);
+      }
+    }
+  }
+  /* load presets to memory */
+  presetbuf = (char *)malloc(sp.preset_read_size);
+  if (presetbuf == NULL) { /* out of mem! */
+    fclose(fd);
+    return(-1);
+  }
+  sp.presets = presetbuf;
+  fseek(fd, sp.preset_seek, SEEK_SET);
+  fread(sp.presets, 1, sp.preset_read_size, fd);
+  /* close the sf file */
+  fclose(fd);
+  /* apply presets to hardware */
+  if (awe32SetPresets(&sp) != 0) {
+    free(presetbuf);
+    presetbuf = NULL;
+    return(-1);
+  }
+  return(0);
+}
+#endif
+
+
 /* inits the out device, also selects the out device, from one of these:
  *  DEV_MPU401
  *  DEV_AWE
@@ -65,7 +125,7 @@ static unsigned short outport = 0;
  *
  * This should be called only ONCE, when program starts.
  * Returns 0 on success, non-zero otherwise. */
-int dev_init(enum outdev_types dev, unsigned short port) {
+int dev_init(enum outdev_types dev, unsigned short port, char *sbank) {
   outdev = dev;
   outport = port;
   switch (outdev) {
@@ -77,17 +137,27 @@ int dev_init(enum outdev_types dev, unsigned short port) {
       break;
     case DEV_AWE:
 #ifdef SBAWE
+      awe32NumG = 30; /* global var used by the AWE lib, must be set to 30 for
+                         DRAM sound fonts to work properly */
       if (awe32Detect(outport) != 0) return(-1);
       if (awe32InitHardware() != 0) return(-2);
-      /* load GM samples from AWE's ROM */
-      awe32SoundPad.SPad1 = awe32SPad1Obj;
-      awe32SoundPad.SPad2 = awe32SPad2Obj;
-      awe32SoundPad.SPad3 = awe32SPad3Obj;
-      awe32SoundPad.SPad4 = awe32SPad4Obj;
-      awe32SoundPad.SPad5 = awe32SPad5Obj;
-      awe32SoundPad.SPad6 = awe32SPad6Obj;
-      awe32SoundPad.SPad7 = awe32SPad7Obj;
-      if (awe32InitMIDI() != 0) return(-3);
+      /* preload GM samples from AWE's ROM */
+      if (sbank == NULL) {
+        awe32SoundPad.SPad1 = awe32SPad1Obj;
+        awe32SoundPad.SPad2 = awe32SPad2Obj;
+        awe32SoundPad.SPad3 = awe32SPad3Obj;
+        awe32SoundPad.SPad4 = awe32SPad4Obj;
+        awe32SoundPad.SPad5 = awe32SPad5Obj;
+        awe32SoundPad.SPad6 = awe32SPad6Obj;
+        awe32SoundPad.SPad7 = awe32SPad7Obj;
+      } else if (awe_loadfont(sbank) != 0) {
+        dev_close();
+        return(-4);
+      }
+      if (awe32InitMIDI() != 0) {
+        dev_close();
+        return(-3);
+      }
 #endif
       break;
     case DEV_OPL:
@@ -103,6 +173,10 @@ int dev_init(enum outdev_types dev, unsigned short port) {
         outdev = DEV_OPL2;
       } else {
         outdev = DEV_OPL3;
+      }
+      /* load a custom sound bank, if any provided */
+      if (sbank != NULL) {
+        opl_loadbank(sbank);
       }
     }
 #endif
@@ -143,6 +217,11 @@ void dev_close(void) {
       _disable();
       awe32Terminate();
       _enable();
+      /* free memory used by custom sound banks */
+      if (presetbuf != NULL) {
+        free(presetbuf);
+        presetbuf = NULL;
+      }
 #endif
       break;
     case DEV_OPL:

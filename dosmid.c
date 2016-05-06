@@ -82,6 +82,7 @@ struct clioptions {
   char *midifile;   /* MIDI filename to play */
   char *syxrst;     /* syx file to use for MIDI resets */
   char *playlist;   /* the playlist to read files from */
+  char *sbnk;       /* optional sound bank to use (IBK file or so) */
   FILE *logfd;      /* an open file descriptor to the debug log file */
 };
 
@@ -243,14 +244,8 @@ static void getfileext(char *ext, char *filename, int limit) {
    NULL on sucess, or a pointer to an error string otherwise. */
 static char *parseargv(int argc, char **argv, struct clioptions *params) {
   int i;
-  /* first load defaults */
-  params->midifile = NULL;
-  params->playlist = NULL;
+  /* set default memory mode */
   params->memmode = MEM_XMS;
-  params->delay = 0;
-  params->logfd = NULL;
-  params->nopowersave = 0;
-  params->dontstop = 0;
   /* if no params at all, don't waste time */
   if (argc == 0) return("");
   /* now read params */
@@ -290,6 +285,8 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
       params->devport = hexstr2uint(argv[i] + 5);
       if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388");
 #endif
+    } else if (stringstartswith(argv[i], "/sbnk=") == 0) {
+      params->sbnk = argv[i] + 6;
     } else if (stringstartswith(argv[i], "/mpu=") == 0) {
       params->device = DEV_MPU401;
       params->devport = hexstr2uint(argv[i] + 5);
@@ -753,7 +750,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   ui_draw(trackinfo, &refreshflags, &refreshchans, PVER, params->devname, params->devport, volume);
   refreshflags = 0xff;
   if (params->logfd != NULL) fprintf(params->logfd, "INIT SOUND HARDWARE\n");
-  if (dev_init(params->device, params->devport) != 0) {
+  if (dev_init(params->device, params->devport, params->sbnk) != 0) {
     ui_puterrmsg("Hardware error", "Error: Failed to initialize the sound device");
     return(ACTION_ERR_HARD);
   }
@@ -1022,6 +1019,7 @@ int main(int argc, char **argv) {
            " /com[=XXX] output MIDI messages to the RS-232 port at I/O address XXX\n"
            " /comX      same as /com=XXX, but takes a COM port instead (example: /com1)\n"
            " /syx=FILE  use SYSEX instructions from FILE for MIDI initialization\n"
+           " /sbnk=FILE load a custom sound bank file(s) (IBK on OPL, SBK on AWE)\n"
            " /log=FILE  write highly verbose logs about DOSMid's activity to FILE\n"
            " /fullcpu   do not let DOSMid try to be CPU-friendly\n"
            " /dontstop  never wait for a keypress on error and continue the playlist\n"

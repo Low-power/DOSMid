@@ -1,7 +1,7 @@
 /*
  * Wrapper for outputing MIDI commands to different devices.
  *
- * Copyright (c) 2015, Mateusz Viste
+ * Copyright (C) 2014-2016, Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -53,7 +53,7 @@ enum outdev_types {
  * This should be called only ONCE, when program starts.
  * Returns 0 on success, non-zero otherwise.
  */
-int dev_init(enum outdev_types dev, unsigned short port);
+int dev_init(enum outdev_types dev, unsigned short port, char *sbank);
 
 /* returns the device that has been inited/selected */
 enum outdev_types dev_getcurdev(void);
