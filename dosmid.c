@@ -1224,7 +1224,7 @@ int main(int argc, char **argv) {
         /* no explicit action - we will do a 'next' action by default */
         break;
       case ACTION_ERR_HARD: /* wait for a keypress and quit */
-        sleep(2);
+        udelay(2000000lu);
         getkey();
         action = ACTION_EXIT;
         break;
@@ -1232,12 +1232,12 @@ int main(int argc, char **argv) {
         if (params.dontstop == 0) { /* acknowledges the error message, */
           getkey();                 /* then continue as usual          */
         } else {
-          sleep(2);
+          udelay(2000000lu);
         }
         /* if too many soft error occur in a row, quit */
         if (++softerrcount > 2) {
           ui_puterrmsg("", "Too many failures occured, will quit now!");
-          sleep(2);
+          udelay(2000000lu);
           getkey();
           action = ACTION_EXIT;
           break;
