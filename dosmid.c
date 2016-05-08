@@ -1109,6 +1109,7 @@ int main(int argc, char **argv) {
   enum playactions action = ACTION_NONE;
   struct trackinfodata *trackinfo;
   struct midi_event_t *eventscache;
+  int softerrcount = 0; /* counts soft errors - if too many occurs at once, dosmid quits */
 
   /* make sure to init all CLI params to empty values */
   memset(&params, 0, sizeof(params));
@@ -1209,6 +1210,9 @@ int main(int argc, char **argv) {
   while (action != ACTION_EXIT) {
 
     action = playfile(&params, trackinfo, eventscache);
+    /* if I get three soft errors in a row, it's time to quit */
+    if (action != ACTION_ERR_SOFT) softerrcount = 0;
+
     switch (action) {
       case ACTION_EXIT:
         /* do nothing, we will exit at the end of the loop anyway */
@@ -1220,11 +1224,8 @@ int main(int argc, char **argv) {
         /* no explicit action - we will do a 'next' action by default */
         break;
       case ACTION_ERR_HARD: /* wait for a keypress and quit */
-        if (params.dontstop == 0) {
-          getkey();
-        } else {
-          sleep(2);
-        }
+        sleep(2);
+        getkey();
         action = ACTION_EXIT;
         break;
       case ACTION_ERR_SOFT:         /* wait for a keypress so the user */
@@ -1232,6 +1233,14 @@ int main(int argc, char **argv) {
           getkey();                 /* then continue as usual          */
         } else {
           sleep(2);
+        }
+        /* if too many soft error occur in a row, quit */
+        if (++softerrcount > 2) {
+          ui_puterrmsg("", "Too many failures occured, will quit now!");
+          sleep(2);
+          getkey();
+          action = ACTION_EXIT;
+          break;
         }
       case ACTION_NONE: /* choose an action depending on the mode we are in */
         if (params.playlist == NULL) {
