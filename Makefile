@@ -30,8 +30,10 @@ pkg: dosmid.exe .symbolic
 	if exist dosmid.zip del dosmid.zip
 	copy dosmid.exe progs\dosmid
 	copy dosmid.txt progs\dosmid
+	copy dosmid.cfg progs\dosmid
 	copy history.txt progs\dosmid
 	copy *.txt source\dosmid
+	copy *.cfg source\dosmid
 	copy *.c source\dosmid
 	copy *.h source\dosmid
 	copy awe32\*.* source\dosmid\awe32
