@@ -8,6 +8,11 @@
 FEATURES = -DSBAWE -DOPL
 
 # memory segmentation mode (s = small ; c = compact ; m = medium ; l = large)
+#             code | data
+#  small      64K  | 64K
+#  compact    64K  | 64K+
+#  medium     64K+ | 64K
+#  large      64K+ | 64K+
 MODE = c
 
 all: dosmid.exe
