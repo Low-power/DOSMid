@@ -255,17 +255,18 @@ void dev_close(void) {
  * often (typically: between each song). */
 void dev_clear(void) {
   int i;
+  /* iterate on MIDI channels and send 'off' messages */
+  for (i = 0; i < 16; i++) {
+    dev_controller(i, 123, 0);   /* "all notes off" */
+    dev_controller(i, 120, 0);   /* "all sounds off" */
+    dev_controller(i, 121, 0);   /* "all controllers off" */
+  }
+  /* execute hardware-specific actions */
   switch (outdev) {
     case DEV_MPU401:
     case DEV_AWE:
     case DEV_RS232:
     case DEV_SBMIDI:
-      /* iterate on MIDI channels and send messages */
-      for (i = 0; i < 16; i++) {
-        dev_controller(i, 123, 0);   /* "all notes off" */
-        dev_controller(i, 120, 0);   /* "all sounds off" */
-        dev_controller(i, 121, 0);   /* "all controllers off" */
-      }
       break;
     case DEV_OPL:
     case DEV_OPL2:
