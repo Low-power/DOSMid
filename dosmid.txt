@@ -102,6 +102,10 @@ DOSMID [options] file.mid (or m3u playlist)
            and wish that DOSMid exit immediately if the file is unplayable).
  /nosound  Disable sound (not very useful for a music player!)
 
+Note: All the above options can also be written to the DOSMID.CFG file. This
+file is loaded by DOSMID and used as default parameters that can still be
+overloaded by command-line options.
+
 
 *** THE BLASTER VARIABLE ***
 
@@ -142,7 +146,7 @@ Internal MIDI synthesizers:
    cards using the 'AWEUTIL' MPU emulator,
  - Based on the EMU8000 chip (SoundBlaster 32, SoundBlaster 64),
  - Based on an OPL2 or OPL3-compatible chip (most ISA sound cards from the
-   nineties: Adlib, all SoundBlaster models, Opti, AzTech...).
+   nineties: Adlib, all SoundBlaster ISA models, Opti, AzTech...).
 
 
 *** BUILDING ***

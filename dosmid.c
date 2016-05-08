@@ -87,6 +87,55 @@ struct clioptions {
 };
 
 
+/* fetch directory where the program resides, and return its length. result
+ * string is never longer than 128 (incl. the null terminator), and it is
+ * always terminated with a backslash separator, unless it is an empty string */
+static int exepath(char *result) {
+  char far *psp, far *env;
+  unsigned int envseg, pspseg, x, i;
+  int lastsep;
+  union REGS regs;
+  /* get the PSP segment */
+  regs.h.ah = 0x62;
+  int86(0x21, &regs, &regs),
+  pspseg = regs.x.bx;
+  /* compute a far pointer that points to the top of PSP */
+  psp = MK_FP(pspseg, 0);
+  /* fetch the segment address of the environment */
+  envseg = psp[0x2D];
+  envseg <<= 8;
+  envseg |= psp[0x2C];
+  /* compute the env pointer */
+  env = MK_FP(envseg, 0);
+  /* skip all environment variables */
+  x = 0;
+  for (;;) {
+    x++;
+    if (env[x] == 0) { /* end of variable */
+      x++;
+      if (env[x] == 0) break; /* end of list */
+    }
+  }
+  x++;
+  /* read the WORD that indicates string that follow */
+  if (env[x] < 1) {
+    result[0] = 0;
+    return(0);
+  }
+  x += 2;
+  /* else copy the EXEPATH to our return variable, and truncate after last '\' */
+  lastsep = -1;
+  for (i = 0;; i++) {
+    result[i] = env[x++];
+    if (result[i] == '\\') lastsep = i;
+    if (result[i] == 0) break; /* end of string */
+    if (i >= 126) break;       /* this DOS string should never go beyond 127 chars! */
+  }
+  result[lastsep + 1] = 0;
+  return(lastsep + 1);
+}
+
+
 /* copies the base name of a file (ie without directory path) into a string */
 static void filename2basename(char *fromname, char *tobasename, char *todirname, int maxlen) {
   int x, x2, firstchar = 0;
@@ -240,6 +289,145 @@ static void getfileext(char *ext, char *filename, int limit) {
 }
 
 
+/* interpret a single config argument, returns NULL on succes, or a pointer to
+ * an error string otherwise */
+static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
+  if (strcmp(arg, "/noxms") == 0) {
+    params->memmode = MEM_MALLOC;
+  } else if (strcmp(arg, "/delay") == 0) {
+    params->delay = 1;
+  } else if (strcmp(arg, "/fullcpu") == 0) {
+    params->nopowersave = 1;
+  } else if (strcmp(arg, "/dontstop") == 0) {
+    params->dontstop = 1;
+  } else if (strcmp(arg, "/nosound") == 0) {
+    params->device = DEV_NONE;
+#ifdef SBAWE
+  } else if (strcmp(arg, "/awe") == 0) {
+    params->device = DEV_AWE;
+    params->devport = params->port_awe;
+    /* if AWE port not found in BLASTER, use the default 0x620 */
+    if (params->devport == 0) params->devport = 0x620;
+  } else if (stringstartswith(arg, "/awe=") == 0) {
+    params->device = DEV_AWE;
+    params->devport = hexstr2uint(arg + 5);
+    if (params->devport < 1) return("Invalid AWE port provided. Example: /awe=620");
+#endif
+  } else if (strcmp(arg, "/mpu") == 0) {
+    params->device = DEV_MPU401;
+    params->devport = params->port_mpu;
+    /* if MPU port not found in BLASTER, use the default 0x330 */
+    if (params->devport == 0) params->devport = 0x330;
+#ifdef OPL
+  } else if (strcmp(arg, "/opl") == 0) {
+    params->device = DEV_OPL;
+    params->devport = 0x388;
+  } else if (stringstartswith(arg, "/opl=") == 0) {
+    params->device = DEV_OPL;
+    params->devport = hexstr2uint(arg + 5);
+    if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388");
+#endif
+  } else if (stringstartswith(arg, "/sbnk=") == 0) {
+    if (params->sbnk != NULL) free(params->sbnk); /* drop last sbnk if already present, so a CLI sbnk would take precedence over a config-file sbnk */
+    params->sbnk = strdup(arg + 6);
+  } else if (stringstartswith(arg, "/mpu=") == 0) {
+    params->device = DEV_MPU401;
+    params->devport = hexstr2uint(arg + 5);
+    if (params->devport < 1) return("Invalid MPU port provided. Example: /mpu=330");
+  } else if (stringstartswith(arg, "/com=") == 0) {
+    params->device = DEV_RS232;
+    params->devport = hexstr2uint(arg + 5);
+    if (params->devport < 10) return("Invalid COM port provided. Example: /com=3f8");
+  } else if (stringstartswith(arg, "/com") == 0) { /* must be compared AFTER "/com=" */
+    params->device = DEV_RS232;
+    params->devicesubtype = arg[4] - '0';
+    if ((params->devicesubtype < 1) || (params->devicesubtype > 4)) return("Invalid COM port provided. Example: /com1");
+    params->devport = rs232_getport(params->devicesubtype);
+    if (params->devport < 1) return("Failed to autodetect the I/O address of this COM port. Try using the /com=XXX option.");
+  } else if (strcmp(arg, "/sbmidi") == 0) {
+    params->device = DEV_SBMIDI;
+    params->devport = params->port_sb;
+    /* if SB port not found in BLASTER, use the default 0x220 */
+    if (params->devport == 0) params->devport = 0x220;
+  } else if (stringstartswith(arg, "/sbmidi=") == 0) {
+    params->device = DEV_SBMIDI;
+    params->devport = hexstr2uint(arg + 5);
+    if (params->devport < 1) return("Invalid SBMIDI port provided. Example: /sbmidi=220");
+  } else if (stringstartswith(arg, "/log=") == 0) {
+    if (params->logfd == NULL) {
+      params->logfd = fopen(arg + 5, "wb");
+      if (params->logfd == NULL) {
+        return("Failed to open the debug log file.");
+      }
+    }
+  } else if (stringstartswith(arg, "/syx=") == 0) {
+    params->syxrst = arg + 5;
+  } else if ((strcmp(arg, "/?") == 0) || (strcmp(arg, "/h") == 0) || (strcmp(arg, "/help") == 0)) {
+    return("");
+  } else if ((fileallowed != 0) && (arg[0] != '/') && (params->midifile == NULL) && (params->playlist == NULL)) {
+    char ext[4];
+    getfileext(ext, arg, 4);
+    if (strcmp(ext, "m3u") == 0) {
+      params->playlist = arg;
+    } else {
+      params->midifile = arg;
+    }
+  } else {
+    return("Unknown option.");
+  }
+  return(NULL);
+}
+
+
+/* trims any white-space and line feeds occuring at the right of the string */
+static void rtrim(char *s) {
+  char *lastchar = s;
+  while (*s != 0) {
+    switch (*s) {
+      case ' ':
+      case '\t':
+      case '\r':
+      case '\n':
+        break;
+      default:
+        lastchar = s;
+    }
+    s += 1;
+  }
+  if (*lastchar != 0) lastchar[1] = 0;
+}
+
+
+static char *loadconfigfile(struct clioptions *params) {
+  char buff[128 + 12]; /* 128 for exepath plus 8+3 for the config file */
+  int r;
+  char *res = NULL;
+  FILE *fd;
+  /* prepare config file's full path */
+  r = exepath(buff);
+  if (r < 1) return(NULL);
+  /* append the config file itself */
+  sprintf(buff + r, "dosmid.cfg");
+  /* open file */
+  fd = fopen(buff, "r");
+  if (fd == NULL) return(NULL);
+  for (;;) {
+    /* read line & trim */
+    res = fgets(buff, sizeof(buff) - 1, fd);
+    if (res == NULL) break; /* stop on EOF */
+    if (*buff == '#') continue; /* skip comments */
+    rtrim(buff);
+    if (*buff == 0) continue; /* skip empty lines */
+    /* push arg to feedarg() (files not allowed because filename not allocated in persistent memory) */
+    res = feedarg(buff, params, 0);
+    if (res != NULL) break;
+  }
+  /* close file */
+  fclose(fd);
+  return(res);
+}
+
+
 /* parse command line params and fills the params struct accordingly. returns
    NULL on sucess, or a pointer to an error string otherwise. */
 static char *parseargv(int argc, char **argv, struct clioptions *params) {
@@ -250,86 +438,9 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
   if (argc == 0) return("");
   /* now read params */
   for (i = 1; i < argc; i++) {
-    if (strcmp(argv[i], "/noxms") == 0) {
-      params->memmode = MEM_MALLOC;
-    } else if (strcmp(argv[i], "/delay") == 0) {
-      params->delay = 1;
-    } else if (strcmp(argv[i], "/fullcpu") == 0) {
-      params->nopowersave = 1;
-    } else if (strcmp(argv[i], "/dontstop") == 0) {
-      params->dontstop = 1;
-    } else if (strcmp(argv[i], "/nosound") == 0) {
-      params->device = DEV_NONE;
-#ifdef SBAWE
-    } else if (strcmp(argv[i], "/awe") == 0) {
-      params->device = DEV_AWE;
-      params->devport = params->port_awe;
-      /* if AWE port not found in BLASTER, use the default 0x620 */
-      if (params->devport == 0) params->devport = 0x620;
-    } else if (stringstartswith(argv[i], "/awe=") == 0) {
-      params->device = DEV_AWE;
-      params->devport = hexstr2uint(argv[i] + 5);
-      if (params->devport < 1) return("Invalid AWE port provided. Example: /awe=620");
-#endif
-    } else if (strcmp(argv[i], "/mpu") == 0) {
-      params->device = DEV_MPU401;
-      params->devport = params->port_mpu;
-      /* if MPU port not found in BLASTER, use the default 0x330 */
-      if (params->devport == 0) params->devport = 0x330;
-#ifdef OPL
-    } else if (strcmp(argv[i], "/opl") == 0) {
-      params->device = DEV_OPL;
-      params->devport = 0x388;
-    } else if (stringstartswith(argv[i], "/opl=") == 0) {
-      params->device = DEV_OPL;
-      params->devport = hexstr2uint(argv[i] + 5);
-      if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388");
-#endif
-    } else if (stringstartswith(argv[i], "/sbnk=") == 0) {
-      params->sbnk = argv[i] + 6;
-    } else if (stringstartswith(argv[i], "/mpu=") == 0) {
-      params->device = DEV_MPU401;
-      params->devport = hexstr2uint(argv[i] + 5);
-      if (params->devport < 1) return("Invalid MPU port provided. Example: /mpu=330");
-    } else if (stringstartswith(argv[i], "/com=") == 0) {
-      params->device = DEV_RS232;
-      params->devport = hexstr2uint(argv[i] + 5);
-      if (params->devport < 10) return("Invalid COM port provided. Example: /com=3f8");
-    } else if (stringstartswith(argv[i], "/com") == 0) { /* must be compared AFTER "/com=" */
-      params->device = DEV_RS232;
-      params->devicesubtype = argv[i][4] - '0';
-      if ((params->devicesubtype < 1) || (params->devicesubtype > 4)) return("Invalid COM port provided. Example: /com1");
-      params->devport = rs232_getport(params->devicesubtype);
-      if (params->devport < 1) return("Failed to autodetect the I/O address of this COM port. Try using the /com=XXX option.");
-    } else if (strcmp(argv[i], "/sbmidi") == 0) {
-      params->device = DEV_SBMIDI;
-      params->devport = params->port_sb;
-      /* if SB port not found in BLASTER, use the default 0x220 */
-      if (params->devport == 0) params->devport = 0x220;
-    } else if (stringstartswith(argv[i], "/sbmidi=") == 0) {
-      params->device = DEV_SBMIDI;
-      params->devport = hexstr2uint(argv[i] + 5);
-      if (params->devport < 1) return("Invalid SBMIDI port provided. Example: /sbmidi=220");
-    } else if (stringstartswith(argv[i], "/log=") == 0) {
-      params->logfd = fopen(argv[i] + 5, "wb");
-      if (params->logfd == NULL) {
-        return("Failed to open the debug log file.");
-      }
-    } else if (stringstartswith(argv[i], "/syx=") == 0) {
-      params->syxrst = argv[i] + 5;
-    } else if ((strcmp(argv[i], "/?") == 0) || (strcmp(argv[i], "/h") == 0) || (strcmp(argv[i], "/help") == 0)) {
-      return("");
-    } else if ((argv[i][0] != '/') && (params->midifile == NULL) && (params->playlist == NULL)) {
-      char ext[4];
-      getfileext(ext, argv[i], 4);
-      if (strcmp(ext, "m3u") == 0) {
-        params->playlist = argv[i];
-      } else {
-        params->midifile = argv[i];
-      }
-    } else {
-      return("Unknown option.");
-    }
+    char *r;
+    r = feedarg(argv[i], params, 1);
+    if (r != NULL) return(r);
   }
   /* check if at least a MIDI filename have been provided */
   if ((params->midifile == NULL) && (params->playlist == NULL)) {
@@ -993,7 +1104,8 @@ int main(int argc, char **argv) {
   /* preload the mpu port to be used (might be forced later via **argv) */
   preload_outdev(&params);
 
-  errstr = parseargv(argc, argv, &params);
+  errstr = loadconfigfile(&params);
+  if (errstr == NULL) errstr = parseargv(argc, argv, &params);
   if (errstr != NULL) {
     if (*errstr != 0) {
       printf("Error: %s\nRun DOSMID /? for additional help", errstr);
@@ -1113,6 +1225,9 @@ int main(int argc, char **argv) {
   if (params.logfd != NULL) fprintf(params.logfd, "Free heap memory\n");
   free(trackinfo);
   free(eventscache);
+
+  /* free the sound bank string, if any was allocated */
+  if (params.sbnk != NULL) free(params.sbnk);
 
   /* if a verbose log file was used, close it now */
   if (params.logfd != NULL) {

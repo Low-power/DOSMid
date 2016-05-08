@@ -6,6 +6,7 @@ DOSMid v0.9 [xx xxx xxxx]
  - increased SYX delaying to 40ms (solves buffering troubles with MT-32 gears),
  - fixes around how OPL percussion instruments are emulated,
  - support for custom sound banks (IBK on OPL, SBK on AWE),
+ - a configuration file allows to set default settings (dosmid.cfg),
  - ...
 
 DOSMid v0.8 [18 Sep 2015]
