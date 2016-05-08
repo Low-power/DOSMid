@@ -1,6 +1,6 @@
 /*
  * User interface routines of DOSMid
- * Copyright (C) 2014-2015 Mateusz Viste
+ * Copyright (C) 2014-2016 Mateusz Viste
  */
 
 #include <dos.h>

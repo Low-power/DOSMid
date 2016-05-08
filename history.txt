@@ -8,6 +8,7 @@ DOSMid v0.9 [xx xxx xxxx]
  - support for custom sound banks (IBK on OPL, SBK on AWE),
  - a configuration file allows to set default settings (dosmid.cfg),
  - the 2s silence gap before songs is inserted only in playlist mode now,
+ - sound hardware is initialized once, instead of being inited for every song,
  - ...
 
 DOSMid v0.8 [18 Sep 2015]

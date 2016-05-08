@@ -823,6 +823,18 @@ static void pauseplay(unsigned long *starttime, unsigned long *nexteventtime, st
 }
 
 
+static void init_trackinfo(struct trackinfodata *trackinfo) {
+  int i;
+  /* zero out the entire structure */
+  memset(trackinfo, 0, sizeof(*trackinfo));
+  /* wire title[] data blocks */
+  for (i = 0; i < UI_TITLENODES; i++) trackinfo->title[i] = trackinfo->titledat[i];
+  /* preload default GM instruments into channels and set initial tempo */
+  for (i = 0; i < 16; i++) trackinfo->chanprogs[i] = i;
+  trackinfo->tempo = 500000l;
+}
+
+
 /* plays a file. returns 0 on success, non-zero if the program must exit */
 static enum playactions playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event_t *eventscache) {
   static int volume = 100; /* volume is static because it needs to be retained between songs */
@@ -836,16 +848,10 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   struct midi_event_t *curevent;
   unsigned long elticks = 0;
   unsigned char *sysexbuff;
-  char *errstr;
 
-  /* clear out trackinfo & cache data */
-  memset(trackinfo, 0, sizeof(*trackinfo));
+  /* init trackinfo & cache data */
+  init_trackinfo(trackinfo);
   getnexteventfromcache(eventscache, -1, 0);
-
-  /* set default params for trackinfo variables */
-  trackinfo->tempo = 500000l;
-  for (i = 0; i < 16; i++) trackinfo->chanprogs[i] = i;
-  for (i = 0; i < UI_TITLENODES; i++) trackinfo->title[i] = trackinfo->titledat[i];
 
   /* if running on a playlist, load next song */
   if (params->playlist != NULL) {
@@ -855,21 +861,6 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
       return(ACTION_ERR_HARD); /* this must be a hard error otherwise DOSMid might be trapped into a loop */
     }
   }
-
-  /* init the sound device */
-  sprintf(trackinfo->title[0], "Sound hardware initialization...");
-  filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
-  ui_draw(trackinfo, &refreshflags, &refreshchans, PVER, params->devname, params->devport, volume);
-  refreshflags = 0xff;
-  if (params->logfd != NULL) fprintf(params->logfd, "INIT SOUND HARDWARE\n");
-  errstr = dev_init(params->device, params->devport, params->sbnk);
-  if (errstr != NULL) {
-    ui_puterrmsg("Hardware initialization failure", errstr);
-    return(ACTION_ERR_HARD);
-  }
-  /* refresh the outdev and its name (might have been changed due to OPL autodetection) */
-  params->device = dev_getcurdev();
-  params->devname = devtoname(params->device, params->devicesubtype);
 
   /* reset the timer, to make sure it doesn't wrap around during playback */
   timer_reset();
@@ -1087,7 +1078,6 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 
   if (params->logfd != NULL) fprintf(params->logfd, "Reset MPU\n");
   dev_clear(); /* reinit the device */
-  dev_close();
 
   return(exitaction);
 }
@@ -1158,7 +1148,6 @@ int main(int argc, char **argv) {
   /* allocate memory segments to be used later */
   trackinfo = malloc(sizeof(struct trackinfodata));
   eventscache = malloc(sizeof(struct midi_event_t) * EVENTSCACHESIZE);
-
   if ((trackinfo == NULL) || (eventscache == NULL)) {
     puts("ERROR: Out of memory! Free some conventional memory.");
     mem_close();
@@ -1166,6 +1155,8 @@ int main(int argc, char **argv) {
     if (eventscache != NULL) free(eventscache);
     return(1);
   }
+  /* populate trackinfo with initial data */
+  init_trackinfo(trackinfo);
 
   /* init random numbers */
   srand((unsigned int)time(NULL));
@@ -1176,6 +1167,24 @@ int main(int argc, char **argv) {
   /* init ui and hide the blinking cursor */
   ui_init();
   ui_hidecursor();
+
+  /* init the sound device */
+  sprintf(trackinfo->title[0], "Sound hardware initialization...");
+  filename2basename(params.midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
+  {
+    unsigned short rflags = 0xffffu, rchans = 0xffffu;
+    ui_draw(trackinfo, &rflags, &rchans, PVER, params.devname, params.devport, 100);
+  }
+  if (params.logfd != NULL) fprintf(params.logfd, "INIT SOUND HARDWARE\n");
+  errstr = dev_init(params.device, params.devport, params.sbnk);
+  if (errstr != NULL) {
+    ui_puterrmsg("Hardware initialization failure", errstr);
+    getkey();
+    action = ACTION_EXIT;
+  }
+  /* refresh the outdev and its name (might have been changed due to OPL autodetection) */
+  params.device = dev_getcurdev();
+  params.devname = devtoname(params.device, params.devicesubtype);
 
   /* playlist loop */
   while (action != ACTION_EXIT) {
@@ -1216,6 +1225,9 @@ int main(int argc, char **argv) {
         break;
     }
   }
+
+  /* close sound hardware */
+  dev_close();
 
   /* reset screen (clears the screen and makes the cursor visible again) */
   ui_close();
