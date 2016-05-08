@@ -922,7 +922,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   memset(trackinfo->title[0], 0, 16);
   refreshflags = 0xff;
 
-  nexteventtime += 2000000lu; /* playback should start no sooner than in 2s (for listening comfort) */
+  if (params->playlist != NULL) nexteventtime += 2000000lu; /* playback starts no sooner than in 2s (for playlist listening comfort) */
   exitaction = loadfile(params, trackinfo, &trackpos);
   if (exitaction != ACTION_NONE) return(exitaction);
   /* draw the gui with track's data */
