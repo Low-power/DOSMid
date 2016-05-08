@@ -176,8 +176,12 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
   if (*refreshflags & UI_REFRESH_TEMPO) {
     char tempstr[16];
     unsigned long miditempo;
-    /* print filename */
-    ui_printstr(18, 1, trackinfo->filename, 16, COLOR_TEMPO[colorflag]);
+    /* print filename (unless NULL - might happen early at playlist load) */
+    if (trackinfo->filename != NULL) {
+      ui_printstr(18, 1, trackinfo->filename, 16, COLOR_TEMPO[colorflag]);
+    } else {
+      ui_printstr(18, 1, "", 16, COLOR_TEMPO[colorflag]);
+    }
     /* print format */
     itoa(trackinfo->midiformat, tempstr, 10);
     ui_printstr(18, 17, "Format:", 8, COLOR_TEMPO[colorflag]);

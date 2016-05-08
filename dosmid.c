@@ -587,15 +587,17 @@ static void preload_outdev(struct clioptions *params) {
 
   /* look at what we got, and choose in order of preference */
 
-  /* set NONE, just so we have anything */
+  /* set NONE, just so we have anything set */
   params->device = DEV_NONE;
   params->devport = 0;
 
   /* use OPL on port 0x388, if OPL output is compiled in */
 #ifdef OPL
-  params->device = DEV_OPL;   /* the SBMIDI port, because it's unlikely    */
-  params->devport = 0x388;    /* there's something connected to it anyway) */
+  params->device = DEV_OPL;
+  params->devport = 0x388;
 #endif
+
+  /* never try using SBMIDI: it's unlikely anything's connected to it anyway */
 
   /* is there an MPU? if so, take it */
   if (params->port_mpu > 0) {
@@ -603,7 +605,7 @@ static void preload_outdev(struct clioptions *params) {
     params->devport = params->port_mpu;
   }
 
-  /* AWE is the most desirable, if present */
+  /* AWE is the most desirable, if present (and compiled in) */
 #ifdef SBAWE
   if (params->port_awe > 0) { /* AWE is the most desirable, if present */
     params->device = DEV_AWE;
@@ -613,7 +615,7 @@ static void preload_outdev(struct clioptions *params) {
 }
 
 
-/* reads a position from an M3U file and returns a ptr to it from a static mem */
+/* reads a position from an M3U file and returns a ptr from static mem */
 static char *getnextm3uitem(char *playlist) {
   static char fnamebuf[256];
   char tempstr[256];
@@ -627,7 +629,11 @@ static char *getnextm3uitem(char *playlist) {
   if (fd == NULL) return(NULL);
   fseek(fd, 0, SEEK_END);
   fsize = ftell(fd);
-  /* go to a random position */
+  if (fsize < 3) { /* a one-entry m3u would be at least 3 bytes long */
+    fclose(fd);
+    return(NULL);
+  }
+  /* go to a random position (avoid last bytes, could be an empty \r\n record) */
   pos = rand() % (fsize - 2);
   fseek(fd, pos, SEEK_SET);
   /* rewind back to nearest \n or 0 position */
@@ -647,8 +653,11 @@ static char *getnextm3uitem(char *playlist) {
   /* trim out the first line */
   for (ptr = fnamebuf; *ptr != '\r' && *ptr != '\n' && *ptr != 0; ptr++);
   *ptr = 0;
+  rtrim(fnamebuf); /* trim also leading spaces, if any */
+  /* if empty, something went wrong */
+  if (fnamebuf[0] == 0) return(NULL);
   /* if the file is a relative path, then prepend it with the path of the playlist */
-  if ((fnamebuf[0] == 0) || (fnamebuf[1] != ':')) {
+  if (fnamebuf[1] != ':') {
     strcpy(tempstr, fnamebuf);
     filename2basename(playlist, NULL, fnamebuf, sizeof(fnamebuf) - 1);
     strncat(fnamebuf, tempstr, sizeof(fnamebuf) - 1);
@@ -823,15 +832,21 @@ static void pauseplay(unsigned long *starttime, unsigned long *nexteventtime, st
 }
 
 
-static void init_trackinfo(struct trackinfodata *trackinfo) {
+static void init_trackinfo(struct trackinfodata *trackinfo, struct clioptions *params) {
   int i;
   /* zero out the entire structure */
-  memset(trackinfo, 0, sizeof(*trackinfo));
+  memset(trackinfo, 0, sizeof(struct trackinfodata));
   /* wire title[] data blocks */
   for (i = 0; i < UI_TITLENODES; i++) trackinfo->title[i] = trackinfo->titledat[i];
   /* preload default GM instruments into channels and set initial tempo */
   for (i = 0; i < 16; i++) trackinfo->chanprogs[i] = i;
   trackinfo->tempo = 500000l;
+  /* put a something into the 'filename' field - midi or playlist, anything */
+  if (params->midifile != NULL) {
+    filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
+  } else if (params->playlist != NULL) {
+    filename2basename(params->playlist, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
+  }
 }
 
 
@@ -846,18 +861,23 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   long trackpos;
   unsigned long midiplaybackstart;
   struct midi_event_t *curevent;
-  unsigned long elticks = 0;
+  unsigned long elticks = 0; /* used only to count clock ticks in debug mode */
   unsigned char *sysexbuff;
 
   /* init trackinfo & cache data */
-  init_trackinfo(trackinfo);
+  init_trackinfo(trackinfo, params);
   getnexteventfromcache(eventscache, -1, 0);
+
+  /* update screen with the next operation */
+  sprintf(trackinfo->title[0], "Loading file...");
+  ui_draw(trackinfo, &refreshflags, &refreshchans, PVER, params->devname, params->devport, volume);
+  refreshflags = 0xffffu;
 
   /* if running on a playlist, load next song */
   if (params->playlist != NULL) {
     params->midifile = getnextm3uitem(params->playlist);
     if (params->midifile == NULL) {
-      ui_puterrmsg(params->playlist, "Error: Failed to fetch an entry from the playlist");
+      ui_puterrmsg("Playlist error", "Failed to fetch an entry from the playlist");
       return(ACTION_ERR_HARD); /* this must be a hard error otherwise DOSMid might be trapped into a loop */
     }
   }
@@ -1156,7 +1176,7 @@ int main(int argc, char **argv) {
     return(1);
   }
   /* populate trackinfo with initial data */
-  init_trackinfo(trackinfo);
+  init_trackinfo(trackinfo, &params);
 
   /* init random numbers */
   srand((unsigned int)time(NULL));
@@ -1170,7 +1190,6 @@ int main(int argc, char **argv) {
 
   /* init the sound device */
   sprintf(trackinfo->title[0], "Sound hardware initialization...");
-  filename2basename(params.midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
   {
     unsigned short rflags = 0xffffu, rchans = 0xffffu;
     ui_draw(trackinfo, &rflags, &rchans, PVER, params.devname, params.devport, 100);
@@ -1180,9 +1199,9 @@ int main(int argc, char **argv) {
   if (errstr != NULL) {
     ui_puterrmsg("Hardware initialization failure", errstr);
     getkey();
-    action = ACTION_EXIT;
+    goto hardwarefailure;
   }
-  /* refresh the outdev and its name (might have been changed due to OPL autodetection) */
+  /* refresh outdev and its name (might have been changed due to OPL autodetection) */
   params.device = dev_getcurdev();
   params.devname = devtoname(params.device, params.devicesubtype);
 
@@ -1228,6 +1247,8 @@ int main(int argc, char **argv) {
 
   /* close sound hardware */
   dev_close();
+
+  hardwarefailure: /* this label I jump to when sound hardware init fails */
 
   /* reset screen (clears the screen and makes the cursor visible again) */
   ui_close();
