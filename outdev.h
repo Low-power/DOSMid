@@ -51,9 +51,9 @@ enum outdev_types {
  *  DEV_NONE
  *
  * This should be called only ONCE, when program starts.
- * Returns 0 on success, non-zero otherwise.
+ * Returns NULL on success, or a pointer to an error message otherwise.
  */
-int dev_init(enum outdev_types dev, unsigned short port, char *sbank);
+char *dev_init(enum outdev_types dev, unsigned short port, char *sbank);
 
 /* returns the device that has been inited/selected */
 enum outdev_types dev_getcurdev(void);

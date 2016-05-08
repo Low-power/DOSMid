@@ -836,6 +836,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   struct midi_event_t *curevent;
   unsigned long elticks = 0;
   unsigned char *sysexbuff;
+  char *errstr;
 
   /* clear out trackinfo & cache data */
   memset(trackinfo, 0, sizeof(*trackinfo));
@@ -861,8 +862,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   ui_draw(trackinfo, &refreshflags, &refreshchans, PVER, params->devname, params->devport, volume);
   refreshflags = 0xff;
   if (params->logfd != NULL) fprintf(params->logfd, "INIT SOUND HARDWARE\n");
-  if (dev_init(params->device, params->devport, params->sbnk) != 0) {
-    ui_puterrmsg("Hardware error", "Error: Failed to initialize the sound device");
+  errstr = dev_init(params->device, params->devport, params->sbnk);
+  if (errstr != NULL) {
+    ui_puterrmsg("Hardware initialization failure", errstr);
     return(ACTION_ERR_HARD);
   }
   /* refresh the outdev and its name (might have been changed due to OPL autodetection) */

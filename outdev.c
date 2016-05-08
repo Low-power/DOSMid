@@ -124,14 +124,14 @@ static int awe_loadfont(char *filename) {
  *  DEV_NONE
  *
  * This should be called only ONCE, when program starts.
- * Returns 0 on success, non-zero otherwise. */
-int dev_init(enum outdev_types dev, unsigned short port, char *sbank) {
+ * Returns NULL on success, or a pointer to an error string otherwise. */
+char *dev_init(enum outdev_types dev, unsigned short port, char *sbank) {
   outdev = dev;
   outport = port;
   switch (outdev) {
     case DEV_MPU401:
       /* reset the MPU401 */
-      if (mpu401_rst(outport) != 0) return(-1);
+      if (mpu401_rst(outport) != 0) return("MPU doesn't answer");
       /* put it into UART mode */
       mpu401_uart(outport);
       break;
@@ -139,8 +139,8 @@ int dev_init(enum outdev_types dev, unsigned short port, char *sbank) {
 #ifdef SBAWE
       awe32NumG = 30; /* global var used by the AWE lib, must be set to 30 for
                          DRAM sound fonts to work properly */
-      if (awe32Detect(outport) != 0) return(-1);
-      if (awe32InitHardware() != 0) return(-2);
+      if (awe32Detect(outport) != 0) return("No EMU8000 chip detected");
+      if (awe32InitHardware() != 0) return("EMU8000 initialization failed");
       /* preload GM samples from AWE's ROM */
       if (sbank == NULL) {
         awe32SoundPad.SPad1 = awe32SPad1Obj;
@@ -152,11 +152,11 @@ int dev_init(enum outdev_types dev, unsigned short port, char *sbank) {
         awe32SoundPad.SPad7 = awe32SPad7Obj;
       } else if (awe_loadfont(sbank) != 0) {
         dev_close();
-        return(-4);
+        return("Sound bank could not be loaded");
       }
       if (awe32InitMIDI() != 0) {
         dev_close();
-        return(-3);
+        return("EMU8000 MIDI processor initialization failed");
       }
 #endif
       break;
@@ -167,7 +167,7 @@ int dev_init(enum outdev_types dev, unsigned short port, char *sbank) {
     {
       int res;
       res = opl_init(outport);
-      if (res < 0) return(res);
+      if (res < 0) return("No OPL2/OPL3 device detected");
       /* change the outdev device depending on OPL autodetection */
       if (res == 0) {
         outdev = DEV_OPL2;
@@ -176,26 +176,29 @@ int dev_init(enum outdev_types dev, unsigned short port, char *sbank) {
       }
       /* load a custom sound bank, if any provided */
       if (sbank != NULL) {
-        opl_loadbank(sbank);
+        if (opl_loadbank(sbank) != 0) {
+          dev_close();
+          return("OPL sound bank could not be loaded");
+        }
       }
     }
 #endif
       break;
     case DEV_RS232:
-      if (rs232_check(outport) != 0) return(-1);
+      if (rs232_check(outport) != 0) return("RS232 failure");
       break;
     case DEV_SBMIDI:
       /* The DSP has to be reset before it is first programmed. The reset
        * causes it to perform an initialization and returns it to its default
        * state. The DSP reset is done through the Reset port. */
-      if (dsp_reset(outport) != 0) return(-1);
+      if (dsp_reset(outport) != 0) return("SB DSP initialization failure");
       dsp_write(outport, 0x30); /* switch the MIDI I/O into polling mode */
       break;
     case DEV_NONE:
       break;
   }
   dev_clear();
-  return(0);
+  return(NULL);
 }
 
 
