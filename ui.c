@@ -203,26 +203,6 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
     sprintf(tempstr, "Volume: %d%%", volume);
     ui_printstr(18, 45, tempstr, 23 - strlen(devname), COLOR_TEMPO[colorflag]);
   }
-  /* title and copyright notice */
-  if (*refreshflags & UI_REFRESH_TITLECOPYR) {
-    ui_printstr(19, 1, trackinfo->title[0], 78, COLOR_TEXT[colorflag]);
-    ui_printstr(20, 1, trackinfo->title[1], 78, COLOR_TEXT[colorflag]);
-    ui_printstr(21, 1, trackinfo->title[2], 78, COLOR_TEXT[colorflag]);
-    ui_printstr(22, 1, trackinfo->copyright, 78, COLOR_TEXT[colorflag]);
-  }
-  /* programs (patches) names */
-  if (*refreshflags & UI_REFRESH_PROGS) {
-    unsigned int color;
-    for (y = 0; y < 16; y++) {
-      color = COLOR_CHANS_DIS[colorflag];
-      if (trackinfo->channelsusage & (1 << y)) color = COLOR_CHANS[colorflag];
-      if (y == 9) {
-        ui_printstr(y + 1, 0, "Percussion", 15, color);
-      } else {
-        ui_printstr(y + 1, 0, gmset[trackinfo->chanprogs[y]], 15, color);
-      }
-    }
-  }
   /* elapsed/total time */
   if (*refreshflags & UI_REFRESH_TIME) {
     char tempstr1[24];
@@ -255,6 +235,41 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
         ui_printchar(23, 1 + x, tempstr2[x - rpos] | curcol);
       } else {
         ui_printchar(23, 1 + x, ' ' | curcol);
+      }
+    }
+    /* if we have more title nodes than fits on screen, scroll them down now */
+    if (trackinfo->titlescount > 4) *refreshflags |= UI_REFRESH_TITLECOPYR;
+  }
+  /* title and copyright notice */
+  if (*refreshflags & UI_REFRESH_TITLECOPYR) {
+    int scrolloffset = 0, i;
+    if ((trackinfo->titlescount <= 4) || (trackinfo->elapsedsec < 8)) {
+      /* simple case */
+      for (i = 0; i < 4; i++) {
+        ui_printstr(19 + i, 1, trackinfo->title[i], 78, COLOR_TEXT[colorflag]);
+      }
+    } else { /* else scroll down one line every 2s */
+      scrolloffset = (trackinfo->elapsedsec >> 1) % (trackinfo->titlescount + 3);
+      scrolloffset -= 3;
+      for (i = 0; i < 4; i++) {
+        if ((i + scrolloffset >= 0) && (i + scrolloffset < trackinfo->titlescount)) {
+          ui_printstr(19 + i, 1, trackinfo->title[i + scrolloffset], 78, COLOR_TEXT[colorflag]);
+        } else {
+          ui_printstr(19 + i, 1, "", 78, COLOR_TEXT[colorflag]);
+        }
+      }
+    }
+  }
+  /* programs (patches) names */
+  if (*refreshflags & UI_REFRESH_PROGS) {
+    unsigned int color;
+    for (y = 0; y < 16; y++) {
+      color = COLOR_CHANS_DIS[colorflag];
+      if (trackinfo->channelsusage & (1 << y)) color = COLOR_CHANS[colorflag];
+      if (y == 9) {
+        ui_printstr(y + 1, 0, "Percussion", 15, color);
+      } else {
+        ui_printstr(y + 1, 0, gmset[trackinfo->chanprogs[y]], 15, color);
       }
     }
   }

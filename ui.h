@@ -14,10 +14,9 @@
 #define UI_REFRESH_TIME      32
 #define UI_REFRESH_VOLUME    64
 
-#define UI_TITLEMAXLEN 63
-#define UI_TITLENODES 3
-#define UI_COPYRIGHTMAXLEN 63
-#define UI_FILENAMEMAXLEN 15
+#define UI_TITLEMAXLEN 48
+#define UI_TITLENODES 12
+#define UI_FILENAMEMAXLEN 16
 
 struct trackinfodata {
   unsigned long tempo;
@@ -29,10 +28,8 @@ struct trackinfodata {
   unsigned char chanprogs[16];
   int titlescount;
   int midiformat;
-  char titledat[UI_TITLENODES][UI_TITLEMAXLEN + 1];
-  char *title[UI_TITLENODES];
-  char copyright[UI_COPYRIGHTMAXLEN + 1];
-  char filename[UI_FILENAMEMAXLEN + 1];
+  char title[UI_TITLENODES][UI_TITLEMAXLEN];
+  char filename[UI_FILENAMEMAXLEN];
 };
 
 /* inits ui, sets colorflag (0=mono ; non-zero=color) */

@@ -10,7 +10,8 @@ DOSMid v0.9 [xx xxx xxxx]
  - the 2s silence gap before songs is inserted only in playlist mode now,
  - sound hardware is initialized once, instead of being inited for every song,
  - fixed playlist parsing so DOSMid won't freeze on an empty m3u playlist,
- - ...
+ - load more textual information by reading titles of empty tracks,
+ - file's information is displayed on a dynamic scroll when over 4 lines.
 
 DOSMid v0.8 [18 Sep 2015]
  - SBMIDI support (can drive MIDI synths attached to SB 1.x and 2.x cards),

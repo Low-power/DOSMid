@@ -1,7 +1,7 @@
 /*
  * DOSMID - a low-requirement MIDI and MUS player for DOS
  *
- * Copyright (c) 2014, 2015, Mateusz Viste
+ * Copyright (C) 2014-2016, Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -153,7 +153,7 @@ static void filename2basename(char *fromname, char *tobasename, char *todirname,
   if (tobasename != NULL) {
     x2 = 0;
     for (x = firstchar; fromname[x] != 0; x++) {
-      if ((fromname[x] == 0) || (x2 >= maxlen)) break;
+      if ((fromname[x] == 0) || (x2+1 >= maxlen)) break;
       tobasename[x2++] = fromname[x];
     }
     tobasename[x2] = 0;
@@ -162,7 +162,7 @@ static void filename2basename(char *fromname, char *tobasename, char *todirname,
   if (todirname != NULL) {
     x2 = 0;
     for (x = 0; x < firstchar; x++) {
-      if ((fromname[x] == 0) || (x2 >= maxlen)) break;
+      if ((fromname[x] == 0) || (x2+1 >= maxlen)) break;
       todirname[x2++] = fromname[x];
     }
     todirname[x2] = 0;
@@ -302,6 +302,7 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
     params->dontstop = 1;
   } else if (strcmp(arg, "/nosound") == 0) {
     params->device = DEV_NONE;
+    params->devport = 0;
 #ifdef SBAWE
   } else if (strcmp(arg, "/awe") == 0) {
     params->device = DEV_AWE;
@@ -667,11 +668,41 @@ static char *getnextm3uitem(char *playlist) {
 }
 
 
+/* returns a pointer to the next line of s, or NULL if no more lines */
+static char *nextlinefrombuf(char *s) {
+  for (;; s++) {
+    if (*s == 0) return(NULL);
+    if (*s == '\n') {
+      s++;
+      if (*s == 0) return(NULL);
+      return(s);
+    }
+  }
+}
+
+
+/* copy the first line of s into d, up to l characters (incl. null term.) */
+static void copyline(char *d, int l, char *s) {
+  for (;;) {
+    *d = *s;
+    if (*d == 0) return;
+    if ((*d == '\r') || (*d == '\n') || (--l == 0)) {
+      *d = 0;
+      return;
+    }
+    d++;
+    s++;
+  }
+}
+
+
 static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
   struct midi_chunkmap_t *chunkmap;
   int miditracks;
   int i;
   long newtrack;
+  char copystring[UI_TITLEMAXLEN];
+  char text[256];
 
   *trackpos = -1;
 
@@ -708,6 +739,8 @@ static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struc
   }
 
   for (i = 0; i < miditracks; i++) {
+    char tracktitle[UI_TITLEMAXLEN];
+    unsigned long tracklen;
     /* is it really a track we got here? */
     if (strcmp(chunkmap[i].id, "MTrk") != 0) {
       char errstr[64];
@@ -719,21 +752,37 @@ static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struc
 
     if (params->logfd != NULL) fprintf(params->logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, chunkmap[i].offset);
     fseek(fd, chunkmap[i].offset, SEEK_SET);
-    if (i == 0) {
-      newtrack = midi_track2events(fd, trackinfo->title, UI_TITLENODES, UI_TITLEMAXLEN, trackinfo->copyright, UI_COPYRIGHTMAXLEN, &(trackinfo->channelsusage), params->logfd);
+    if (i == 0) { /* copyright and text events are fetched from track 0 only */
+      newtrack = midi_track2events(fd, tracktitle, UI_TITLEMAXLEN, copystring, UI_TITLEMAXLEN, text, sizeof(text), &(trackinfo->channelsusage), params->logfd, &tracklen);
     } else {
-      newtrack = midi_track2events(fd, NULL, 0, UI_TITLEMAXLEN, NULL, 0, &(trackinfo->channelsusage), params->logfd);
-      if (params->logfd != NULL) fprintf(params->logfd, "TRACK %d LOADED (start id=%ld) -> MERGING NOW\n", i, newtrack);
+      newtrack = midi_track2events(fd, tracktitle, UI_TITLEMAXLEN, NULL, 0, NULL, 0, &(trackinfo->channelsusage), params->logfd, &tracklen);
     }
     if (newtrack == MIDI_OUTOFMEM) {
       ui_puterrmsg(params->midifile, "Error: Out of memory");
       free(chunkmap);
       return(ACTION_ERR_SOFT);
     }
+    /* there is a non-written rule saying that useful text is written into
+     * titles of empty tracks - push data into next available title node */
+    if (((tracklen == 0) || (i == 0)) && (trackinfo->titlescount < UI_TITLENODES) && (tracktitle[0] != 0)) {
+      memcpy(trackinfo->title[trackinfo->titlescount++], tracktitle, UI_TITLEMAXLEN);
+    }
+    /* merge the track now */
     if (newtrack >= 0) {
       *trackpos = midi_mergetrack(*trackpos, newtrack, &(trackinfo->totlen), trackinfo->miditimeunitdiv);
       if (params->logfd != NULL) fprintf(params->logfd, "TRACK %d MERGED (start id=%ld) -> TOTAL TIME: %ld\n", i, *trackpos, trackinfo->totlen);
     }
+  }
+  /* if we got any 'text', but no 'titles', then push the text into titles */
+  if ((text[0] != 0) && (trackinfo->titlescount == 0)) {
+    char *l;
+    for (l = text; (l != NULL) && (trackinfo->titlescount < UI_TITLENODES); l = nextlinefrombuf(l)) {
+      copyline(trackinfo->title[trackinfo->titlescount++], UI_TITLEMAXLEN, l);
+    }
+  }
+  /* if we have room in title nodes, copy the copyright string there */
+  if (trackinfo->titlescount < UI_TITLENODES) {
+    memcpy(trackinfo->title[trackinfo->titlescount++], copystring, UI_TITLEMAXLEN);
   }
   free(chunkmap);
 
@@ -836,8 +885,6 @@ static void init_trackinfo(struct trackinfodata *trackinfo, struct clioptions *p
   int i;
   /* zero out the entire structure */
   memset(trackinfo, 0, sizeof(struct trackinfodata));
-  /* wire title[] data blocks */
-  for (i = 0; i < UI_TITLENODES; i++) trackinfo->title[i] = trackinfo->titledat[i];
   /* preload default GM instruments into channels and set initial tempo */
   for (i = 0; i < 16; i++) trackinfo->chanprogs[i] = i;
   trackinfo->tempo = 500000l;

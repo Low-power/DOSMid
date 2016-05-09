@@ -1,7 +1,7 @@
 /*
  * A simple MIDI parsing library
  *
- * Copyright (c) 2014, 2015 Mateusz Viste
+ * Copyright (c) 2014-2016 Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -173,20 +173,29 @@ int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned short *timeunitdiv
 
 /* parse a track object and returns the id of the first events in the linked
  * list. channelsusage contains 16 flags indicating what channels are used.
- * returns MIDI_OUTOFMEM if faild to store events in memory. */
-long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, char *copyright, int copyrightmaxlen, unsigned short *channelsusage, FILE *logfd) {
+ * titlemaxlen and copyrightmaxlen are the maximum lengths of the strings,
+ * including the NULL terminator.
+ * returns MIDI_EMPTYTRACK if no event found in the track.
+ * returns MIDI_OUTOFMEM if failed to store events in memory. */
+long midi_track2events(FILE *fd, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen, unsigned short *channelsusage, FILE *logfd, unsigned long *tracklen) {
   unsigned long deltatime;
   unsigned char statusbyte = 0, tmp;
   struct midi_event_t event;
   long result = -1;
-  unsigned long tracklen = 0;
   unsigned long ignoreddeltas = 0;
   unsigned char ubuff[4]; /* micro buffer for loading data */
+
+  /* zero out title and copyright strings, if provided */
+  if (titlemaxlen > 0) title[0] = 0;
+  if (copyrightmaxlen > 0) copyright[0] = 0;
+  if (textmaxlen > 0) text[0] = 0;
+
+  *tracklen = 0;
 
   for (;;) {
     /* read the delta time first - variable length */
     midi_fetch_variablelen_fromfile(fd, &deltatime);
-    tracklen += deltatime;
+    *tracklen += deltatime;
     /* check the type of the event */
     /* if it's a byte with MSB set, we are dealing with running status (so it's same status as last time */
     tmp = fgetc(fd);
@@ -206,14 +215,35 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
         midi_fetch_variablelen_fromfile(fd, &metalen);
         /* printf("got META[0x%02X] of %ld bytes\n", subtype, metalen); */
         switch (subtype) {
-          case 1: /* text */
-            fseek(fd, metalen, SEEK_CUR);
+          case 1: /* text or marker - often used to describe the file... */
+          case 6: /* marker */
+            i = 0;
+            if ((text != NULL) && (text[0] == 0) && (textmaxlen > 3)) { /* title might be NULL */
+              for (; i < metalen; i++) {
+                if (i+1 >= textmaxlen) break; /* avoid overflow */
+                text[i] = fgetc(fd);
+              }
+              text[i] = 0;
+              /* recompute the available maxlen */
+              text += i;
+              textmaxlen -= i;
+              /* add a LF trailer, just in case we'd like to append more data */
+              if (textmaxlen > 2) {
+                *text = '\n';
+                text++;
+                *text = 0;
+                textmaxlen--;
+              }
+            }
+            /* skip the rest, if we had to truncate the string */
+            fseek(fd, metalen - i, SEEK_CUR);
+            if (logfd != NULL) fprintf(logfd, "%lu: TEXT OR MARKER EVENT\n", *tracklen);
             break;
           case 2: /* copyright notice */
             i = 0;
-            if (copyright != NULL) { /* take care, copyright might be NULL */
+            if ((copyright != NULL) && (copyright[0] == 0)) { /* take care, copyright might be NULL */
               for (; i < metalen; i++) {
-                if (i == copyrightmaxlen) break; /* avoid overflow */
+                if (i+1 >= copyrightmaxlen) break; /* avoid overflow */
                 copyright[i] = fgetc(fd);
               }
               copyright[i] = 0;
@@ -222,41 +252,34 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
             break;
           case 3: /* track name */
             i = 0;
-            /* find the first empty track */
             if (title != NULL) { /* title might be NULL */
-              int titid = -1, t;
-              for (t = 0; t < titlenodes; t++) {
-                if (title[t][0] == 0) {
-                  titid = t;
-                  break;
-                }
+              for (; i < metalen; i++) {
+                if (i+1 >= titlemaxlen) break; /* avoid overflow */
+                title[i] = fgetc(fd);
               }
-              if (titid >= 0) {
-                for (i = 0; i < metalen; i++) {
-                  if (i == titlemaxlen) break; /* avoid overflow */
-                  title[titid][i] = fgetc(fd);
-                }
-                title[titid][i] = 0;
-              }
+              title[i] = 0;
             }
             fseek(fd, metalen - i, SEEK_CUR); /* skip the rest, if we had to truncate the string */
             break;
           case 4: /* instrument name */
+            fseek(fd, metalen, SEEK_CUR);
+            if (logfd != NULL) fprintf(logfd, "%lu: INSTRUMENT EVENT (ignored)\n", *tracklen);
+            break;
           case 5: /* lyric */
             fseek(fd, metalen, SEEK_CUR);
-            if (logfd != NULL) fprintf(logfd, "%lu: LYRIC EVENT (ignored)\n", tracklen);
+            if (logfd != NULL) fprintf(logfd, "%lu: LYRIC EVENT (ignored)\n", *tracklen);
             break;
           case 0x21:  /* MIDI port -- no support for multi-MIDI files, I just ignore it */
             fseek(fd, metalen, SEEK_CUR);
-            if (logfd != NULL) fprintf(logfd, "%lu: MIDI PORT EVENT (ignored)\n", tracklen);
+            if (logfd != NULL) fprintf(logfd, "%lu: MIDI PORT EVENT (ignored)\n", *tracklen);
             break;
           case 0x2F: /* end of track */
-            if (logfd != NULL) fprintf(logfd, "%lu: END OF TRACK\n", tracklen);
+            if (logfd != NULL) fprintf(logfd, "%lu: END OF TRACK\n", *tracklen);
             endoftrack = 1;
             break;
           case 0x51:  /* set tempo */
             if (metalen != 3) {
-              if (logfd != NULL) fprintf(logfd, "%lu: TEMPO ERROR\n", tracklen);
+              if (logfd != NULL) fprintf(logfd, "%lu: TEMPO ERROR\n", *tracklen);
             } else {
               fread(ubuff, 1, 3, fd);
               event.type = EVENT_TEMPO;
@@ -265,38 +288,38 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
               event.data.tempoval |= ubuff[1];
               event.data.tempoval <<= 8;
               event.data.tempoval |= ubuff[2];
-              if (logfd != NULL) fprintf(logfd, "%lu: TEMPO -> %lu\n", tracklen, event.data.tempoval);
+              if (logfd != NULL) fprintf(logfd, "%lu: TEMPO -> %lu\n", *tracklen, event.data.tempoval);
             }
             break;
           case 0x54:  /* SMPTE offset -> since I expect only format 0/1 files, I ignore this because I want to start playing asap anyway */
             fseek(fd, metalen, SEEK_CUR);
-            if (logfd != NULL) fprintf(logfd, "%lu: SMPTE OFFSET (ignored)\n", tracklen);
+            if (logfd != NULL) fprintf(logfd, "%lu: SMPTE OFFSET (ignored)\n", *tracklen);
             break;
           case 0x58:  /* Time signature */
             if (metalen != 4) {
-              if (logfd != NULL) fprintf(logfd, "%lu: INVALID TIME SIGNATURE!\n", tracklen);
+              if (logfd != NULL) fprintf(logfd, "%lu: INVALID TIME SIGNATURE!\n", *tracklen);
               return(-1);
             } else {
               fseek(fd, metalen, SEEK_CUR);
-              if (logfd != NULL) fprintf(logfd, "%lu: TIME SIGNATURE (ignored)\n", tracklen);
+              if (logfd != NULL) fprintf(logfd, "%lu: TIME SIGNATURE (ignored)\n", *tracklen);
             }
             break;
           case 0x59:  /* key signature */
             if (metalen != 2) {
-              if (logfd != NULL) fprintf(logfd, "%lu: INVALID KEY SIGNATURE!\n", tracklen);
+              if (logfd != NULL) fprintf(logfd, "%lu: INVALID KEY SIGNATURE!\n", *tracklen);
               return(-1);
             } else {
               fseek(fd, metalen, SEEK_CUR);
-              if (logfd != NULL) fprintf(logfd, "%lu: KEY SIGNATURE (ignored)\n", tracklen);
+              if (logfd != NULL) fprintf(logfd, "%lu: KEY SIGNATURE (ignored)\n", *tracklen);
             }
             break;
           case 0x7F:  /* proprietary event -> this is non-standard stuff, I ignore it */
             fseek(fd, metalen, SEEK_CUR);
-            if (logfd != NULL) fprintf(logfd, "%lu: PROPRIETARY EVENT (ignored)\n", tracklen);
+            if (logfd != NULL) fprintf(logfd, "%lu: PROPRIETARY EVENT (ignored)\n", *tracklen);
             break;
           default:
             fseek(fd, metalen, SEEK_CUR);  /* skip the meta data */
-            if (logfd != NULL) fprintf(logfd, "%lu: UNHANDLED META EVENT [0x%02Xh] (ignored)\n", tracklen, subtype);
+            if (logfd != NULL) fprintf(logfd, "%lu: UNHANDLED META EVENT [0x%02Xh] (ignored)\n", *tracklen, subtype);
             break;
         }
         if (endoftrack != 0) break;
@@ -304,7 +327,7 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
         unsigned long sysexlen = 0;
         unsigned char *sysexbuff;
         midi_fetch_variablelen_fromfile(fd, &sysexlen); /* get length */
-        if (logfd != NULL) fprintf(logfd, "%lu: SYSEX EVENT OF %ld BYTES ON CHAN #%d\n", tracklen, sysexlen, statusbyte & 0x0F);
+        if (logfd != NULL) fprintf(logfd, "%lu: SYSEX EVENT OF %ld BYTES ON CHAN #%d\n", *tracklen, sysexlen, statusbyte & 0x0F);
         sysexlen += 1; /* add one byte for the status byte that is not counted, but that we will add to the top of the buffer later */
         if (sysexlen > 4096) { /* skip SYSEX events that are more than 4K big */
           fseek(fd, sysexlen, SEEK_CUR);
@@ -325,13 +348,13 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
               event.type = EVENT_NONE;
               free(sysexbuff);
               sysexbuff = NULL;
-              if (logfd != NULL) fprintf(logfd, "%lu: SYSEX MEM_ALLOC FAILED FOR %ld BYTES\n", tracklen, sysexlen);
+              if (logfd != NULL) fprintf(logfd, "%lu: SYSEX MEM_ALLOC FAILED FOR %ld BYTES\n", *tracklen, sysexlen);
               return(MIDI_OUTOFMEM);
             }
             free(sysexbuff);
           } else {
             event.type = EVENT_NONE;
-            if (logfd != NULL) fprintf(logfd, "%lu: SYSEX MALLOC FAILED FOR %ld BYTES\n", tracklen, sysexlen);
+            if (logfd != NULL) fprintf(logfd, "%lu: SYSEX MALLOC FAILED FOR %ld BYTES\n", *tracklen, sysexlen);
             return(MIDI_OUTOFMEM);
           }
         }
@@ -388,7 +411,7 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
             event.data.pitch.wheel |= ubuff[0];
             break;
           default:
-            if (logfd != NULL) fprintf(logfd, "%lu: Unknown note data\n", tracklen);
+            if (logfd != NULL) fprintf(logfd, "%lu: Unknown note data\n", *tracklen);
             return(-1);
             break;
         }
@@ -404,7 +427,7 @@ long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, 
       event.deltatime += ignoreddeltas; /* add any previously ignored delta times */
       ignoreddeltas = 0;
       /* add the event to the queue */
-      if (result < 0) {
+      if (result < 0) { /* this is the first event in the queue */
         pusheventres = pusheventqueue(&event, &result);
       } else {
         pusheventres = pusheventqueue(&event, NULL);

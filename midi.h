@@ -1,7 +1,7 @@
 /*
  * A simple MIDI parsing library
  *
- * Copyright (c) 2014, 2015 Mateusz Viste
+ * Copyright (C) 2014-2016 Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,6 +33,7 @@
 #define midi_h_sentinel
 
 #define MIDI_OUTOFMEM -10
+#define MIDI_EMPTYTRACK -1
 
 enum midi_midievents {
   EVENT_NOTEOFF = 0,
@@ -120,7 +121,7 @@ struct midi_chunk_t *midi_readchunk(FILE *fd);
 int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned short *timeunitdiv, struct midi_chunkmap_t *chunklist, int maxchunks);
 
 /* parse a track object and returns the id of the first events in the linked list */
-long midi_track2events(FILE *fd, char **title, int titlenodes, int titlemaxlen, char *copyright, int copyrightmaxlen, unsigned short *channelsusage, FILE *logfd);
+long midi_track2events(FILE *fd, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen, unsigned short *channelsusage, FILE *logfd, unsigned long *tracklen);
 
 /* merge two MIDI tracks into a single (serialized) one. returns a "pointer"
  * to the unique track. I take care here to not allocate/free memory here.
