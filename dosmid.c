@@ -389,13 +389,13 @@ static void rtrim(char *s) {
       case '\t':
       case '\r':
       case '\n':
+        s++;
         break;
       default:
-        lastchar = s;
+        lastchar = ++s;
     }
-    s += 1;
   }
-  if (*lastchar != 0) lastchar[1] = 0;
+  *lastchar = 0;
 }
 
 
@@ -770,7 +770,11 @@ static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struc
     /* there is a non-written rule saying that useful text is written into
      * titles of empty tracks - push data into next available title node */
     if (((tracklen == 0) || (i == 0)) && (trackinfo->titlescount < UI_TITLENODES) && (tracktitle[0] != 0)) {
-      memcpy(trackinfo->title[trackinfo->titlescount++], tracktitle, UI_TITLEMAXLEN);
+      /* ignore empty titles, though, if no valid title was found before */
+      rtrim(tracktitle);
+      if ((trackinfo->titlescount > 0) || (tracktitle[0] != 0)) {
+        memcpy(trackinfo->title[trackinfo->titlescount++], tracktitle, UI_TITLEMAXLEN);
+      }
     }
     /* merge the track now */
     if (newtrack >= 0) {
