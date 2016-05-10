@@ -34,6 +34,7 @@
 
 #define MIDI_OUTOFMEM -10
 #define MIDI_EMPTYTRACK -1
+#define MIDI_TRACKERROR -2
 
 enum midi_midievents {
   EVENT_NOTEOFF = 0,

@@ -175,7 +175,7 @@ int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned short *timeunitdiv
 static int ld_meta(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned long *tracklen, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen) {
   unsigned long metalen;
   unsigned long i;
-  int subtype, endoftrack = 0;
+  int subtype, result = 0;
   subtype = fgetc(fd); /* fetch the META subtype fields */
   midi_fetch_variablelen_fromfile(fd, &metalen);
   /* printf("got META[0x%02X] of %ld bytes\n", subtype, metalen); */
@@ -240,11 +240,12 @@ static int ld_meta(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned l
       break;
     case 0x2F: /* end of track */
       if (logfd != NULL) fprintf(logfd, "%lu: END OF TRACK\n", *tracklen);
-      endoftrack = 1;
+      result = 1;
       break;
     case 0x51:  /* set tempo */
       if (metalen != 3) {
         if (logfd != NULL) fprintf(logfd, "%lu: TEMPO ERROR\n", *tracklen);
+        return(-1);
       } else {
         event->type = EVENT_TEMPO;
         event->data.tempoval = fgetc(fd);
@@ -286,7 +287,7 @@ static int ld_meta(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned l
       if (logfd != NULL) fprintf(logfd, "%lu: UNHANDLED META EVENT [0x%02Xh] (ignored)\n", *tracklen, subtype);
       break;
   }
-  return(endoftrack);
+  return(result);
 }
 
 
@@ -397,13 +398,14 @@ static int ld_note(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned c
  * list. channelsusage contains 16 flags indicating what channels are used.
  * titlemaxlen and copyrightmaxlen are the maximum lengths of the strings,
  * including the NULL terminator.
- * returns MIDI_EMPTYTRACK if no event found in the track.
- * returns MIDI_OUTOFMEM if failed to store events in memory. */
+ * returns MIDI_EMPTYTRACK if no event found in the track
+ * returns MIDI_TRACKERROR if the track is corrupted
+ * returns MIDI_OUTOFMEM if failed to store events in memory */
 long midi_track2events(FILE *fd, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen, unsigned short *channelsusage, FILE *logfd, unsigned long *tracklen) {
   unsigned long deltatime;
-  unsigned char statusbyte = 0, tmp;
+  unsigned char statusbyte = 0;
   struct midi_event_t event;
-  long result = -1;
+  long result = MIDI_EMPTYTRACK;
   unsigned long ignoreddeltas = 0;
 
   /* zero out title and copyright strings, if provided */
@@ -420,9 +422,10 @@ long midi_track2events(FILE *fd, char *title, int titlemaxlen, char *copyright, 
     *tracklen += deltatime;
     /* check the type of the event */
     /* if it's a byte with MSB set, we are dealing with running status (so it's same status as last time */
-    tmp = fgetc(fd);
-    if ((tmp & 128) != 0) {
-      statusbyte = tmp;
+    r = fgetc(fd);
+    if (r == EOF) return(MIDI_TRACKERROR);
+    if ((r & 128) != 0) {
+      statusbyte = r;
     } else { /* get back one byte */
       fseek(fd, -1, SEEK_CUR);
     }
@@ -431,17 +434,17 @@ long midi_track2events(FILE *fd, char *title, int titlemaxlen, char *copyright, 
     event.next = -1;
     if (statusbyte == 0xFF) { /* META event */
       r = ld_meta(&event, fd, logfd, tracklen, title, titlemaxlen, copyright, copyrightmaxlen, text, textmaxlen);
-      if (r < 0) return(-1);
+      if (r < 0) return(MIDI_TRACKERROR);
       if (r == 1) break; /* end of track */
     } else if ((statusbyte >= 0xF0) && (statusbyte <= 0xF7)) { /* SYSEX event */
       r = ld_sysex(&event, fd, logfd, statusbyte, tracklen);
-      if (r != 0) return(r);
+      if (r != 0) return(MIDI_TRACKERROR);
     } else if ((statusbyte >= 0x80) && (statusbyte <= 0xEF)) { /* else it's a note-related command */
       r = ld_note(&event, fd, logfd, statusbyte, tracklen, channelsusage);
-      if (r != 0) return(r);
+      if (r != 0) return(MIDI_TRACKERROR);
     } else { /* else it's an error - free memory we allocated and return NULL */
       if (logfd != NULL) fprintf(logfd, "Err. at offset %04lX (bytebuff = 0x%02X)\n", ftell(fd), statusbyte);
-      return(-1);
+      return(MIDI_TRACKERROR);
     }
     /* add the event to the queue */
     if (event.type == EVENT_NONE) {
@@ -451,7 +454,7 @@ long midi_track2events(FILE *fd, char *title, int titlemaxlen, char *copyright, 
       event.deltatime += ignoreddeltas; /* add any previously ignored delta times */
       ignoreddeltas = 0;
       /* add the event to the queue */
-      if (result < 0) { /* this is the first event in the queue */
+      if (result == MIDI_EMPTYTRACK) { /* this is the first event in the queue */
         pusheventres = pusheventqueue(&event, &result);
       } else {
         pusheventres = pusheventqueue(&event, NULL);

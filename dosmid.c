@@ -757,8 +757,13 @@ static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struc
     } else {
       newtrack = midi_track2events(fd, tracktitle, UI_TITLEMAXLEN, NULL, 0, NULL, 0, &(trackinfo->channelsusage), params->logfd, &tracklen);
     }
+    /* look for error conditions */
     if (newtrack == MIDI_OUTOFMEM) {
       ui_puterrmsg(params->midifile, "Error: Out of memory");
+      free(chunkmap);
+      return(ACTION_ERR_SOFT);
+    } else if (newtrack == MIDI_TRACKERROR) {
+      ui_puterrmsg(params->midifile, "Error: Malformed MIDI file");
       free(chunkmap);
       return(ACTION_ERR_SOFT);
     }
