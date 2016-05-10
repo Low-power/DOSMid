@@ -778,6 +778,8 @@ static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struc
       if (params->logfd != NULL) fprintf(params->logfd, "TRACK %d MERGED (start id=%ld) -> TOTAL TIME: %ld\n", i, *trackpos, trackinfo->totlen);
     }
   }
+  /* free memory */
+  free(chunkmap);
   /* if we got any 'text', but no 'titles', then push the text into titles */
   if ((text[0] != 0) && (trackinfo->titlescount == 0)) {
     char *l;
@@ -786,11 +788,13 @@ static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struc
     }
   }
   /* if we have room in title nodes, copy the copyright string there */
-  if (trackinfo->titlescount < UI_TITLENODES) {
+  if ((trackinfo->titlescount < UI_TITLENODES) && (copystring[0] != 0)) {
     memcpy(trackinfo->title[trackinfo->titlescount++], copystring, UI_TITLEMAXLEN);
   }
-  free(chunkmap);
-
+  /* if no text data could be found at all, add a note about that */
+  if (trackinfo->titlescount == 0) {
+    strcpy(trackinfo->title[trackinfo->titlescount++], "<no title>");
+  }
   return(ACTION_NONE);
 }
 
