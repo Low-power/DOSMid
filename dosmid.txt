@@ -87,12 +87,12 @@ DOSMID [options] file.mid (or m3u playlist)
  /sbnk=FILE Makes DOSMid load a custom sound bank. This is supported only on
            OPL and AWE hardware. The sound bank file must be in the IBK format
            when used with OPL, and SBK format for AWE. OPL accepts one or two
-           IBK files (eg. /sbnk=file1.ibk,file2.ibk). If two are provided, then
-           the first one will be used for the standard 128-instruments GM set,
-           and the second one for defining percussion instruments.
- /log=FILE Logs all DOSMid activity to FILE. This is clearly a debugging
-           option that you shouldn't be interested in. Beware, the log file
-           can get pretty big (MUCH bigger than the MIDI file you are playing).
+           IBK files (eg. /sbnk=file1.ibk,file2.ibk). If two are provided,
+           then the first one will be used for the standard 128-instruments GM
+           set, and the second one for defining percussion instruments.
+ /log=FILE Logs all DOSMid activity to FILE. This is a debugging feature that
+           you shouldn't be interested in. Beware, the log file can get pretty
+           big (MUCH bigger than the MIDI file you are playing).
  /fullcpu  Do not let DOSMid being CPU-friendly. By default DOSMid issues an
            INT 28h when idle, to let the system be gentler on the CPU, but on
            some hardware this might lead to degraded sound performance.
@@ -123,10 +123,10 @@ DOSMid can output directly to the card's MIDI port. If not instructed
 otherwise, DOSMid will always try to use the EMU8000 synth if found in the
 BLASTER string, and if not, it will use the MPU-401. If neither of them are
 found in the BLASTER string, or if there is no BLASTER variable at all, then
-DOSMid will try to use FM synthesis on port 388h.
+DOSMid will try to fall back to FM synthesis on port 388h.
 
 
-*** COMPATIBLE HARDWARE ***
+*** COMPATIBLE SOUND HARDWARE ***
 
 DOSMid supports a variety of MIDI hardware. Here below I list the types of
 hardware that DOSMid can talk to, as well as a few examples.
@@ -153,9 +153,11 @@ Internal MIDI synthesizers:
 
 DOSMid is compiled with OpenWatcom. The entire build process is automated via
 a Makefile file, so if you wish to rebuild DOSMid, all you have to do is type
-"wmake". When building, a few compile-time options are available: to fine-tune
-DOSMid to your needs, edit the Makefile and adapt FEATURES to your likeness.
-The FEATURES list is documented in the Makefile.
+"wmake". A few compile-time options are available to disable features you
+don't need. Edit the Makefile and adapt FEATURES to your likeness. The
+FEATURES list is documented in the Makefile. The default build comes with all
+features compiled in, so you really should fiddle with FEATURES only in case
+you desperately need to lower DOSMid's memory footprint.
 
 
 *** LICENSE ***
