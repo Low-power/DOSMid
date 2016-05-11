@@ -170,6 +170,12 @@ static void filename2basename(char *fromname, char *tobasename, char *todirname,
 }
 
 
+/* switch a string to upper case */
+static void ucase(char *s) {
+  for (; *s != 0; s++) if ((*s >= 'a') && (*s <= 'z')) *s -= 32;
+}
+
+
 /* checks whether str starts with start or not. returns 0 if so, non-zero otherwise */
 static int stringstartswith(char *str, char *start) {
   if ((str == NULL) || (start == NULL)) return(-1);
@@ -907,6 +913,7 @@ static void init_trackinfo(struct trackinfodata *trackinfo, struct clioptions *p
   } else if (params->playlist != NULL) {
     filename2basename(params->playlist, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
   }
+  ucase(trackinfo->filename);
 }
 
 
@@ -989,6 +996,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   /* load the file into memory */
   sprintf(trackinfo->title[0], "Loading...");
   filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
+  ucase(trackinfo->filename);
   ui_draw(trackinfo, &refreshflags, &refreshchans, PVER, params->devname, params->devport, volume);
   memset(trackinfo->title[0], 0, 16);
   refreshflags = 0xff;
