@@ -143,8 +143,16 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
     ui_printchar(24, 79, 188 | COLOR_TUI[colorflag]);
     sprintf(tempstr, "[ DOSMid v%s ]", pver);
     ui_printstr(24, 78 - strlen(tempstr), tempstr, -1, COLOR_TUI[colorflag]);
+    /* clear out the background on the 'messages' part of the screen */
+    for (y = 18; y < 23; y++) {
+      ui_printstr(y, 1, "", 78, COLOR_TEXT[colorflag]);
+    }
+    /* print static strings */
     sprintf(tempstr, "%s port: %03Xh", devname, mpuport);
     ui_printstr(18, 79 - strlen(tempstr), tempstr, -1, COLOR_TEMPO[colorflag]);
+    ui_printstr(19, 67, "Volume:", 7, COLOR_TEMPO[colorflag]);
+    ui_printstr(20, 67, "Format:", 7, COLOR_TEMPO[colorflag]);
+    ui_printstr(21, 68, "Tempo:", 6, COLOR_TEMPO[colorflag]);
   }
   /* print notes states on every channel */
   if (*refreshflags & UI_REFRESH_NOTES) {
@@ -178,14 +186,13 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
     unsigned long miditempo;
     /* print filename (unless NULL - might happen early at playlist load) */
     if (trackinfo->filename != NULL) {
-      ui_printstr(18, 1, trackinfo->filename, 16, COLOR_TEMPO[colorflag]);
+      ui_printstr(18, 50, trackinfo->filename, 12, COLOR_TEMPO[colorflag]);
     } else {
-      ui_printstr(18, 1, "", 16, COLOR_TEMPO[colorflag]);
+      ui_printstr(18, 50, "", 12, COLOR_TEMPO[colorflag]);
     }
     /* print format */
     itoa(trackinfo->midiformat, tempstr, 10);
-    ui_printstr(18, 17, "Format:", 8, COLOR_TEMPO[colorflag]);
-    ui_printstr(18, 25, tempstr, 4, COLOR_TEMPO[colorflag]);
+    ui_printstr(20, 75, tempstr, 4, COLOR_TEMPO[colorflag]);
     /* print tempo */
     if (trackinfo->tempo > 0) {
       miditempo = 60000000lu / trackinfo->tempo;
@@ -193,15 +200,14 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
       miditempo = 0;
     }
     ultoa(miditempo, tempstr, 10);
-    strcat(tempstr, " bpm");
-    ui_printstr(18, 29, "Tempo:", 7, COLOR_TEMPO[colorflag]);
-    ui_printstr(18, 36, tempstr, 9, COLOR_TEMPO[colorflag]);
+    /*strcat(tempstr, "bpm");*/
+    ui_printstr(21, 75, tempstr, 4, COLOR_TEMPO[colorflag]);
   }
   /* volume */
   if (*refreshflags & UI_REFRESH_VOLUME) {
-    char tempstr[16];
-    sprintf(tempstr, "Volume: %d%%", volume);
-    ui_printstr(18, 45, tempstr, 23 - strlen(devname), COLOR_TEMPO[colorflag]);
+    char tempstr[8];
+    sprintf(tempstr, "%d%%", volume);
+    ui_printstr(19, 75, tempstr, 4, COLOR_TEMPO[colorflag]);
   }
   /* elapsed/total time */
   if (*refreshflags & UI_REFRESH_TIME) {
@@ -238,24 +244,24 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
       }
     }
     /* if we have more title nodes than fits on screen, scroll them down now */
-    if (trackinfo->titlescount > 4) *refreshflags |= UI_REFRESH_TITLECOPYR;
+    if (trackinfo->titlescount > 5) *refreshflags |= UI_REFRESH_TITLECOPYR;
   }
   /* title and copyright notice */
   if (*refreshflags & UI_REFRESH_TITLECOPYR) {
     int scrolloffset = 0, i;
-    if ((trackinfo->titlescount <= 4) || (trackinfo->elapsedsec < 8)) {
+    if ((trackinfo->titlescount <= 5) || (trackinfo->elapsedsec < 8)) {
       /* simple case */
-      for (i = 0; i < 4; i++) {
-        ui_printstr(19 + i, 1, trackinfo->title[i], 78, COLOR_TEXT[colorflag]);
+      for (i = 0; i < 5; i++) {
+        ui_printstr(18 + i, 1, trackinfo->title[i], UI_TITLEMAXLEN, COLOR_TEXT[colorflag]);
       }
     } else { /* else scroll down one line every 2s */
-      scrolloffset = (trackinfo->elapsedsec >> 1) % (trackinfo->titlescount + 3);
-      scrolloffset -= 3;
-      for (i = 0; i < 4; i++) {
+      scrolloffset = (trackinfo->elapsedsec >> 1) % (trackinfo->titlescount + 4);
+      scrolloffset -= 4;
+      for (i = 0; i < 5; i++) {
         if ((i + scrolloffset >= 0) && (i + scrolloffset < trackinfo->titlescount)) {
-          ui_printstr(19 + i, 1, trackinfo->title[i + scrolloffset], 78, COLOR_TEXT[colorflag]);
+          ui_printstr(18 + i, 1, trackinfo->title[i + scrolloffset], UI_TITLEMAXLEN, COLOR_TEXT[colorflag]);
         } else {
-          ui_printstr(19 + i, 1, "", 78, COLOR_TEXT[colorflag]);
+          ui_printstr(18 + i, 1, "", UI_TITLEMAXLEN, COLOR_TEXT[colorflag]);
         }
       }
     }

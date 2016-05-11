@@ -11,7 +11,7 @@ DOSMid v0.9 [xx xxx xxxx]
  - sound hardware is initialized once, instead of being inited for every song,
  - fixed playlist parsing so DOSMid won't freeze on an empty m3u playlist,
  - load more textual information from the MIDI file (titles, markers, text),
- - file's information is displayed on a dynamic scroll when over 4 lines,
+ - file's information is displayed on a dynamic scroll when over 5 lines,
  - DOSMid refuses to play corrupted files, instead of ignoring MIDI errors.
 
 DOSMid v0.8 [18 Sep 2015]
