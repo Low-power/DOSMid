@@ -235,7 +235,7 @@ static char *devtoname(enum outdev_types device, int devicesubtype) {
       if (devicesubtype == 3) return("COM3");
       if (devicesubtype == 4) return("COM4");
       return("COM");
-    case DEV_SBMIDI: return("SBMIDI");
+    case DEV_SBMIDI: return("SB");
     default:         return("UNK");
   }
 }
