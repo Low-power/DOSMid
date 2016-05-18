@@ -31,6 +31,7 @@
 
 #include <conio.h> /* inp(), out() */
 #include <dos.h>
+#include <i86.h>   /* delay() */
 #include <stdio.h>
 #include <stdlib.h> /* calloc() */
 #include <string.h> /* memset() */
@@ -183,7 +184,7 @@ static void calc_vol(unsigned char *regbyte, int volume) {
 /* Initialize hardware upon startup - positive on success, negative otherwise
  * Returns 0 for OPL2 initialization, or 1 if OPL3 has been detected */
 int opl_init(unsigned short port) {
-  int x, y, i;
+  int x, y;
 
   /* make sure we're not inited yet */
   if (oplmem != NULL) return(-1);
@@ -194,8 +195,11 @@ int opl_init(unsigned short port) {
   x = inp(port) & 0xE0; /* read the status register (port 388h) and store the result */
   oplregwr(port, 0x02, 0xff); /* write FFh to register 2 (Timer 1) */
   oplregwr(port, 0x04, 0x21); /* start timer 1 by writing 21h to register 4 */
-  i = 512;
-  while (i--) y = inp(port) & 0xE0; /* delay for at least 80 microseconds (and read the status register) */
+  delay(90);  /* delay for at least 80 microseconds (I delay for 90ms to make
+                 sure that the DOS timing resolution won't zero out my delay).
+                 DO NOT perform inp() calls for delay here, some cards do not
+                 initialize well then (reported for CT2760) */
+  y = inp(port) & 0xE0;  /* read the upper bits of the status register */
   oplregwr(port, 0x04, 0x60); /* reset both timers and interrupts (see steps 1 and 2) */
   oplregwr(port, 0x04, 0x80); /* reset both timers and interrupts (see steps 1 and 2) */
   /* test the stored results of steps 3 and 7 by ANDing them with E0h. The result of step 3 should be */

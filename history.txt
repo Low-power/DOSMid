@@ -12,6 +12,8 @@ DOSMid v0.9 [xx xxx xxxx]
  - fixed playlist parsing so DOSMid won't freeze on an empty m3u playlist,
  - load more textual information from the MIDI file (titles, markers, text),
  - file's information is displayed on a dynamic scroll when over 5 lines,
+ - reorganized the display so more MIDI textual data fits on the screen,
+ - fixed OPL detection for cards intolerant to hw calls during init (CT2760),
  - DOSMid refuses to play corrupted files, instead of ignoring MIDI errors.
 
 DOSMid v0.8 [18 Sep 2015]
