@@ -280,6 +280,8 @@ void dev_clear(void) {
   }
   /* load default GM instruments (even real MIDI synths do not always reset those properly) */
   for (i = 0; i < 16; i++) dev_setprog(i, i);
+  /* reset the device's master volume via sysex */
+  dev_sysex(0x7F, "\xF0\x7F\x7F\x04\x01\x7F\x7F\xF7", 8);
 }
 
 
