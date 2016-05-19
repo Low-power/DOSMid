@@ -59,12 +59,6 @@ enum playactions {
   ACTION_EXIT = 64
 };
 
-enum fileformats {
-  FORMAT_UNKNOWN,
-  FORMAT_MIDI,
-  FORMAT_RMID,
-  FORMAT_MUS
-};
 
 struct clioptions {
   int memmode;          /* type of memory to use: MEM_XMS or MEM_MALLOC */
@@ -813,7 +807,6 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
   FILE *fd;
   unsigned char hdr[16];
   enum playactions res;
-  enum fileformats fileformat;
 
   /* flush all MIDI events from memory for new events to have where to load */
   mem_clear();
@@ -834,16 +827,15 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
   rewind(fd);
 
   /* analyze the header to guess the format of the file */
-  fileformat = header2fileformat(hdr);
+  trackinfo->fileformat = header2fileformat(hdr);
 
   /* load file if format recognized */
-  switch (fileformat) {
+  switch (trackinfo->fileformat) {
     case FORMAT_MIDI:
     case FORMAT_RMID:
       res = loadfile_midi(fd, params, trackinfo, trackpos);
       break;
     case FORMAT_MUS:
-      /* memset(trackinfo, 0, sizeof(struct trackinfodata)); */ /* should I ? */
       *trackpos = mus_load(fd, &(trackinfo->totlen), &(trackinfo->miditimeunitdiv), &(trackinfo->channelsusage));
       if (*trackpos == MUS_OUTOFMEM) { /* detect out of memory */
         res = ACTION_ERR_SOFT;

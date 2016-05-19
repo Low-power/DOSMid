@@ -18,6 +18,13 @@
 #define UI_TITLENODES 12
 #define UI_FILENAMEMAXLEN 16
 
+enum fileformats {
+  FORMAT_UNKNOWN,
+  FORMAT_MIDI,
+  FORMAT_RMID,
+  FORMAT_MUS
+};
+
 struct trackinfodata {
   unsigned long tempo;
   unsigned long totlen; /* total length, in seconds */
@@ -27,6 +34,7 @@ struct trackinfodata {
   unsigned short miditimeunitdiv;
   unsigned char chanprogs[16];
   int titlescount;
+  enum fileformats fileformat;
   int midiformat;
   char title[UI_TITLENODES][UI_TITLEMAXLEN];
   char filename[UI_FILENAMEMAXLEN];

@@ -182,7 +182,7 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
   }
   /* tempo */
   if (*refreshflags & UI_REFRESH_TEMPO) {
-    char tempstr[16];
+    char tempstr[16], *sptr;
     unsigned long miditempo;
     /* print filename (unless NULL - might happen early at playlist load) */
     if (trackinfo->filename != NULL) {
@@ -191,8 +191,27 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
       ui_printstr(18, 50, "", 12, COLOR_TEMPO[colorflag]);
     }
     /* print format */
-    itoa(trackinfo->midiformat, tempstr, 10);
-    ui_printstr(20, 75, tempstr, 4, COLOR_TEMPO[colorflag]);
+    switch ((trackinfo->fileformat << 1) | trackinfo->midiformat) {
+      case FORMAT_MIDI << 1:
+        sptr = "MID0";
+        break;
+      case (FORMAT_MIDI << 1) | 1:
+        sptr = "MID1";
+        break;
+      case FORMAT_RMID << 1:
+        sptr = "RMI0";
+        break;
+      case (FORMAT_RMID << 1) | 1:
+        sptr = "RMI1";
+        break;
+      case FORMAT_MUS << 1:
+        sptr = "MUS";
+        break;
+      default:
+        sptr = "-";
+        break;
+    }
+    ui_printstr(20, 75, sptr, 4, COLOR_TEMPO[colorflag]);
     /* print tempo */
     if (trackinfo->tempo > 0) {
       miditempo = 60000000lu / trackinfo->tempo;
