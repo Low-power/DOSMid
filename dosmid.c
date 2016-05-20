@@ -165,16 +165,35 @@ static void filename2basename(char *fromname, char *tobasename, char *todirname,
 
 
 /* switch a string to upper case */
-static void ucase(char *s) {
+static void ucasestr(char *s) {
   for (; *s != 0; s++) if ((*s >= 'a') && (*s <= 'z')) *s -= 32;
 }
 
 
-/* checks whether str starts with start or not. returns 0 if so, non-zero otherwise */
+/* returns the lower-case version of c char, if applicable */
+static int lcase(char c) {
+  if ((c >= 'A') && (c <= 'Z')) return(c + 32);
+  return(c);
+}
+
+
+/* a case-insensitive version of strcmp() */
+static int strucmp(char *s1, char *s2) {
+  for (;;) {
+    if (lcase(*s1) != lcase(*s2)) return(1);
+    if (*s1 == 0) return(0);
+    s1++;
+    s2++;
+  }
+}
+
+
+/* checks whether str starts with start or not. returns 0 if so, non-zero
+ * otherwise - this function is case insensitive */
 static int stringstartswith(char *str, char *start) {
   if ((str == NULL) || (start == NULL)) return(-1);
   while (*start != 0) {
-    if (*start != *str) return(-1);
+    if (lcase(*start) != lcase(*str)) return(-1);
     str++;
     start++;
   }
@@ -292,19 +311,19 @@ static void getfileext(char *ext, char *filename, int limit) {
 /* interpret a single config argument, returns NULL on succes, or a pointer to
  * an error string otherwise */
 static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
-  if (strcmp(arg, "/noxms") == 0) {
+  if (strucmp(arg, "/noxms") == 0) {
     params->memmode = MEM_MALLOC;
-  } else if (strcmp(arg, "/delay") == 0) {
+  } else if (strucmp(arg, "/delay") == 0) {
     params->delay = 1;
-  } else if (strcmp(arg, "/fullcpu") == 0) {
+  } else if (strucmp(arg, "/fullcpu") == 0) {
     params->nopowersave = 1;
-  } else if (strcmp(arg, "/dontstop") == 0) {
+  } else if (strucmp(arg, "/dontstop") == 0) {
     params->dontstop = 1;
-  } else if (strcmp(arg, "/nosound") == 0) {
+  } else if (strucmp(arg, "/nosound") == 0) {
     params->device = DEV_NONE;
     params->devport = 0;
 #ifdef SBAWE
-  } else if (strcmp(arg, "/awe") == 0) {
+  } else if (strucmp(arg, "/awe") == 0) {
     params->device = DEV_AWE;
     params->devport = params->port_awe;
     /* if AWE port not found in BLASTER, use the default 0x620 */
@@ -314,13 +333,13 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
     params->devport = hexstr2uint(arg + 5);
     if (params->devport < 1) return("Invalid AWE port provided. Example: /awe=620");
 #endif
-  } else if (strcmp(arg, "/mpu") == 0) {
+  } else if (strucmp(arg, "/mpu") == 0) {
     params->device = DEV_MPU401;
     params->devport = params->port_mpu;
     /* if MPU port not found in BLASTER, use the default 0x330 */
     if (params->devport == 0) params->devport = 0x330;
 #ifdef OPL
-  } else if (strcmp(arg, "/opl") == 0) {
+  } else if (strucmp(arg, "/opl") == 0) {
     params->device = DEV_OPL;
     params->devport = 0x388;
   } else if (stringstartswith(arg, "/opl=") == 0) {
@@ -345,7 +364,7 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
     if ((params->devicesubtype < 1) || (params->devicesubtype > 4)) return("Invalid COM port provided. Example: /com1");
     params->devport = rs232_getport(params->devicesubtype);
     if (params->devport < 1) return("Failed to autodetect the I/O address of this COM port. Try using the /com=XXX option.");
-  } else if (strcmp(arg, "/sbmidi") == 0) {
+  } else if (strucmp(arg, "/sbmidi") == 0) {
     params->device = DEV_SBMIDI;
     params->devport = params->port_sb;
     /* if SB port not found in BLASTER, use the default 0x220 */
@@ -363,12 +382,12 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
     }
   } else if (stringstartswith(arg, "/syx=") == 0) {
     params->syxrst = arg + 5;
-  } else if ((strcmp(arg, "/?") == 0) || (strcmp(arg, "/h") == 0) || (strcmp(arg, "/help") == 0)) {
+  } else if ((strucmp(arg, "/?") == 0) || (strucmp(arg, "/h") == 0) || (strucmp(arg, "/help") == 0)) {
     return("");
   } else if ((fileallowed != 0) && (arg[0] != '/') && (params->midifile == NULL) && (params->playlist == NULL)) {
     char ext[4];
     getfileext(ext, arg, 4);
-    if (strcmp(ext, "m3u") == 0) {
+    if (strucmp(ext, "m3u") == 0) {
       params->playlist = arg;
     } else {
       params->midifile = arg;
@@ -905,7 +924,7 @@ static void init_trackinfo(struct trackinfodata *trackinfo, struct clioptions *p
   } else if (params->playlist != NULL) {
     filename2basename(params->playlist, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
   }
-  ucase(trackinfo->filename);
+  ucasestr(trackinfo->filename);
 }
 
 
@@ -988,7 +1007,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   /* load the file into memory */
   sprintf(trackinfo->title[0], "Loading...");
   filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
-  ucase(trackinfo->filename);
+  ucasestr(trackinfo->filename);
   ui_draw(trackinfo, &refreshflags, &refreshchans, PVER, params->devname, params->devport, volume);
   memset(trackinfo->title[0], 0, 16);
   refreshflags = 0xff;
