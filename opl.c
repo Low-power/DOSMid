@@ -560,6 +560,19 @@ static int opl_loadbank_internal(char *file, int offset) {
   return(0);
 }
 
+/*
+static void dump2file(void) {
+  FILE *fd;
+  int i;
+  fd = fopen("dump.txt", "wb");
+  if (fd == NULL) return;
+  for (i = 0; i < 256; i++) {
+    char *comma = "";
+    if (i < 255) comma = ",";
+    fprintf(fd, "{0x%07lX,0x%07lX,0x%02X,0x%02X,0x%02X,%d}%s\r\n", gmtimbres[i].modulator_E862, gmtimbres[i].carrier_E862, gmtimbres[i].modulator_40, gmtimbres[i].carrier_40, gmtimbres[i].feedconn, gmtimbres[i].finetune, comma);
+  }
+  fclose(fd);
+}*/
 
 int opl_loadbank(char *file) {
   char *instruments = NULL, *percussion = NULL;
@@ -580,6 +593,7 @@ int opl_loadbank(char *file) {
     res = opl_loadbank_internal(percussion, 128);
   }
   free(instruments);
+  /*dump2file();*/ /* dump instruments to a 'dump.txt' file */
   return(res);
 }
 
