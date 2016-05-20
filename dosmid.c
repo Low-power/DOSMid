@@ -814,10 +814,6 @@ static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struc
   if ((trackinfo->titlescount < UI_TITLENODES) && (copystring[0] != 0)) {
     memcpy(trackinfo->title[trackinfo->titlescount++], copystring, UI_TITLEMAXLEN);
   }
-  /* if no text data could be found at all, add a note about that */
-  if (trackinfo->titlescount == 0) {
-    strcpy(trackinfo->title[trackinfo->titlescount++], "<no title>");
-  }
   return(ACTION_NONE);
 }
 
@@ -873,8 +869,12 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
       ui_puterrmsg(params->midifile, "Error: Unknown file format");
       break;
   }
-
   fclose(fd);
+
+  /* if no text data could be found at all, add a note about that */
+  if ((res == ACTION_NONE) && (trackinfo->titlescount == 0)) {
+    strcpy(trackinfo->title[trackinfo->titlescount++], "<no title>");
+  }
 
   return(res);
 }
