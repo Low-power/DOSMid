@@ -15,6 +15,7 @@ DOSMid v0.9 [xx xxx xxxx]
  - reorganized the display so more MIDI textual data fits on the screen,
  - fixed OPL detection for cards intolerant to hw calls during init (CT2760),
  - command-line arguments are case-insensitive,
+ - renamed the /delay command-line option to /xmsdelay,
  - DOSMid refuses to play corrupted files, instead of ignoring MIDI errors.
 
 DOSMid v0.8 [18 Sep 2015]

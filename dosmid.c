@@ -62,7 +62,7 @@ enum playactions {
 
 struct clioptions {
   int memmode;          /* type of memory to use: MEM_XMS or MEM_MALLOC */
-  int delay;
+  int xmsdelay;
   unsigned short devport;
   unsigned short port_mpu;
   unsigned short port_awe;
@@ -261,7 +261,7 @@ static char *devtoname(enum outdev_types device, int devicesubtype) {
 
 
 /* analyzes a 16 bytes file header and guess the file format */
-enum fileformats header2fileformat(unsigned char *hdr) {
+static enum fileformats header2fileformat(unsigned char *hdr) {
   /* Classic MIDI */
   if ((hdr[0] == 'M') && (hdr[1] == 'T') && (hdr[2] == 'h') && (hdr[3] == 'd')) {
     return(FORMAT_MIDI);
@@ -313,8 +313,8 @@ static void getfileext(char *ext, char *filename, int limit) {
 static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
   if (strucmp(arg, "/noxms") == 0) {
     params->memmode = MEM_MALLOC;
-  } else if (strucmp(arg, "/delay") == 0) {
-    params->delay = 1;
+  } else if (strucmp(arg, "/xmsdelay") == 0) {
+    params->xmsdelay = 1;
   } else if (strucmp(arg, "/fullcpu") == 0) {
     params->nopowersave = 1;
   } else if (strucmp(arg, "/dontstop") == 0) {
@@ -490,7 +490,7 @@ static int compute_elapsed_time(unsigned long starttime, unsigned long *elapsed)
 
 /* check the event cache for a given event. to reset the cache, issue a single
  * call with trackpos < 0. */
-static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscache, long trackpos, int delay) {
+static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscache, long trackpos, int xmsdelay) {
   static unsigned int itemsincache = 0;
   static unsigned int curcachepos = 0;
   struct midi_event_t *res = NULL;
@@ -514,7 +514,7 @@ static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscac
         /* sleep 2ms after a MIDI OUT write, and before accessing XMS.
            This is especially important for SoundBlaster "AWE" cards with the
            AWEUTIL TSR midi emulation enabled, without this AWEUTIL crashes. */
-        if (delay != 0) udelay(2000);
+        if (xmsdelay != 0) udelay(2000);
         nextslot = curcachepos + itemsincache;
         nextevent = eventscache[nextslot & EVENTSCACHEMASK].next;
         while ((itemsincache < EVENTSCACHESIZE - 1) && (nextevent >= 0)) {
@@ -534,7 +534,7 @@ static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscac
       /* sleep 2ms after a MIDI OUT write, and before accessing XMS.
          this is especially important for SoundBlaster "AWE" cards with the
          AWEUTIL TSR midi emulation enabled, without this AWEUTIL crashes. */
-      if (delay != 0) udelay(2000);
+      if (xmsdelay != 0) udelay(2000);
       nextevent = trackpos;
       curcachepos = 0;
       for (refillcount = 0; refillcount < EVENTSCACHESIZE; refillcount++) {
@@ -1027,7 +1027,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   while (trackpos >= 0) {
 
     /* fetch next event */
-    curevent = getnexteventfromcache(eventscache, trackpos, params->delay);
+    curevent = getnexteventfromcache(eventscache, trackpos, params->xmsdelay);
     if (curevent == NULL) { /* abort on error */
       ui_puterrmsg(params->midifile, "Error: Memory access fault");
       exitaction = ACTION_ERR_HARD;
@@ -1203,14 +1203,13 @@ int main(int argc, char **argv) {
       printf("Error: %s\nRun DOSMID /? for additional help", errstr);
     } else {
       puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste\n"
+           "a MIDI player that plays MID, RMI and MUS files using a synth.\n"
            "\n"
-           "DOSMid is a MIDI player that reads *.MID or *.RMI files to drive a MIDI synth.\n"
-           "\n"
-           "Usage: dosmid [options] file.mid (or m3u playlist)\n"
+           "usage: dosmid [options] file.mid (or m3u playlist)\n"
            "\n"
            "options:\n"
            " /noxms     use conventional memory instead of XMS (loads tiny files only)\n"
-           " /delay     wait 2ms before accessing XMS memory (AWEUTIL compatibility)\n"
+           " /xmsdelay  wait 2ms before accessing XMS memory (AWEUTIL compatibility)\n"
            " /mpu[=XXX] use MPU-401 on I/O port XXX. /mpu reads port address from BLASTER\n"
 #ifdef SBAWE
            " /awe[=XXX] use the EMU8000 synth on SoundBlaster AWE cards, you can specify\n"
