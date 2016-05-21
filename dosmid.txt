@@ -48,7 +48,7 @@ DOSMID [options] file.mid (or m3u playlist)
            only if you don't have XMS. Don't use this option otherwise, since
            without XMS you won't be able to load MIDI files bigger than a few
            few dozen KiBs.
- /delay    Wait 2ms before each XMS access. Such waiting is required sometimes
+ /xmsdelay Wait 2ms before each XMS access. Such waiting is required sometimes
            when the MPU controller is emulated by a TSR driver (specifically,
            the AWEUTIL driver used with SoundBlaster AWE 32/64 cards happens
            to crash if XMS accesses are not slightly delayed).
