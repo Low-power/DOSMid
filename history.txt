@@ -4,6 +4,7 @@
 
 DOSMid v0.9.1 [xx xxx xxxx]
  - resetting channels to "all piano" before playing MIDI files,
+ - device reinitialization happens always before playing a song, not after,
  - ...
 
 DOSMid v0.9 [21 May 2016]
