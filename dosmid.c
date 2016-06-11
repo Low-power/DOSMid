@@ -964,6 +964,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   timer_reset();
   timer_read(&nexteventtime); /* save current time, to schedule when the song shall start */
 
+  if (params->logfd != NULL) fprintf(params->logfd, "Reset MPU\n");
+  dev_clear(); /* reinit the device */
+
   /* if a SYX init file is provided, feed it to the MIDI synth now */
   if (params->syxrst != NULL) {
     int syxlen;
@@ -1174,9 +1177,6 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
       }
     }
   }
-
-  if (params->logfd != NULL) fprintf(params->logfd, "Reset MPU\n");
-  dev_clear(); /* reinit the device */
 
   return(exitaction);
 }
