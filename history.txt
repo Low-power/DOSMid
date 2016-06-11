@@ -2,6 +2,10 @@
 * DOSMid history file *
 
 
+DOSMid v0.9.1 [xx xxx xxxx]
+ - resetting channels to "all piano" before playing MIDI files,
+ - ...
+
 DOSMid v0.9 [21 May 2016]
  - increased SYX delaying to 40ms (solves buffering troubles on MT-32 gears),
  - fixes around how OPL percussion instruments are emulated,
