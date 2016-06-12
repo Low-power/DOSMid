@@ -965,7 +965,13 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   timer_read(&nexteventtime); /* save current time, to schedule when the song shall start */
 
   if (params->logfd != NULL) fprintf(params->logfd, "Reset MPU\n");
-  dev_clear(); /* reinit the device */
+
+  /* load piano to all channels (even real MIDI synths do not always reset
+   * those properly) - this could just as well happen during dev_clear(), but
+   * there are users that happen to use DOSMid to init their MPU hardware,
+   * and resetting patches *after* the midi file played would break that
+   * usage for them */
+  for (i = 0; i < 16; i++) dev_setprog(i, 0);
 
   /* if a SYX init file is provided, feed it to the MIDI synth now */
   if (params->syxrst != NULL) {
@@ -1177,6 +1183,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
       }
     }
   }
+
+  /* reinit the device (all notes off, reset master volume, etc) */
+  dev_clear();
 
   return(exitaction);
 }
