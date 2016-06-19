@@ -43,7 +43,7 @@
 #include "timer.h"
 #include "ui.h"
 
-#define PVER "0.9.1"
+#define PVER "0.9.1 beta"
 #define PDATE "2014-2016"
 
 #define MAXTRACKS 64
@@ -381,7 +381,7 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
       }
     }
   } else if (stringstartswith(arg, "/syx=") == 0) {
-    params->syxrst = arg + 5;
+    params->syxrst = strdup(arg + 5);
   } else if ((strucmp(arg, "/?") == 0) || (strucmp(arg, "/h") == 0) || (strucmp(arg, "/help") == 0)) {
     return("");
   } else if ((fileallowed != 0) && (arg[0] != '/') && (params->midifile == NULL) && (params->playlist == NULL)) {
@@ -1357,8 +1357,9 @@ int main(int argc, char **argv) {
   free(trackinfo);
   free(eventscache);
 
-  /* free the sound bank string, if any was allocated */
+  /* free the allocated strings, if any */
   if (params.sbnk != NULL) free(params.sbnk);
+  if (params.syxrst != NULL) free(params.syxrst);
 
   /* if a verbose log file was used, close it now */
   if (params.logfd != NULL) {
