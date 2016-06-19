@@ -1011,7 +1011,8 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     }
     fclose(syxfd); /* close the syx file */
     free(sysexbuff);
-  }
+    udelay(100000lu); /* wait 100ms for MPU to apply settings - users report */
+  }                   /* that SC-55 takes up to 100ms to apply reverb        */
 
   /* load the file into memory */
   sprintf(trackinfo->title[0], "Loading...");
