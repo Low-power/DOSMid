@@ -75,6 +75,7 @@ struct clioptions {
   char *devname;    /* the human name of the out device (MPU, AWE..) */
   char *midifile;   /* MIDI filename to play */
   char *syxrst;     /* syx file to use for MIDI resets */
+  int delay;        /* additional delay to apply before playing a file */
   char *playlist;   /* the playlist to read files from */
   char *sbnk;       /* optional sound bank to use (IBK file or so) */
   FILE *logfd;      /* an open file descriptor to the debug log file */
@@ -382,6 +383,11 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
     }
   } else if (stringstartswith(arg, "/syx=") == 0) {
     params->syxrst = strdup(arg + 5);
+  } else if (stringstartswith(arg, "/delay=") == 0) {
+    params->delay = atoi(arg + 7);
+    if ((params->delay < 1) || (params->delay > 9000)) {
+      return("Invalid delay value: must be in the range 1..9000");
+    }
   } else if ((strucmp(arg, "/?") == 0) || (strucmp(arg, "/h") == 0) || (strucmp(arg, "/help") == 0)) {
     return("");
   } else if ((fileallowed != 0) && (arg[0] != '/') && (params->midifile == NULL) && (params->playlist == NULL)) {
@@ -1011,8 +1017,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     }
     fclose(syxfd); /* close the syx file */
     free(sysexbuff);
-    udelay(100000lu); /* wait 100ms for MPU to apply settings - users report */
-  }                   /* that SC-55 takes up to 100ms to apply reverb        */
+  }
 
   /* load the file into memory */
   sprintf(trackinfo->title[0], "Loading...");
@@ -1022,7 +1027,8 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   memset(trackinfo->title[0], 0, 16);
   refreshflags = 0xff;
 
-  if (params->playlist != NULL) nexteventtime += 2000000lu; /* playback starts no sooner than in 2s (for playlist listening comfort) */
+  if ((params->playlist != NULL) && (params->delay < 2000)) nexteventtime += (2000 - params->delay) * 1000; /* playback starts no sooner than in 2s (for playlist listening comfort) */
+  nexteventtime += params->delay * 1000; /* add the extra custom delay */
   exitaction = loadfile(params, trackinfo, &trackpos);
   if (exitaction != ACTION_NONE) return(exitaction);
   /* draw the gui with track's data */
@@ -1030,7 +1036,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   for (;;) {
     timer_read(&midiplaybackstart); /* save start time so we can compute elapsed time later */
     if (midiplaybackstart >= nexteventtime) break; /* wait until the scheduled start time is met */
-    if (midiplaybackstart + 5000000lu < nexteventtime) break; /* do not freeze on timer wraparound */
+    if (midiplaybackstart + 10000000lu < nexteventtime) break; /* do not freeze on timer wraparound */
   }
   nexteventtime = midiplaybackstart;
 

@@ -5,7 +5,7 @@
 DOSMid v0.9.1 [xx xxx xxxx]
  - resetting channels to "all piano" before playing MIDI files,
  - syx files can be set from within DOSMID.CFG now,
- - added a delay of 100ms after loading a syx file for MPU to apply settings,
+ - configurable extra delay before playing files (/delay=X),
  - ...
 
 DOSMid v0.9 [21 May 2016]

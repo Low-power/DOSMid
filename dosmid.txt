@@ -84,6 +84,12 @@ DOSMID [options] file.mid (or m3u playlist)
  /syx=FILE Uses SYSEX instructions stored in FILE for initializing the MIDI
            device. FILE must be in "SYX" format, and can contain one or more
            SYSEX messages.
+ /delay=X  Insert an extra delay of X ms (X being in the range 1..9000) before
+           playing the MIDI file. Setting this to 100 or 200 might help in
+           some cases where the sound hardware needs more time to initialize
+           completely, or when complex sysex data is fed via the /syx option.
+           You can also use this simply to make the silence longer between
+           the files of your playlist.
  /sbnk=FILE Makes DOSMid load a custom sound bank. This is supported only on
            OPL and AWE hardware. The sound bank file must be in the IBK format
            when used with OPL, and SBK format for AWE. OPL accepts one or two
