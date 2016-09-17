@@ -47,7 +47,7 @@ DOSMID [options] file.mid (or m3u playlist)
  /noxms    Use conventional memory instead of XMS. This is obviously useful
            only if you don't have XMS. Don't use this option otherwise, since
            without XMS you won't be able to load MIDI files bigger than a few
-           few dozen KiBs.
+           dozen KiBs.
  /xmsdelay Wait 2ms before each XMS access. Such waiting is required sometimes
            when the MPU controller is emulated by a TSR driver (specifically,
            the AWEUTIL driver used with SoundBlaster AWE 32/64 cards happens
@@ -65,11 +65,11 @@ DOSMID [options] file.mid (or m3u playlist)
            I observed this problem on an AWE64 CT4390 ("Gold"), but not on an
            AWE32 CT2760.
  /opl=XXX  Use an OPL2-compatible chip on port XXX. This should be a last
-           resort option if you don't have a wavetable device. Do NOT expect
-           pleasing results. The port part is optional ("/opl" will use port
-           388h by default).
+           resort option if you don't have any wavetable device. Do NOT expect
+           pleasing results. The port part is optional ("/opl" will default to
+           port 388h).
  /sbmidi=XXX Drives an external synth connected to the gameport of your Sound
-           Blaster card.  The port part is optional ("/sbmidi" will use the
+           Blaster card. The port part is optional ("/sbmidi" will use the
            port read from BLASTER, or fallback to 220h).
  /com=XXX  Send MIDI messages out via the RS232 port at I/O port XXX. This can
   or /com1 be used to hook a hardware synth to a computer with no MIDI
