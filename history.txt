@@ -2,11 +2,10 @@
 * DOSMid history file *
 
 
-DOSMid v0.9.1 [xx xxx xxxx]
+DOSMid v0.9.1 [19 Nov 2016]
  - resetting channels to "all piano" before playing MIDI files,
  - syx files can be set from within DOSMID.CFG now,
- - configurable extra delay before playing files (/delay=X),
- - ...
+ - configurable extra delay before playing files (/delay=X).
 
 DOSMid v0.9 [21 May 2016]
  - increased SYX delaying to 40ms (solves buffering troubles on MT-32 gears),
