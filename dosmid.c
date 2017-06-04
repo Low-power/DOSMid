@@ -372,7 +372,7 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
     if (params->devport == 0) params->devport = 0x220;
   } else if (stringstartswith(arg, "/sbmidi=") == 0) {
     params->device = DEV_SBMIDI;
-    params->devport = hexstr2uint(arg + 5);
+    params->devport = hexstr2uint(arg + 8);
     if (params->devport < 1) return("Invalid SBMIDI port provided. Example: /sbmidi=220");
   } else if (stringstartswith(arg, "/log=") == 0) {
     if (params->logfd == NULL) {
