@@ -106,6 +106,7 @@ DOSMID [options] file.mid (or m3u playlist)
            useful if you want to play a long playlist and don't care about
            bad MIDI files, simply skipping them (or if you play a single file
            and wish that DOSMid exit immediately if the file is unplayable).
+ /random   randomize playlist order
  /nosound  Disable sound (not very useful for a music player!)
 
 Note: All the above options can also be written to the DOSMID.CFG file. This
@@ -166,9 +167,16 @@ features compiled in, so you really should fiddle with FEATURES only in case
 you desperately need to lower DOSMid's memory footprint.
 
 
+*** CONTACT ***
+
+If you enjoy DOSMid, or noticed any bugs, I'd love to hear about it! You won't
+see my e-mail address here, but you will find contact information on my home
+page: http://mateusz.viste.fr
+
+
 *** LICENSE ***
 
-Copyright (C) 2014-2016 Mateusz Viste
+Copyright (C) 2014-2017 Mateusz Viste
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without

@@ -1,7 +1,7 @@
 /*
  * DOSMID - a low-requirement MIDI and MUS player for DOS
  *
- * Copyright (C) 2014-2016, Mateusz Viste
+ * Copyright (C) 2014-2017, Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,8 +43,8 @@
 #include "timer.h"
 #include "ui.h"
 
-#define PVER "0.9.1"
-#define PDATE "2014-2016"
+#define PVER "0.9.2 beta"
+#define PDATE "2014-2017"
 
 #define MAXTRACKS 64
 #define EVENTSCACHESIZE 64 /* *must* be a power of 2 !!! */
@@ -70,6 +70,7 @@ struct clioptions {
   unsigned short port_sb;
   int nopowersave;
   int dontstop;
+  int random;       /* randomize playlist order */
   enum outdev_types device;
   int devicesubtype;
   char *devname;    /* the human name of the out device (MPU, AWE..) */
@@ -320,6 +321,8 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
     params->nopowersave = 1;
   } else if (strucmp(arg, "/dontstop") == 0) {
     params->dontstop = 1;
+  } else if (strucmp(arg, "/random") == 0) {
+    params->random = 1;
   } else if (strucmp(arg, "/nosound") == 0) {
     params->device = DEV_NONE;
     params->devport = 0;
@@ -642,13 +645,12 @@ static void preload_outdev(struct clioptions *params) {
 
 
 /* reads a position from an M3U file and returns a ptr from static mem */
-static char *getnextm3uitem(char *playlist) {
+static char *getnextm3uitem(char *playlist, int randomize) {
   static char fnamebuf[256];
   char tempstr[256];
   long fsize;
-  long pos;
+  static long pos = 0;
   int slen;
-  char *ptr;
   FILE *fd;
   /* open the playlist and read its size */
   fd = fopen(playlist, "rb");
@@ -659,27 +661,56 @@ static char *getnextm3uitem(char *playlist) {
     fclose(fd);
     return(NULL);
   }
-  /* go to a random position (avoid last bytes, could be an empty \r\n record) */
-  pos = rand() % (fsize - 2);
+  if (randomize != 0) {
+    /* go to a random position (avoid last bytes, could be an empty \r\n record) */
+    pos = rand() % (fsize - 2);
+  }
   fseek(fd, pos, SEEK_SET);
   /* rewind back to nearest \n or 0 position */
-  while ((pos > 0) && (fgetc(fd) != '\n')) {
-    fseek(fd, -2, SEEK_CUR);
-    pos--;
+  while (pos > 0) {
+    if (fgetc(fd) != '\n') {
+      fseek(fd, -2, SEEK_CUR);
+      pos--;
+    } else {
+      pos++;
+      break;
+    }
   }
+
   /* read the string into fnamebuf */
-  slen = fread(fnamebuf, 1, sizeof(fnamebuf), fd);
-  if (slen > 0) {
-    fnamebuf[slen - 1] = 0;
-  } else {
-    fnamebuf[0] = 0;
+  slen = 0;
+  fnamebuf[0] = 0;
+  for (;;) {
+    int c = fgetc(fd);
+    if ((c == EOF) || (c == '\r') || (c == '\n')) break;
+    pos++;
+    fnamebuf[slen++] = c;
+    if (slen == sizeof(fnamebuf)) { /* overflow! */
+      fnamebuf[0] = 0;
+      break;
+    }
+    fnamebuf[slen] = 0;
   }
+
+  /* if sequential reading of the playlist, then jump to next entry */
+  if (randomize == 0) {
+    for (;;) {
+      int c = fgetc(fd);
+      if ((c == '\r') || (c == '\n')) {
+        pos++;
+      } else if (c == EOF) {
+        pos = 0;
+        break;
+      } else {
+        break;
+      }
+    }
+  }
+
   /* close the file descriptor */
   fclose(fd);
-  /* trim out the first line */
-  for (ptr = fnamebuf; *ptr != '\r' && *ptr != '\n' && *ptr != 0; ptr++);
-  *ptr = 0;
-  rtrim(fnamebuf); /* trim also leading spaces, if any */
+  /* trim any leading spaces, if any */
+  rtrim(fnamebuf);
   /* if empty, something went wrong */
   if (fnamebuf[0] == 0) return(NULL);
   /* if the file is a relative path, then prepend it with the path of the playlist */
@@ -959,7 +990,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 
   /* if running on a playlist, load next song */
   if (params->playlist != NULL) {
-    params->midifile = getnextm3uitem(params->playlist);
+    params->midifile = getnextm3uitem(params->playlist, params->random);
     if (params->midifile == NULL) {
       ui_puterrmsg("Playlist error", "Failed to fetch an entry from the playlist");
       return(ACTION_ERR_HARD); /* this must be a hard error otherwise DOSMid might be trapped into a loop */
@@ -1242,6 +1273,7 @@ int main(int argc, char **argv) {
            " /log=FILE  write highly verbose logs about DOSMid's activity to FILE\n"
            " /fullcpu   do not let DOSMid try to be CPU-friendly\n"
            " /dontstop  never wait for a keypress on error and continue the playlist\n"
+           " /random    randomize playlist order\n"
            " /nosound   disable sound output\n"
       );
     }
