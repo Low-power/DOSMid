@@ -161,7 +161,7 @@ Internal MIDI synthesizers:
 DOSMid is compiled with OpenWatcom. The entire build process is automated via
 a Makefile file, so if you wish to rebuild DOSMid, all you have to do is type
 "wmake". A few compile-time options are available to disable features you
-don't need. Edit the Makefile and adapt FEATURES to your likeness. The
+might not need: edit the Makefile and adapt FEATURES to your likeness. The
 FEATURES list is documented in the Makefile. The default build comes with all
 features compiled in, so you really should fiddle with FEATURES only in case
 you desperately need to lower DOSMid's memory footprint.
