@@ -1,7 +1,7 @@
 /*
  * Crude memory management for DOSMid
  *
- * Copyright (c) 2014, 2015 Mateusz Viste
+ * Copyright (C) 2014-2018 Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,8 +36,8 @@
 #include "mem.h" /* include self for control */
 
 
-#define LOWMEMBUFCOUNT 16    /* how many memory pools I can try using for 'noxms' allocations */
-#define LOWMEMBUFSIZE 32768u /* how big each memory pool is, in bytes */
+#define LOWMEMBUFCOUNT 64    /* how many memory pools I can try using for 'noxms' allocations */
+#define LOWMEMBUFSIZE  8192  /* how big each memory pool is, in bytes */
 
 static unsigned char far *mempool[LOWMEMBUFCOUNT];
 static int memmode = 0;
