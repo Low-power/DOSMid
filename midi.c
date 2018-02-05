@@ -297,8 +297,8 @@ static int ld_sysex(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned 
   int sysexleneven; /* can be int, guaranteed to be less than 4K */
   unsigned char *sysexbuff;
   midi_fetch_variablelen_fromfile(fd, &sysexlen); /* get length */
-  if (logfd != NULL) fprintf(logfd, "%lu: SYSEX EVENT OF %ld BYTES ON CHAN #%d\n", *tracklen, sysexlen, statusbyte & 0x0F);
   sysexlen += 1; /* add one byte for the status byte that is not counted, but that we will add to the top of the buffer later */
+  if (logfd != NULL) fprintf(logfd, "%lu: SYSEX EVENT OF %ld BYTES ON CHAN #%d\n", *tracklen, sysexlen, statusbyte & 0x0F);
   if (sysexlen > 4096) { /* skip SYSEX events that are more than 4K big */
     fseek(fd, sysexlen, SEEK_CUR);
     return(0);
