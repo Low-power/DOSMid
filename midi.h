@@ -1,7 +1,7 @@
 /*
  * A simple MIDI parsing library
  *
- * Copyright (C) 2014-2016 Mateusz Viste
+ * Copyright (C) 2014-2018 Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -97,8 +97,6 @@ struct midi_event_keypressure_t {
 
 struct midi_event_sysex_t {
   long sysexptr;
-  unsigned short sysexlen;
-  unsigned char chan;
 };
 
 struct midi_event_t {
@@ -125,7 +123,7 @@ int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned short *timeunitdiv
 long midi_track2events(FILE *fd, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen, unsigned short *channelsusage, FILE *logfd, unsigned long *tracklen);
 
 /* merge two MIDI tracks into a single (serialized) one. returns a "pointer"
- * to the unique track. I take care here to not allocate/free memory here.
+ * to the unique track. I take care not to allocate/free memory here.
  * All notes are already in RAM after all. totlen is filled with the total
  * time of the merged tracks (in miliseconds). */
 long midi_mergetrack(long t0, long t1, unsigned long *totlen, unsigned short timeunitdiv);

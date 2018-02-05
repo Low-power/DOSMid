@@ -1,7 +1,7 @@
 /*
  * A simple MIDI parsing library
  *
- * Copyright (c) 2014-2016 Mateusz Viste
+ * Copyright (C) 2014-2018 Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -304,19 +304,18 @@ static int ld_sysex(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned 
     return(0);
   }
   /* read the sysex string */
-  sysexleneven = sysexlen;
+  sysexleneven = sysexlen + 2; /* add two bytes for the sysex length that I will add in front of the actual sysex string */
   if ((sysexleneven & 1) != 0) sysexleneven++; /* make sysexleneven an even number (XMS moves MUST occur on even numbers of bytes) */
   sysexbuff = malloc(sysexleneven);
   if (sysexbuff == NULL) {
-    if (logfd != NULL) fprintf(logfd, "%lu: SYSEX MALLOC FAILED FOR %ld BYTES\n", *tracklen, sysexlen);
+    if (logfd != NULL) fprintf(logfd, "%lu: SYSEX MALLOC FAILED FOR %ld BYTES\n", *tracklen, sysexleneven);
     return(MIDI_OUTOFMEM);
   }
   event->type = EVENT_SYSEX;
-  event->data.sysex.sysexlen = sysexlen;
-  event->data.sysex.chan = statusbyte & 0x0F;
 
-  sysexbuff[0] = statusbyte; /* I store the entire sysex string in memory */
-  fread(sysexbuff + 1, 1, sysexlen - 1, fd); /* read sysexlen-1 because we already read the status byte */
+  ((unsigned short *)sysexbuff)[0] = sysexlen;
+  sysexbuff[2] = statusbyte; /* I store the entire sysex string in memory */
+  fread(sysexbuff + 3, 1, sysexlen - 1, fd); /* read sysexlen-1 because I have already read the status byte */
   event->data.sysex.sysexptr = mem_alloc(sysexleneven);
   if (event->data.sysex.sysexptr >= 0) {
     mem_push(sysexbuff, event->data.sysex.sysexptr, sysexleneven);

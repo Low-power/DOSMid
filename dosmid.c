@@ -1,7 +1,7 @@
 /*
  * DOSMID - a low-requirement MIDI and MUS player for DOS
  *
- * Copyright (C) 2014-2017, Mateusz Viste
+ * Copyright (C) 2014-2018, Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,8 +43,8 @@
 #include "timer.h"
 #include "ui.h"
 
-#define PVER "0.9.2"
-#define PDATE "2014-2017"
+#define PVER "0.9.3"
+#define PDATE "2014-2018"
 
 #define MAXTRACKS 64
 #define EVENTSCACHESIZE 64 /* *must* be a power of 2 !!! */
@@ -1175,17 +1175,25 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         dev_keypressure(curevent->data.keypressure.chan, curevent->data.keypressure.note, curevent->data.keypressure.pressure);
         break;
       case EVENT_SYSEX:
+      {
+        unsigned short sysexlen;
         if (params->logfd != NULL) {
-          fprintf(params->logfd, "%lu: SYSEX of %d bytes: F%Xh", trackinfo->elapsedsec, curevent->data.sysex.sysexlen, curevent->data.sysex.chan);
+          fprintf(params->logfd, "%lu: SYSEX", trackinfo->elapsedsec);
         }
-        i = curevent->data.sysex.sysexlen;
+        /* read two bytes from sysexptr so I know how long the thing is */
+        mem_pull(curevent->data.sysex.sysexptr, &sysexlen, 2);
+        if (params->logfd != NULL) {
+          fprintf(params->logfd, "%lu: SYSEX is %d bytes long", trackinfo->elapsedsec, sysexlen);
+        }
+        /* */
+        i = sysexlen;
         if ((i & 1) != 0) i++; /* XMS moves MUST occur on even-aligned data only */
         sysexbuff = malloc(i);
         if (sysexbuff != NULL) {
-          mem_pull(curevent->data.sysex.sysexptr, sysexbuff, i);
-          dev_sysex(curevent->data.sysex.chan, sysexbuff, curevent->data.sysex.sysexlen);
+          mem_pull(curevent->data.sysex.sysexptr, sysexbuff, i + 2);
+          dev_sysex(sysexbuff[2] & 0x0F, sysexbuff + 2, sysexlen);
           if (params->logfd != NULL) {
-            for (i = 0; i < curevent->data.sysex.sysexlen; i++) {
+            for (i = 0; i < sysexlen; i++) {
               fprintf(params->logfd, " %02Xh", sysexbuff[i]);
             }
             fprintf(params->logfd, "\n");
@@ -1195,6 +1203,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
           if (params->logfd != NULL) fprintf(params->logfd, " ERROR\n");
         }
         break;
+      }
       default:
         if (params->logfd != NULL) {
           fprintf(params->logfd, "%lu: ILLEGAL COMMAND: 0x%02X\n", trackinfo->elapsedsec, curevent->type);
