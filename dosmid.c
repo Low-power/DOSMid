@@ -1177,9 +1177,6 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
       case EVENT_SYSEX:
       {
         unsigned short sysexlen;
-        if (params->logfd != NULL) {
-          fprintf(params->logfd, "%lu: SYSEX", trackinfo->elapsedsec);
-        }
         /* read two bytes from sysexptr so I know how long the thing is */
         mem_pull(curevent->data.sysex.sysexptr, &sysexlen, 2);
         if (params->logfd != NULL) {
@@ -1194,7 +1191,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
           dev_sysex(sysexbuff[2] & 0x0F, sysexbuff + 2, sysexlen);
           if (params->logfd != NULL) {
             for (i = 0; i < sysexlen; i++) {
-              fprintf(params->logfd, " %02Xh", sysexbuff[i]);
+              fprintf(params->logfd, " %02Xh", sysexbuff[i + 2]);
             }
             fprintf(params->logfd, "\n");
           }
