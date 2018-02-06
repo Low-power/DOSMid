@@ -49,26 +49,20 @@ void ui_init(void) {
   oldmode = regs.h.al;
   /* set text mode 80x25 */
   regs.h.ah = 0x00;  /* set video mode */
+  screenptr = MK_FP(0xB800, 0);
+  colorflag = 0;
   switch (oldmode) {
     case 0: /* 40x25 BW */
-      colorflag = 0;
-      regs.h.al = 0x02;  /* 80x25 BW */
-      screenptr = MK_FP(0xB800, 0);
-      break;
     case 2: /* 80x25 BW */
-      colorflag = 0;
       regs.h.al = 0x02;  /* 80x25 BW */
-      screenptr = MK_FP(0xB800, 0);
       break;
     case 7: /* 80x25 BW HGC */
-      colorflag = 0;
       regs.h.al = 0x07;  /* 80x25 BW HGC */
       screenptr = MK_FP(0xB000, 0);
       break;
     default:
       colorflag = 1;
       regs.h.al = 0x03;  /* 80x25, 16 colors */
-      screenptr = MK_FP(0xB800, 0);
       break;
   }
   int86(0x10, &regs, &regs);
