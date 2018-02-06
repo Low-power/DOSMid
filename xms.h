@@ -1,7 +1,7 @@
 /*
  * XMS driver for DOSMid
  *
- * Copyright (c) 2014, 2015 Mateusz Viste
+ * Copyright (C) 2014-2018 Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,23 +31,23 @@
 #define xms_h_sentinel
 
 struct xms_struct {
-  unsigned int handle;
+  unsigned short handle;
   long memsize; /* allocated memory size, in bytes */
 };
 
 /* checks if a XMS driver is installed, inits it and allocates a memory block of memsize K-bytes.
  * if memsize is 0, then the maximum possible block will be allocated.
  * returns the amount of allocated memory (in K-bytes) on success, 0 otherwise. */
-unsigned int xms_init(struct xms_struct *xms, unsigned int memsize);
+unsigned int xms_init(struct xms_struct *xms, unsigned short memsize);
 
 /* free XMS memory */
 void xms_close(struct xms_struct *xms);
 
 /* copies a chunk of memory from conventional memory into the XMS block.
    returns 0 on sucess, non-zero otherwise. */
-int xms_push(struct xms_struct *xms, void far *src, unsigned int len, long xmsoffset);
+int xms_push(struct xms_struct *xms, void far *src, unsigned short len, long xmsoffset);
 
 /* copies a chunk of memory from the XMS block into conventional memory */
-int xms_pull(struct xms_struct *xms, long xmsoffset, void far *dst, unsigned int len);
+int xms_pull(struct xms_struct *xms, long xmsoffset, void far *dst, unsigned short len);
 
 #endif

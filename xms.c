@@ -1,7 +1,7 @@
 /*
  * XMS driver for DOSMid
  *
- * Copyright (c) 2014, 2015 Mateusz Viste
+ * Copyright (C) 2014-2018 Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,18 +37,18 @@ void far (*xmsdrv)(void);
 
 /* descriptor for XMS moves */
 struct xms_move {
-  long count;             /* number of bytes to move */
-  unsigned int srchandle; /* source handle (0 for real memory) */
-  long srcoffset;         /* source offset (or far pointer) */
-  unsigned int dsthandle; /* destination handle (0 for real memory) */
-  long dstoffset;         /* destination offset (or far pointer) */
+  long count;               /* number of bytes to move */
+  unsigned short srchandle; /* source handle (0 for real memory) */
+  long srcoffset;           /* source offset (or far pointer) */
+  unsigned short dsthandle; /* destination handle (0 for real memory) */
+  long dstoffset;           /* destination offset (or far pointer) */
 };
 
 
 /* used by xms_push() and xms_pull() to call the xms driver for data copy.
    returns 0 on success, non-zero otherwise */
 static int xms_move(struct xms_move far *xmove) {
-  unsigned int resax = 0;
+  unsigned short resax = 0;
   unsigned char resbl = 0;
   __asm {
     push bp                  ; save BP
@@ -71,7 +71,7 @@ static int xms_move(struct xms_move far *xmove) {
 
 /* returns the largest available block of free XMS memory */
 static unsigned int xms_memfree(void) {
-  unsigned int res = 0;
+  unsigned short res = 0;
   __asm {
     mov ah, 0x08
     call dword ptr [xmsdrv]  ; call the XMS driver
@@ -84,11 +84,11 @@ static unsigned int xms_memfree(void) {
 /* checks if a XMS driver is installed, inits it and allocates a memory block of memsize K-bytes.
  * if memsize is 0, then the maximum possible block will be allocated.
  * returns the amount of allocated memory (in K-bytes) on success, 0 otherwise. */
-unsigned int xms_init(struct xms_struct *xms, unsigned int memsize) {
+unsigned int xms_init(struct xms_struct *xms, unsigned short memsize) {
   union REGS regs;
   struct SREGS sregs;
-  unsigned int axres = 0, dxres = 0;
-  unsigned freemem;
+  unsigned short axres = 0, dxres = 0;
+  unsigned short freemem;
   /* check that an XMS driver is present */
   regs.x.ax = 0x4300;
   int86(0x2F, &regs, &regs);
@@ -121,7 +121,7 @@ unsigned int xms_init(struct xms_struct *xms, unsigned int memsize) {
 
 /* free XMS memory */
 void xms_close(struct xms_struct *xms) {
-  unsigned int handle;
+  unsigned short handle;
   handle = xms->handle;
   __asm {
     mov ah, 0x0a
@@ -135,7 +135,7 @@ void xms_close(struct xms_struct *xms) {
 
 /* copies a chunk of memory from conventional memory into the XMS block.
    returns 0 on sucess, non-zero otherwise. */
-int xms_push(struct xms_struct *xms, void far *src, unsigned int len, long xmsoffset) {
+int xms_push(struct xms_struct *xms, void far *src, unsigned short len, long xmsoffset) {
   int res;
   struct xms_move xmove, far *ptr;
   ptr = &xmove;
@@ -153,7 +153,7 @@ int xms_push(struct xms_struct *xms, void far *src, unsigned int len, long xmsof
 
 /* copies a chunk of memory from the XMS block into conventional memory.
    returns 0 on success, non-zero otherwise. */
-int xms_pull(struct xms_struct *xms, long xmsoffset, void far *dst, unsigned int len) {
+int xms_pull(struct xms_struct *xms, long xmsoffset, void far *dst, unsigned short len) {
   int res;
   struct xms_move xmove, far *ptr;
   ptr = &xmove;
