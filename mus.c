@@ -1,7 +1,7 @@
 /*
  * MUS loader for DOSMid
  *
- * Copyright (c) 2014, 2015 Mateusz Viste
+ * Copyright (C) 2014-2018 Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,7 +43,6 @@
  * or -1 on error. channelsusage contains 16 flags indicating what channels
  * are used. */
 long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsigned short *channelsusage) {
-  unsigned char remapchannel[16] = {0,1,2,3,4,5,6,7,8,15,10,11,12,13,14,9};
   unsigned char hdr_or_chanvol[16];
   unsigned short scorestart;
   int bytebuff, bytebuff2, loadflag = 0;
@@ -86,7 +85,11 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
     bytebuff >>= 3;
     event_dtime = bytebuff; /* if the 'last' bit is set, remember to read time after the event later */
     /* if channel is 15, it is percussion, and must be remapped to MIDI #9 */
-    event_channel = remapchannel[event_channel];
+    if (event_channel == 15) {
+      event_channel = 9;
+    } else if (event_channel == 9) {
+      event_channel = 15;
+    }
     /* clear out midievent to make room for the incoming MIDI message */
     memset(&midievent, 0, sizeof(struct midi_event_t));
     /* read complementary data, if any */
