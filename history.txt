@@ -2,7 +2,7 @@
 * DOSMid history file *
 
 
-DOSMid v0.9.3 [xx xxx xxxx]
+DOSMid v0.9.3 [06 Feb 2018]
  - memory optimization (25% less RAM needed when loading files),
  - improved memory usage when using /noxms.
 
