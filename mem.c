@@ -119,7 +119,6 @@ int pusheventqueue(struct midi_event_t *event, long *root) {
 
 
 /* returns a free eventid for a new event of sz bytes */
-/* TODO handle allocation of LOW MEM in different 'pools' */
 long mem_alloc(int sz) {
   long res;
   if (memmode == MEM_XMS) {
