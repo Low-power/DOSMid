@@ -102,7 +102,6 @@ struct midi_event_sysex_t {
 struct midi_event_t {
   long next;
   unsigned long deltatime;
-  enum midi_midievents type;
   union {
     struct midi_event_note_t note;
     struct midi_event_prog_t prog;
@@ -113,6 +112,7 @@ struct midi_event_t {
     struct midi_event_sysex_t sysex;
     unsigned long tempoval;
   } data;
+  enum midi_midievents type;
 };
 
 struct midi_chunk_t *midi_readchunk(FILE *fd);
