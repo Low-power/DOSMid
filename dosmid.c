@@ -949,11 +949,10 @@ static void pauseplay(unsigned long *starttime, unsigned long *nexteventtime, st
 
 
 static void init_trackinfo(struct trackinfodata *trackinfo, struct clioptions *params) {
-  int i;
   /* zero out the entire structure */
   memset(trackinfo, 0, sizeof(struct trackinfodata));
-  /* preload default GM instruments into channels and set initial tempo */
-  for (i = 0; i < 16; i++) trackinfo->chanprogs[i] = i;
+  /* preload piano into channels and set initial tempo */
+  /* for (i = 0; i < 16; i++) trackinfo->chanprogs[i] = 0; */ /* no need, already zeroed by memset() */
   trackinfo->tempo = 500000l;
   /* put a something into the 'filename' field - midi or playlist, anything */
   if (params->midifile != NULL) {

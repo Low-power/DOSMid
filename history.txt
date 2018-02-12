@@ -2,6 +2,9 @@
 * DOSMid history file *
 
 
+DOSMid v0.9.4 [xx xxx xxxx]
+ - UI displays channels as 'piano' if no instrument is explicitely loaded.
+
 DOSMid v0.9.3 [06 Feb 2018]
  - memory optimization (25% less RAM needed when loading files),
  - improved memory usage when using /noxms.
