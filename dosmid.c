@@ -32,7 +32,6 @@
 #include <limits.h> /* ULONG_MAX */
 #include <stdlib.h> /* malloc(), free(), rand() */
 #include <string.h> /* strcmp() */
-#include <time.h>
 
 #include "mem.h"
 #include "midi.h"
@@ -1310,11 +1309,15 @@ int main(int argc, char **argv) {
   /* populate trackinfo with initial data */
   init_trackinfo(trackinfo, &params);
 
-  /* init random numbers */
-  srand((unsigned int)time(NULL));
-
   /* initialize the high resolution timer */
   timer_init();
+
+  /* init random numbers */
+  {
+    unsigned long randseed;
+    timer_read(&randseed);
+    srand(randseed);
+  }
 
   /* init ui and hide the blinking cursor */
   ui_init();

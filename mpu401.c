@@ -30,8 +30,8 @@
 #include <dos.h>
 #include <conio.h>  /* inp() and outp() */
 #include <stdlib.h> /* NULL */
-#include <time.h>
 
+#include "timer.h"
 #include "mpu401.h"  /* include self for control */
 
 
@@ -57,15 +57,17 @@ void mpu401_waitwrite(int mpuport) {
 
 
 /* wait until it's okay for us to write to the MPU - but no longer than
- * timeout seconds. returns 0 on success, non-zero otherwise. */
+ * timeout ms. returns 0 on success, non-zero otherwise. */
 static int mpu401_waitwrite_timeout(int mpuport, int timeout) {
   int buff;
-  time_t notafter;
-  notafter = time(NULL) + timeout;
+  unsigned long curtime, notafter;
+  timer_read(&notafter);
+  notafter += timeout;
   for (;;) {
     buff = inp(MPU_STAT);
     if ((buff & 0x40) == 0) return(0);
-    if (time(NULL) >= notafter) return(-1);
+    timer_read(&curtime);
+    if (curtime >= notafter) return(-1);
   }
 }
 
@@ -87,17 +89,20 @@ void mpu401_waitread(int mpuport) {
 
 /* resets the MPU-401. returns 0 on success, non-zero otherwise. */
 int mpu401_rst(int mpuport) {
-  time_t timeout;
-  if (mpu401_waitwrite_timeout(mpuport, 2) != 0) return(-1);  /* wait for the MPU to accept bytes from us */
+  unsigned long curtime, timeout;
+  if (mpu401_waitwrite_timeout(mpuport, 2000) != 0) return(-1);  /* wait for the MPU to accept bytes from us */
   outp(MPU_STAT, 0xFF); /* Send MPU-401 RESET Command */
   /* note that some cards do not ACK on 0xFF ! that's why I should wait for a timeout here, and skip waiting if no answer after 1 or 2s */
   /* puts("wait ack"); */
-  timeout = time(NULL) + 2; /* timeout is 1-2s */
-  while (time(NULL) < timeout) {
+  timer_read(&timeout);
+  timeout += 2000; /* timeout is 2s */
+  for (;;) {
     /* wait for the MPU to hand a byte to us (we are waiting for an ACK) */
     if (mpu401_poll(mpuport) != 0) {
       if (inp(MPU_DATA) == 0xFE) break; /* if we got the ACK, continue */
     }
+    timer_read(&curtime);
+    if (curtime > timeout) break;
   }
   mpu401_flush(mpuport);
   return(0);
