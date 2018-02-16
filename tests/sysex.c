@@ -35,7 +35,7 @@ int main(void) {
   int i, x;
   unsigned char sysexbuff[] = {0xf0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x01, 0x30, 0x00, 0x00, 0xf7};
 
-  if (dev_init(DEVICE, DEVICEPORT) != 0) {
+  if (dev_init(DEVICE, DEVICEPORT, NULL) != 0) {
     puts("dev_init() failure");
     return(1);
   }
