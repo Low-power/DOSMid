@@ -1,7 +1,7 @@
 /*
  * Wrapper for outputing MIDI commands to different devices.
  *
- * Copyright (C) 2014-2016, Mateusz Viste
+ * Copyright (C) 2014-2018, Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,6 +36,7 @@
 #include "opl.h"
 #endif
 
+#include "gus.h"
 #include "mpu401.h"
 #include "rs232.h"
 #include "sbdsp.h"
@@ -121,6 +122,7 @@ static int awe_loadfont(char *filename) {
  *  DEV_OPL
  *  DEV_RS232
  *  DEV_SBMIDI
+ *  DEV_GUS
  *  DEV_NONE
  *
  * This should be called only ONCE, when program starts.
@@ -194,6 +196,9 @@ char *dev_init(enum outdev_types dev, unsigned short port, char *sbank) {
       if (dsp_reset(outport) != 0) return("SB DSP initialization failure");
       dsp_write(outport, 0x30); /* switch the MIDI I/O into polling mode */
       break;
+    case DEV_GUS:
+      gus_open(port);
+      break;
     case DEV_NONE:
       break;
   }
@@ -244,8 +249,12 @@ void dev_close(void) {
        * UART mode, it important that you send the DSP reset command to exit
        * the MIDI UART mode when your application terminates. */
       dsp_reset(outport); /* I don't use MIDI UART mode because it requires */
-      break;              /* DSP v2.x, but reseting the chip seems like a   */
-    case DEV_NONE:        /* good thing to do anyway                        */
+                          /* DSP v2.x, but reseting the chip seems like a   */
+      break;              /* good thing to do anyway                        */
+    case DEV_GUS:
+      gus_close();
+      break;
+    case DEV_NONE:
       break;
   }
 }
@@ -274,6 +283,9 @@ void dev_clear(void) {
 #ifdef OPL
       opl_clear(outport);
 #endif
+      break;
+    case DEV_GUS:
+      gus_allnotesoff();
       break;
     case DEV_NONE:
       break;
@@ -319,6 +331,11 @@ void dev_noteon(int channel, int note, int velocity) {
       dsp_write(outport, 0x38);             /* MIDI output */
       dsp_write(outport, velocity);         /* Send velocity */
       break;
+    case DEV_GUS:
+      gus_write(0x90 | channel);            /* Send note ON to selected channel */
+      gus_write(note);                      /* Send note number to turn ON */
+      gus_write(velocity);                  /* Send velocity */
+      break;
     case DEV_NONE:
       break;
   }
@@ -360,6 +377,11 @@ void dev_noteoff(int channel, int note) {
       dsp_write(outport, note);           /* Send note number to turn OFF */
       dsp_write(outport, 0x38);           /* MIDI output */
       dsp_write(outport, 64);             /* Send velocity */
+      break;
+    case DEV_GUS:
+      gus_write(0x80 | channel);   /* 'note off' + channel selector */
+      gus_write(note);             /* note number */
+      gus_write(64);               /* velocity */
       break;
     case DEV_NONE:
       break;
@@ -403,6 +425,11 @@ void dev_pitchwheel(int channel, int wheelvalue) {
       dsp_write(outport, 0x38);             /* MIDI output */
       dsp_write(outport, wheelvalue >> 7);  /* Send the highest (most significant) 7 bits of the wheel value */
       break;
+    case DEV_GUS:
+      gus_write(0xE0 | channel);   /* Send selected channel */
+      gus_write(wheelvalue & 127); /* Send the lowest (least significant) 7 bits of the wheel value */
+      gus_write(wheelvalue >> 7);  /* Send the highest (most significant) 7 bits of the wheel value */
+      break;
     case DEV_NONE:
       break;
   }
@@ -445,6 +472,11 @@ void dev_controller(int channel, int id, int val) {
       dsp_write(outport, 0x38);            /* MIDI output */
       dsp_write(outport, val);             /* Send controller's value */
       break;
+    case DEV_GUS:
+      gus_write(0xB0 | channel);           /* Send selected channel */
+      gus_write(id);                       /* Send the controller's id */
+      gus_write(val);                      /* Send controller's value */
+      break;
     case DEV_NONE:
       break;
   }
@@ -480,6 +512,10 @@ void dev_chanpressure(int channel, int pressure) {
       dsp_write(outport, 0xD0 | channel);  /* Send selected channel */
       dsp_write(outport, 0x38);            /* MIDI output */
       dsp_write(outport, pressure);        /* Send the pressure value */
+      break;
+    case DEV_GUS:
+      gus_write(0xD0 | channel);           /* Send selected channel */
+      gus_write(pressure);                 /* Send the pressure value */
       break;
     case DEV_NONE:
       break;
@@ -522,6 +558,11 @@ void dev_keypressure(int channel, int note, int pressure) {
       dsp_write(outport, 0x38);            /* MIDI output */
       dsp_write(outport, pressure);        /* Send the pressure value */
       break;
+    case DEV_GUS:
+      gus_write(0xA0 | channel);           /* Send selected channel */
+      gus_write(note);                     /* Send the note we target */
+      gus_write(pressure);                 /* Send the pressure value */
+      break;
     case DEV_NONE:
       break;
   }
@@ -549,6 +590,8 @@ void dev_tick(void) {
       /* while (rs232_read(outport) >= 0); */
       break;
     case DEV_SBMIDI:
+      break;
+    case DEV_GUS:
       break;
     case DEV_NONE:
       break;
@@ -587,6 +630,13 @@ void dev_setprog(int channel, int program) {
       dsp_write(outport, 0x38);           /* MIDI output */
       dsp_write(outport, program);        /* Send patch id */
       break;
+    case DEV_GUS:
+      /* NOTE I might (?) want to call gus_loadpatch() here */
+      /*if (channel == 9) program |= 128;
+      gus_loadpatch(program);*/
+      gus_write(0xC0 | channel);          /* Send channel */
+      gus_write(program);                 /* Send patch id */
+      break;
     case DEV_NONE:
       break;
   }
@@ -617,13 +667,18 @@ void dev_sysex(int channel, unsigned char *buff, int bufflen) {
       break;
     case DEV_RS232:
       for (x = 0; x < bufflen; x++) {
-        rs232_write(outport, buff[x]);        /* Send sysex data byte */
+        rs232_write(outport, buff[x]);      /* Send sysex data byte */
       }
       break;
     case DEV_SBMIDI:
       for (x = 0; x < bufflen; x++) {
         dsp_write(outport, 0x38);           /* MIDI output */
         dsp_write(outport, buff[x]);        /* Send sysex data byte */
+      }
+      break;
+    case DEV_GUS:
+      for (x = 0; x < bufflen; x++) {
+        gus_write(buff[x]);                 /* Send sysex data byte */
       }
       break;
     case DEV_NONE:

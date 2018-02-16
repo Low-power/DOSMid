@@ -18,7 +18,7 @@ MODE = c
 
 all: dosmid.exe
 
-dosmid.exe: dosmid.c mem.c midi.c mpu401.c mus.c opl.c outdev.c rs232.c sbdsp.c timer.c ui.c xms.c
+dosmid.exe: dosmid.c gus.c mem.c midi.c mpu401.c mus.c opl.c outdev.c rs232.c sbdsp.c timer.c ui.c xms.c
 	wcl -zp2 -lr -we -d0 -y -0 -s -m$(MODE) $(FEATURES) -wx -fe=dosmid.exe -fm=dosmid.map *.c awe32\rawe32$(MODE).lib
 	upx --8086 -9 dosmid.exe
 

@@ -1,7 +1,7 @@
 /*
  * Wrapper for outputing MIDI commands to different devices.
  *
- * Copyright (C) 2014-2016, Mateusz Viste
+ * Copyright (C) 2014-2018, Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,7 +38,8 @@ enum outdev_types {
   DEV_OPL2,
   DEV_OPL3,
   DEV_RS232,
-  DEV_SBMIDI
+  DEV_SBMIDI,
+  DEV_GUS
 };
 
 

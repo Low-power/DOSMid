@@ -33,6 +33,7 @@
 #include <stdlib.h> /* malloc(), free(), rand() */
 #include <string.h> /* strcmp() */
 
+#include "gus.h"
 #include "mem.h"
 #include "midi.h"
 #include "mus.h"
@@ -256,6 +257,7 @@ static char *devtoname(enum outdev_types device, int devicesubtype) {
       if (devicesubtype == 4) return("COM4");
       return("COM");
     case DEV_SBMIDI: return("SB");
+    case DEV_GUS:    return("GUS");
     default:         return("UNK");
   }
 }
@@ -341,6 +343,10 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
     params->devport = params->port_mpu;
     /* if MPU port not found in BLASTER, use the default 0x330 */
     if (params->devport == 0) params->devport = 0x330;
+  } else if (strucmp(arg, "/gus") == 0) {
+    params->device = DEV_GUS;
+    params->devport = gus_find();
+    if (params->devport < 1) return("GUS error: No ULTRAMID driver found");
 #ifdef OPL
   } else if (strucmp(arg, "/opl") == 0) {
     params->device = DEV_OPL;
@@ -631,6 +637,15 @@ static void preload_outdev(struct clioptions *params) {
   if (params->port_mpu > 0) {
     params->device = DEV_MPU401;
     params->devport = params->port_mpu;
+  }
+
+  /* if a GUS seems to be installed, let's try it */
+  if (getenv("ULTRADIR") != 0) {
+    int gusp = gus_find();
+    if (gusp > 0) {
+      params->device = DEV_GUS;
+      params->devport = gusp;
+    }
   }
 
   /* AWE is the most desirable, if present (and compiled in) */
@@ -1254,7 +1269,7 @@ int main(int argc, char **argv) {
       printf("Error: %s\nRun DOSMID /? for additional help", errstr);
     } else {
       puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste\n"
-           "a MIDI player that plays MID, RMI and MUS files using a synth.\n"
+           "a MIDI player that plays MID, RMI and MUS files.\n"
            "\n"
            "usage: dosmid [options] file.mid (or m3u playlist)\n"
            "\n"
@@ -1263,8 +1278,7 @@ int main(int argc, char **argv) {
            " /xmsdelay  wait 2ms before accessing XMS memory (AWEUTIL compatibility)\n"
            " /mpu[=XXX] use MPU-401 on I/O port XXX. /mpu reads port address from BLASTER\n"
 #ifdef SBAWE
-           " /awe[=XXX] use the EMU8000 synth on SoundBlaster AWE cards, you can specify\n"
-           "            the port if needed (read from BLASTER otherwise)\n"
+           " /awe[=XXX] use the EMU8K on SB AWE cards, port is optional (read from BLASTER)\n"
 #endif
 #ifdef OPL
            " /opl[=XXX] use an FM synthesis OPL2/OPL3 chip for sound output\n"
@@ -1272,6 +1286,7 @@ int main(int argc, char **argv) {
            " /sbmidi[=XXX] outputs MIDI to the SoundBlaster MIDI port at I/O addr XXX\n"
            " /com[=XXX] output MIDI messages to the RS-232 port at I/O address XXX\n"
            " /comX      same as /com=XXX, but takes a COM port instead (example: /com1)\n"
+           " /gus       use the Gravis UltraSound card (requires ULTRAMID)\n"
            " /syx=FILE  use SYSEX instructions from FILE for MIDI initialization\n"
            " /sbnk=FILE load a custom sound bank file(s) (IBK on OPL, SBK on AWE)\n"
            " /log=FILE  write highly verbose logs about DOSMid's activity to FILE\n"

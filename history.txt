@@ -3,7 +3,8 @@
 
 
 DOSMid v0.9.4 [xx xxx xxxx]
- - UI displays channels as 'piano' if no instrument is explicitely loaded.
+ - UI displays channels as 'piano' if no instrument is explicitely loaded,
+ - GUS support (requires the ULTRAMID TSR).
 
 DOSMid v0.9.3 [06 Feb 2018]
  - memory optimization (25% less RAM needed when loading files),
