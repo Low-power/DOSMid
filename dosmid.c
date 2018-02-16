@@ -1007,7 +1007,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
    * there are users that happen to use DOSMid to init their MPU hardware,
    * and resetting patches *after* the midi file played would break that
    * usage for them */
-  for (i = 0; i < 16; i++) dev_setprog(i, 0);
+  for (i = 0; i < 16; i++) if (i != 9) dev_setprog(i, 0); /* skip percussions */
 
   /* if a SYX init file is provided, feed it to the MIDI synth now */
   if (params->syxrst != NULL) {
