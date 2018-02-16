@@ -43,7 +43,7 @@
 #include "timer.h"
 #include "ui.h"
 
-#define PVER "0.9.3"
+#define PVER "0.9.4 beta"
 #define PDATE "2014-2018"
 
 #define MAXTRACKS 64
