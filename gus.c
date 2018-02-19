@@ -38,7 +38,7 @@
 static void (far *ultramidfn)(void);
 
 /* detect whether or not a GUS is present in the system (relying on the
- * ultramid API), returns ULTRAMID's vector, or -1 on error */
+ * ultramid API), returns ULTRAMID's vector, or 0 on error */
 int gus_find(void) {
   void far *vaddr;
   char far *sig;
@@ -48,10 +48,9 @@ int gus_find(void) {
   for (v = 0x78; v < 0x80; v++) {
     vaddr = _dos_getvect(v);
     sig = MK_FP(FP_SEG(vaddr), 0x103);
-    /*if (_fmemcmp(sig, "ULTRAMID", 8) == 0) return(v);*/
     if ((sig[0] == 'U') && (sig[1] == 'L') && (sig[2] == 'T') && (sig[3] == 'R') && (sig[4] == 'A') && (sig[5] == 'M') && (sig[6] == 'I') && (sig[7] == 'D')) return(v);
   }
-  return(-1);
+  return(0);
 }
 
 /* opens an ULTRAMID session */
