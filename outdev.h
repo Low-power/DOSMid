@@ -56,6 +56,9 @@ enum outdev_types {
  */
 char *dev_init(enum outdev_types dev, unsigned short port, char *sbank);
 
+/* pre-load a patch (so far needed only for GUS) */
+void dev_preloadpatch(enum outdev_types dev, int p);
+
 /* returns the device that has been inited/selected */
 enum outdev_types dev_getcurdev(void);
 

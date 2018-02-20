@@ -40,6 +40,9 @@ void gus_open(int v);
 /* preload patch p into memory */
 void gus_loadpatch(int p);
 
+/* unloads all patches from memory */
+void gus_unloadpatches(void);
+
 /* sends a MIDI byte to ULTRAMID */
 void gus_write(int b);
 

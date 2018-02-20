@@ -35,6 +35,6 @@
 /* loads a MUS file into memory, returns the id of the first event on success,
  * or -1 on error. channelsusage contains 16 flags indicating what channels
  * are used. */
-long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsigned short *channelsusage);
+long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsigned short *channelsusage, void *reqpatches);
 
 #endif

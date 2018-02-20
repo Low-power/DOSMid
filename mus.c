@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <string.h> /* memcpy() */
 
+#include "bitfield.h"
 #include "mem.h"
 #include "midi.h"
 
@@ -42,7 +43,7 @@
 /* loads a MUS file into memory, returns the id of the first event on success,
  * or -1 on error. channelsusage contains 16 flags indicating what channels
  * are used. */
-long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsigned short *channelsusage) {
+long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsigned short *channelsusage, void *reqpatches) {
   unsigned char hdr_or_chanvol[16];
   unsigned short scorestart;
   int bytebuff, bytebuff2, loadflag = 0;
@@ -114,6 +115,8 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
         } else {
           midievent.data.note.velocity = hdr_or_chanvol[event_channel];
         }
+        /* if percussion, note the associated instrument (program) as 'used' */
+        if (event_channel == 9) BIT_SET(reqpatches, bytebuff | 128);
         break;
       case 2: /* pitch wheel (1 byte follows) */
         /* MIDI says that pitch wheel is a 14bit value with the center being
@@ -140,6 +143,7 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
           midievent.type = EVENT_PROGCHAN;
           midievent.data.prog.prog = bytebuff2;
           midievent.data.note.chan = event_channel;
+          BIT_SET(reqpatches, bytebuff2);
         } else if ((bytebuff >= 1) && (bytebuff <= 9)) { /* else it maps directly to a MIDI controller message */
           int tmpmap[10] = {0,0,1,7,10,11,91,93,64,67}; /* map MUS controllers to MIDI controller IDs */
           midievent.type = EVENT_CONTROL;

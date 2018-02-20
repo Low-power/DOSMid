@@ -207,6 +207,26 @@ char *dev_init(enum outdev_types dev, unsigned short port, char *sbank) {
 }
 
 
+/* pre-load a patch (so far needed only for GUS) */
+void dev_preloadpatch(enum outdev_types dev, int p) {
+  switch (dev) {
+    case DEV_MPU401:
+    case DEV_AWE:
+    case DEV_OPL:
+    case DEV_OPL2:
+    case DEV_OPL3:
+    case DEV_RS232:
+    case DEV_SBMIDI:
+      break;
+    case DEV_GUS:
+      gus_loadpatch(p);
+      break;
+    case DEV_NONE:
+      break;
+  }
+}
+
+
 /* returns the device that has been inited/selected */
 enum outdev_types dev_getcurdev(void) {
   return(outdev);
@@ -261,7 +281,7 @@ void dev_close(void) {
 
 
 /* clears/reinits the out device (turns all sounds off...). this can be used
- * often (typically: between each song). */
+ * often (typically: between each song) */
 void dev_clear(void) {
   int i;
   /* iterate on MIDI channels and send 'off' messages */
@@ -286,6 +306,7 @@ void dev_clear(void) {
       break;
     case DEV_GUS:
       gus_allnotesoff();
+      gus_unloadpatches();
       break;
     case DEV_NONE:
       break;

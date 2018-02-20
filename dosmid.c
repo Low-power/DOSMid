@@ -33,6 +33,7 @@
 #include <stdlib.h> /* malloc(), free(), rand() */
 #include <string.h> /* strcmp() */
 
+#include "bitfield.h"
 #include "gus.h"
 #include "mem.h"
 #include "midi.h"
@@ -823,9 +824,9 @@ static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struc
     if (params->logfd != NULL) fprintf(params->logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, chunkmap[i].offset);
     fseek(fd, chunkmap[i].offset, SEEK_SET);
     if (i == 0) { /* copyright and text events are fetched from track 0 only */
-      newtrack = midi_track2events(fd, tracktitle, UI_TITLEMAXLEN, copystring, UI_TITLEMAXLEN, text, sizeof(text), &(trackinfo->channelsusage), params->logfd, &tracklen);
+      newtrack = midi_track2events(fd, tracktitle, UI_TITLEMAXLEN, copystring, UI_TITLEMAXLEN, text, sizeof(text), &(trackinfo->channelsusage), params->logfd, &tracklen, trackinfo->reqpatches);
     } else {
-      newtrack = midi_track2events(fd, tracktitle, UI_TITLEMAXLEN, NULL, 0, NULL, 0, &(trackinfo->channelsusage), params->logfd, &tracklen);
+      newtrack = midi_track2events(fd, tracktitle, UI_TITLEMAXLEN, NULL, 0, NULL, 0, &(trackinfo->channelsusage), params->logfd, &tracklen, trackinfo->reqpatches);
     }
     /* look for error conditions */
     if (newtrack == MIDI_OUTOFMEM) {
@@ -902,7 +903,7 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
       res = loadfile_midi(fd, params, trackinfo, trackpos);
       break;
     case FORMAT_MUS:
-      *trackpos = mus_load(fd, &(trackinfo->totlen), &(trackinfo->miditimeunitdiv), &(trackinfo->channelsusage));
+      *trackpos = mus_load(fd, &(trackinfo->totlen), &(trackinfo->miditimeunitdiv), &(trackinfo->channelsusage), trackinfo->reqpatches);
       if (*trackpos == MUS_OUTOFMEM) { /* detect out of memory */
         res = ACTION_ERR_SOFT;
         ui_puterrmsg(params->midifile, "Error: Out of memory");
@@ -1075,6 +1076,17 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   nexteventtime += params->delay * 1000; /* add the extra custom delay */
   exitaction = loadfile(params, trackinfo, &trackpos);
   if (exitaction != ACTION_NONE) return(exitaction);
+  /* if driving a GUS, preload needed MIDI patches up front */
+  if (params->device == DEV_GUS) {
+    int i;
+    dev_preloadpatch(params->device, 0); /* always load grand piano, since it's the default instrument and the midi track might omit loading it explicitely */
+    for (i = 0; i < 256; i++) {
+      if (BIT_GET(trackinfo->reqpatches, i) != 0) {
+        dev_preloadpatch(params->device, i);
+        if (params->logfd != NULL) fprintf(params->logfd, "preloading patch %d\n", i);
+      }
+    }
+  }
   /* draw the gui with track's data */
   ui_draw(trackinfo, &refreshflags, &refreshchans, PVER, params->devname, params->devport, volume);
   for (;;) {

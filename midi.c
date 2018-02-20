@@ -30,6 +30,7 @@
 #include <stdlib.h> /* malloc */
 #include <string.h> /* strcmp() */
 
+#include "bitfield.h"
 #include "mem.h"
 #include "midi.h"   /* include self for control */
 
@@ -331,7 +332,7 @@ static int ld_sysex(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned 
 }
 
 
-static int ld_note(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned char statusbyte, unsigned long *tracklen, unsigned short *channelsusage) {
+static int ld_note(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned char statusbyte, unsigned long *tracklen, unsigned short *channelsusage, void *reqpatches) {
   unsigned char ubuff[2]; /* micro buffer for loading data */
   switch (statusbyte & 0xF0) { /* I care only about NoteOn/NoteOff events */
     case 0x80:  /* Note OFF */
@@ -349,6 +350,8 @@ static int ld_note(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned c
       event->data.note.note = ubuff[0] & 127;
       event->data.note.velocity = ubuff[1];
       if (event->data.note.velocity == 0) event->type = EVENT_NOTEOFF; /* if no velocity, it's in fact a note OFF */
+      /* if it's percussion, mark the required patch */
+      if (event->data.note.chan == 9) BIT_SET(reqpatches, event->data.note.note | 128);
       break;
     case 0xA0:  /* key after-touch */
       /* puts("KEY AFTER-TOUCH"); */
@@ -369,7 +372,8 @@ static int ld_note(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned c
     case 0xC0:  /* program (patch) change */
       event->type = EVENT_PROGCHAN;
       event->data.prog.chan = statusbyte & 0x0F;
-      event->data.prog.prog = fgetc(fd);
+      event->data.prog.prog = fgetc(fd) & 127;
+      BIT_SET(reqpatches, event->data.prog.prog);
       break;
     case 0xD0:  /* channel after-touch (aka "channel pressure") */
       event->type = EVENT_CHANPRESSURE;
@@ -400,7 +404,7 @@ static int ld_note(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned c
  * returns MIDI_EMPTYTRACK if no event found in the track
  * returns MIDI_TRACKERROR if the track is corrupted
  * returns MIDI_OUTOFMEM if failed to store events in memory */
-long midi_track2events(FILE *fd, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen, unsigned short *channelsusage, FILE *logfd, unsigned long *tracklen) {
+long midi_track2events(FILE *fd, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen, unsigned short *channelsusage, FILE *logfd, unsigned long *tracklen, void *reqpatches) {
   unsigned long deltatime;
   unsigned char statusbyte = 0;
   struct midi_event_t event;
@@ -439,7 +443,7 @@ long midi_track2events(FILE *fd, char *title, int titlemaxlen, char *copyright, 
       r = ld_sysex(&event, fd, logfd, statusbyte, tracklen);
       if (r != 0) return(MIDI_TRACKERROR);
     } else if ((statusbyte >= 0x80) && (statusbyte <= 0xEF)) { /* else it's a note-related command */
-      r = ld_note(&event, fd, logfd, statusbyte, tracklen, channelsusage);
+      r = ld_note(&event, fd, logfd, statusbyte, tracklen, channelsusage, reqpatches);
       if (r != 0) return(MIDI_TRACKERROR);
     } else { /* else it's an error - free memory we allocated and return NULL */
       if (logfd != NULL) fprintf(logfd, "Err. at offset %04lX (bytebuff = 0x%02X)\n", ftell(fd), statusbyte);

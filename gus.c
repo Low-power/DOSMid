@@ -69,6 +69,13 @@ void gus_loadpatch(int p) {
   (*ultramidfn)();
 }
 
+/* unload all patches from memory */
+void gus_unloadpatches(void) {
+  /* TSR_UNLOAD_ALL_PATCHES (15) */
+  __asm mov ax, 15
+  (*ultramidfn)();
+}
+
 /* sends a MIDI byte to ULTRAMID */
 void gus_write(int b) {
   /* TSR_MIDI_OUT (16) */
