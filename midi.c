@@ -344,12 +344,15 @@ static int ld_note(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned c
       break;
     case 0x90:  /* Note ON */
       fread(ubuff, 1, 2, fd);
-      *channelsusage |= (1 << event->data.note.chan); /* update the channel usage flags */
       event->type = EVENT_NOTEON;
       event->data.note.chan = statusbyte & 0x0F;
       event->data.note.note = ubuff[0] & 127;
       event->data.note.velocity = ubuff[1];
-      if (event->data.note.velocity == 0) event->type = EVENT_NOTEOFF; /* if no velocity, it's in fact a note OFF */
+      if (event->data.note.velocity == 0) {
+        event->type = EVENT_NOTEOFF; /* if no velocity, it's in fact a note OFF */
+      } else {
+        *channelsusage |= (1 << event->data.note.chan); /* update the channel usage flags */
+      }
       /* if it's percussion, mark the required patch */
       if (event->data.note.chan == 9) BIT_SET(reqpatches, event->data.note.note | 128);
       break;
