@@ -9,7 +9,7 @@ DOSMid is a MIDI and MUS player for DOS. It's a real mode application designed
 to run on very modest hardware configurations. It plays standard MIDI files,
 as well as MIDI in RIFF (ie. RMID), and MUS tunes (as used by Id Software in
 numerous games like Doom, Heretic, Hexen, etc).
-DOSMid requires a MIDI-capable hardware available either via the standard
+DOSMid requires MIDI-capable hardware available either via the standard
 MPU-401 interface, or an RS-232 port, or an EMU8000 engine (as found on
 SoundBlaster 32/64 AWE series). Note, that some sound cards provide an MPU-401
 interface natively, although many need an additional 'wavetable' daughterboard
@@ -81,6 +81,7 @@ DOSMID [options] file.mid (or m3u playlist)
            to COM1 on most BIOS implementations).
            It is also possible to use simpler "/com1", "/com2", "/com3" and
            "/com4" switches. These will autodetect the correct I/O port.
+ /gus      Use the Gravis UltraSound card, relying on its ULTRAMID API.
  /syx=FILE Uses SYSEX instructions stored in FILE for initializing the MIDI
            device. FILE must be in "SYX" format, and can contain one or more
            SYSEX messages.
@@ -130,13 +131,15 @@ DOSMid can output directly to the card's MIDI port. If not instructed
 otherwise, DOSMid will always try to use the EMU8000 synth if found in the
 BLASTER string, and if not, it will use the MPU-401. If neither of them are
 found in the BLASTER string, or if there is no BLASTER variable at all, then
-DOSMid will try to fall back to FM synthesis on port 388h.
+DOSMid will try to fall back to FM synthesis on port 388h, unless an ULTRADIR
+environment variable is present, in which case it will try to detect a GUS
+through the ULTRAMID TSR API.
 
 
 *** COMPATIBLE SOUND HARDWARE ***
 
 DOSMid supports a variety of MIDI hardware. Here below I list the types of
-hardware that DOSMid can talk to, as well as a few examples.
+hardware that DOSMid can talk to:
 
 External MIDI synthesizers:
  - Connected through a MIDI/game port: either using an industry standard
@@ -152,6 +155,7 @@ Internal MIDI synthesizers:
    models, some versions of the HighScreen SoundBoostar 16, SoundBlaster 64
    cards using the 'AWEUTIL' MPU emulator,
  - Based on the EMU8000 chip (SoundBlaster 32, SoundBlaster 64),
+ - Gravis UltraSound (GUS) cards, through their ULTRAMID driver,
  - Based on an OPL2 or OPL3-compatible chip (most ISA sound cards from the
    nineties: Adlib, all SoundBlaster ISA models, Opti, AzTech...).
 
@@ -176,7 +180,7 @@ page: http://mateusz.viste.fr
 
 *** LICENSE ***
 
-Copyright (C) 2014-2017 Mateusz Viste
+Copyright (C) 2014-2018 Mateusz Viste
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
