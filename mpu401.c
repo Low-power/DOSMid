@@ -1,7 +1,7 @@
 /*
  * Library to access MPU-401 hardware
  *
- * Copyright (c) 2014, 2015, Mateusz Viste
+ * Copyright (C) 2014-2018 Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -57,8 +57,8 @@ void mpu401_waitwrite(int mpuport) {
 
 
 /* wait until it's okay for us to write to the MPU - but no longer than
- * timeout ms. returns 0 on success, non-zero otherwise. */
-static int mpu401_waitwrite_timeout(int mpuport, int timeout) {
+ * timeout us. returns 0 on success, non-zero otherwise. */
+static int mpu401_waitwrite_timeout(int mpuport, long timeout) {
   int buff;
   unsigned long curtime, notafter;
   timer_read(&notafter);
@@ -90,19 +90,19 @@ void mpu401_waitread(int mpuport) {
 /* resets the MPU-401. returns 0 on success, non-zero otherwise. */
 int mpu401_rst(int mpuport) {
   unsigned long curtime, timeout;
-  if (mpu401_waitwrite_timeout(mpuport, 2000) != 0) return(-1);  /* wait for the MPU to accept bytes from us */
+  if (mpu401_waitwrite_timeout(mpuport, 2000000l) != 0) return(-1);  /* wait for the MPU to accept bytes from us */
   outp(MPU_STAT, 0xFF); /* Send MPU-401 RESET Command */
   /* note that some cards do not ACK on 0xFF ! that's why I should wait for a timeout here, and skip waiting if no answer after 1 or 2s */
   /* puts("wait ack"); */
   timer_read(&timeout);
-  timeout += 2000; /* timeout is 2s */
+  timeout += 2000000l; /* timeout is 2s */
   for (;;) {
     /* wait for the MPU to hand a byte to us (we are waiting for an ACK) */
     if (mpu401_poll(mpuport) != 0) {
       if (inp(MPU_DATA) == 0xFE) break; /* if we got the ACK, continue */
     }
     timer_read(&curtime);
-    if (curtime > timeout) break;
+    if (curtime >= timeout) break;
   }
   mpu401_flush(mpuport);
   return(0);

@@ -1,7 +1,7 @@
 /*
  * Library to access MPU-401 hardware
  *
- * Copyright (c) 2014, 2015, Mateusz Viste
+ * Copyright (C) 2014-2018 Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,8 +33,7 @@
 /* wait until it's okay for us to write to the MPU */
 void mpu401_waitwrite(int mpuport);
 
-/* polls the midi interface - returns 0 if nothing is available to be read, non-zero otherwise.
-   note that this should be checked as often as possible - whenever UART have some bytes for you, you MUST read them out */
+/* polls the midi interface - returns 0 if nothing is available to be read, non-zero otherwise. note that this should be checked as often as possible - whenever UART have some bytes for you, you MUST read them out */
 int mpu401_poll(int mpuport);
 
 void mpu401_waitread(int mpuport);
