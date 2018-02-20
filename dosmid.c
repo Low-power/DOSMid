@@ -28,7 +28,7 @@
  */
 
 #include <dos.h>
-#include <stdio.h>  /* printf(), puts(), fopen()... */
+#include <stdio.h>  /* printf(), fopen()... */
 #include <limits.h> /* ULONG_MAX */
 #include <stdlib.h> /* malloc(), free(), rand() */
 #include <string.h> /* strcmp() */
@@ -130,6 +130,33 @@ static int exepath(char *result) {
   }
   result[lastsep + 1] = 0;
   return(lastsep + 1);
+}
+
+
+static void dos_puts(char *s) {
+  /* DOS 1+ - WRITE STRING TO STANDARD OUTPUT
+     AH = 09h
+     DS:DX -> '$'-terminated string */
+  unsigned short segm, offs;
+  segm = FP_SEG(s);
+  offs = FP_OFF(s);
+  __asm {
+    mov ah, 9
+    push ds
+    mov cx, segm
+    push cx
+    pop ds
+    mov dx, offs
+    int 21h
+    pop ds /* restore DS */
+    /* print out a CR/LF using INT21h AH=2 */
+    mov ah, 2
+    mov dl, 0dh
+    int 21h
+    mov ah, 2
+    mov dl, 0ah
+    int 21h
+  }
 }
 
 
@@ -1280,33 +1307,33 @@ int main(int argc, char **argv) {
     if (*errstr != 0) {
       printf("Error: %s\nRun DOSMID /? for additional help", errstr);
     } else {
-      puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste\n"
-           "a MIDI player that plays MID, RMI and MUS files.\n"
-           "\n"
-           "usage: dosmid [options] file.mid (or m3u playlist)\n"
-           "\n"
-           "options:\n"
-           " /noxms     use conventional memory instead of XMS (loads tiny files only)\n"
-           " /xmsdelay  wait 2ms before accessing XMS memory (AWEUTIL compatibility)\n"
-           " /mpu[=XXX] use MPU-401 on I/O port XXX. /mpu reads port address from BLASTER\n"
+      dos_puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste\r\n"
+               "a MIDI player that plays MID, RMI and MUS files.\r\n"
+               "\r\n"
+               "usage: dosmid [options] file.mid (or m3u playlist)\r\n"
+               "\r\n"
+               "options:\r\n"
+               " /noxms     use conventional memory instead of XMS (loads tiny files only)$");
+      dos_puts(" /xmsdelay  wait 2ms before accessing XMS memory (AWEUTIL compatibility)\r\n"
+               " /mpu[=XXX] use MPU-401 on I/O port XXX. /mpu reads port address from BLASTER\r\n"
 #ifdef SBAWE
-           " /awe[=XXX] use the EMU8K on SB AWE cards, port is optional (read from BLASTER)\n"
+               " /awe[=XXX] use the EMU8K on SB AWE cards, port is optional (read from BLASTER)\r\n"
 #endif
 #ifdef OPL
-           " /opl[=XXX] use an FM synthesis OPL2/OPL3 chip for sound output\n"
+               " /opl[=XXX] use an FM synthesis OPL2/OPL3 chip for sound output\r\n"
 #endif
-           " /sbmidi[=XXX] outputs MIDI to the SoundBlaster MIDI port at I/O addr XXX\n"
-           " /com[=XXX] output MIDI messages to the RS-232 port at I/O address XXX\n"
-           " /comX      same as /com=XXX, but takes a COM port instead (example: /com1)\n"
-           " /gus       use the Gravis UltraSound card (requires ULTRAMID)\n"
-           " /syx=FILE  use SYSEX instructions from FILE for MIDI initialization\n"
-           " /sbnk=FILE load a custom sound bank file(s) (IBK on OPL, SBK on AWE)\n"
-           " /log=FILE  write highly verbose logs about DOSMid's activity to FILE\n"
-           " /fullcpu   do not let DOSMid try to be CPU-friendly\n"
-           " /dontstop  never wait for a keypress on error and continue the playlist\n"
-           " /random    randomize playlist order\n"
-           " /nosound   disable sound output\n"
-      );
+               " /sbmidi[=XXX] outputs MIDI to the SoundBlaster MIDI port at I/O addr XXX$");
+      dos_puts(" /com[=XXX] output MIDI messages to the RS-232 port at I/O address XXX\r\n"
+               " /comX      same as /com=XXX, but takes a COM port instead (example: /com1)\r\n"
+               " /gus       use the Gravis UltraSound card (requires ULTRAMID)\r\n"
+               " /syx=FILE  use SYSEX instructions from FILE for MIDI initialization\r\n"
+               " /sbnk=FILE load a custom sound bank file(s) (IBK on OPL, SBK on AWE)$");
+      dos_puts(" /log=FILE  write highly verbose logs about DOSMid's activity to FILE\r\n"
+               " /fullcpu   do not let DOSMid try to be CPU-friendly\r\n"
+               " /dontstop  never wait for a keypress on error and continue the playlist\r\n"
+               " /random    randomize playlist order\r\n"
+               " /nosound   disable sound output\r\n"
+               "$");
     }
     return(1);
   }
@@ -1316,9 +1343,9 @@ int main(int argc, char **argv) {
   /* allocate the work memory */
   if (mem_init(params.memmode) == 0) {
     if (params.memmode == MEM_XMS) {
-      puts("ERROR: Memory init failed! No XMS maybe? Try /noxms.");
+      dos_puts("ERROR: Memory init failed! No XMS maybe? Try /noxms.$");
     } else {
-      puts("ERROR: Memory init failed!");
+      dos_puts("ERROR: Memory init failed!$");
     }
     return(1);
   }
@@ -1327,7 +1354,7 @@ int main(int argc, char **argv) {
   trackinfo = malloc(sizeof(struct trackinfodata));
   eventscache = malloc(sizeof(struct midi_event_t) * EVENTSCACHESIZE);
   if ((trackinfo == NULL) || (eventscache == NULL)) {
-    puts("ERROR: Out of memory! Free some conventional memory.");
+    dos_puts("ERROR: Out of memory! Free some conventional memory.$");
     mem_close();
     if (trackinfo != NULL) free(trackinfo);
     if (eventscache != NULL) free(eventscache);
@@ -1441,7 +1468,7 @@ int main(int argc, char **argv) {
     fclose(params.logfd);
   }
 
-  puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste ");
+  dos_puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste$");
 
   return(0);
 }
