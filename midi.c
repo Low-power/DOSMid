@@ -357,7 +357,6 @@ static int ld_note(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned c
       if (event->data.note.chan == 9) BIT_SET(reqpatches, event->data.note.note | 128);
       break;
     case 0xA0:  /* key after-touch */
-      /* puts("KEY AFTER-TOUCH"); */
       fread(ubuff, 1, 2, fd);
       event->type = EVENT_KEYPRESSURE;
       event->data.keypressure.chan = statusbyte & 0x0F;
@@ -365,7 +364,6 @@ static int ld_note(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned c
       event->data.keypressure.pressure = ubuff[1];
       break;
     case 0xB0:  /* control change */
-      /* puts("CONTROL CHANGE"); */
       fread(ubuff, 1, 2, fd);
       event->type = EVENT_CONTROL;
       event->data.control.chan = statusbyte & 0x0F;

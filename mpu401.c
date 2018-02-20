@@ -93,7 +93,6 @@ int mpu401_rst(int mpuport) {
   if (mpu401_waitwrite_timeout(mpuport, 2000000l) != 0) return(-1);  /* wait for the MPU to accept bytes from us */
   outp(MPU_STAT, 0xFF); /* Send MPU-401 RESET Command */
   /* note that some cards do not ACK on 0xFF ! that's why I should wait for a timeout here, and skip waiting if no answer after 1 or 2s */
-  /* puts("wait ack"); */
   timer_read(&timeout);
   timeout += 2000000l; /* timeout is 2s */
   for (;;) {
