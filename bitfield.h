@@ -10,9 +10,9 @@
 #ifndef bitfield_h
 
 /* set bit 'b' in bit array 'map' */
-#define BIT_SET(map, b) ((unsigned char *)map)[b >> 3] |= (1 << (b & 7))
+#define BIT_SET(map, b) ((unsigned char *)map)[(b) >> 3] |= (1 << ((b) & 7))
 
 /* get bit 'b' from bit array 'map' (0 if not set, non-zero otherwise) */
-#define BIT_GET(map, b) (((unsigned char *)map)[b >> 3] & (1 << (b & 7)))
+#define BIT_GET(map, b) (((unsigned char *)map)[(b) >> 3] & (1 << ((b) & 7)))
 
 #endif
