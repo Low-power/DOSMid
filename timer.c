@@ -141,12 +141,11 @@ void timer_init(void) {
 
   /* Install the timer_stop() routine to be called at exit */
   atexit(timer_stop);
-
 }
 
 
 /* This routine will return the present value of the time, as a number of
- * microseconds.  Interrupts are disabled during this time to prevent the
+ * microseconds. Interrupts are disabled during this time to prevent the
  * clock from changing while it is being read. */
 void timer_read(unsigned long *res) {
   /* Disable interrupts */

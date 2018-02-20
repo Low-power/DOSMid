@@ -1,6 +1,6 @@
 /*
  * This file is part of the DOSMid project.
- * Copyright (C) Mateusz Viste 2014-2015
+ * Copyright (C) Mateusz Viste 2014-2018
  *
  * This file contains the implementation of a more precise timer than that
  * provided by DOS. Routines are provided to increase the PIT clock rate to
@@ -34,9 +34,9 @@ void timer_stop(void);
  * its higher rate, but then it returns -1 to indicate the error. */
 void timer_init(void);
 
-/* This routine will return the present value of the time, which is
- * read from the nowtime structure. Interrupts are disabled during this
- * time to prevent the clock from changing while it is being read. */
+/* This routine will return the present value of the time, as a number of
+ * microseconds. Interrupts are disabled during this time to prevent the
+ * clock from changing while it is being read. */
 void timer_read(unsigned long *res);
 
 #endif
