@@ -159,6 +159,13 @@ static void dos_puts(char *s) {
   }
 }
 
+/* returns a pseudo-random number to be used as a seed for srand(), based on the DOS system timer */
+static unsigned short rnd_seed(void) {
+  union REGS regs;
+  regs.h.ah = 0x2C;
+  int86(0x21, &regs, &regs);
+  return(regs.x.dx); /* dh = seconds, dl = 1/100 seconds */
+}
 
 /* copies the base name of a file (ie without directory path) into a string */
 static void filename2basename(char *fromname, char *tobasename, char *todirname, int maxlen) {
@@ -1368,11 +1375,7 @@ int main(int argc, char **argv) {
   timer_init();
 
   /* init random numbers */
-  {
-    unsigned long randseed;
-    timer_read(&randseed);
-    srand(randseed);
-  }
+  srand(rnd_seed());
 
   /* init ui and hide the blinking cursor */
   ui_init();
