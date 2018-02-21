@@ -34,7 +34,7 @@
 #include <i86.h>   /* delay() */
 #include <stdio.h>
 #include <stdlib.h> /* calloc() */
-#include <string.h> /* memset() */
+#include <string.h> /* strdup() */
 
 #include "opl.h"
 
