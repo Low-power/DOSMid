@@ -364,7 +364,7 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
   } else if (stringstartswith(arg, "/awe=") == 0) {
     params->device = DEV_AWE;
     params->devport = hexstr2uint(arg + 5);
-    if (params->devport < 1) return("Invalid AWE port provided. Example: /awe=620");
+    if (params->devport < 1) return("Invalid AWE port provided. Example: /awe=620$");
 #endif
   } else if (strucmp(arg, "/mpu") == 0) {
     params->device = DEV_MPU401;
@@ -374,7 +374,7 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
   } else if (strucmp(arg, "/gus") == 0) {
     params->device = DEV_GUS;
     params->devport = gus_find();
-    if (params->devport < 1) return("GUS error: No ULTRAMID driver found");
+    if (params->devport < 1) return("GUS error: No ULTRAMID driver found$");
 #ifdef OPL
   } else if (strucmp(arg, "/opl") == 0) {
     params->device = DEV_OPL;
@@ -382,7 +382,7 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
   } else if (stringstartswith(arg, "/opl=") == 0) {
     params->device = DEV_OPL;
     params->devport = hexstr2uint(arg + 5);
-    if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388");
+    if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388$");
 #endif
   } else if (stringstartswith(arg, "/sbnk=") == 0) {
     if (params->sbnk != NULL) free(params->sbnk); /* drop last sbnk if already present, so a CLI sbnk would take precedence over a config-file sbnk */
@@ -390,17 +390,17 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
   } else if (stringstartswith(arg, "/mpu=") == 0) {
     params->device = DEV_MPU401;
     params->devport = hexstr2uint(arg + 5);
-    if (params->devport < 1) return("Invalid MPU port provided. Example: /mpu=330");
+    if (params->devport < 1) return("Invalid MPU port provided. Example: /mpu=330$");
   } else if (stringstartswith(arg, "/com=") == 0) {
     params->device = DEV_RS232;
     params->devport = hexstr2uint(arg + 5);
-    if (params->devport < 10) return("Invalid COM port provided. Example: /com=3f8");
+    if (params->devport < 10) return("Invalid COM port provided. Example: /com=3f8$");
   } else if (stringstartswith(arg, "/com") == 0) { /* must be compared AFTER "/com=" */
     params->device = DEV_RS232;
     params->devicesubtype = arg[4] - '0';
-    if ((params->devicesubtype < 1) || (params->devicesubtype > 4)) return("Invalid COM port provided. Example: /com1");
+    if ((params->devicesubtype < 1) || (params->devicesubtype > 4)) return("Invalid COM port provided. Example: /com1$");
     params->devport = rs232_getport(params->devicesubtype);
-    if (params->devport < 1) return("Failed to autodetect the I/O address of this COM port. Try using the /com=XXX option.");
+    if (params->devport < 1) return("Failed to autodetect the I/O address of this COM port. Try using the /com=XXX option.$");
   } else if (strucmp(arg, "/sbmidi") == 0) {
     params->device = DEV_SBMIDI;
     params->devport = params->port_sb;
@@ -409,12 +409,12 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
   } else if (stringstartswith(arg, "/sbmidi=") == 0) {
     params->device = DEV_SBMIDI;
     params->devport = hexstr2uint(arg + 8);
-    if (params->devport < 1) return("Invalid SBMIDI port provided. Example: /sbmidi=220");
+    if (params->devport < 1) return("Invalid SBMIDI port provided. Example: /sbmidi=220$");
   } else if (stringstartswith(arg, "/log=") == 0) {
     if (params->logfd == NULL) {
       params->logfd = fopen(arg + 5, "wb");
       if (params->logfd == NULL) {
-        return("Failed to open the debug log file.");
+        return("Failed to open the debug log file.$");
       }
     }
   } else if (stringstartswith(arg, "/syx=") == 0) {
@@ -422,7 +422,7 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
   } else if (stringstartswith(arg, "/delay=") == 0) {
     params->delay = atoi(arg + 7);
     if ((params->delay < 1) || (params->delay > 9000)) {
-      return("Invalid delay value: must be in the range 1..9000");
+      return("Invalid delay value: must be in the range 1..9000$");
     }
   } else if ((strucmp(arg, "/?") == 0) || (strucmp(arg, "/h") == 0) || (strucmp(arg, "/help") == 0)) {
     return("");
@@ -435,7 +435,7 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
       params->midifile = arg;
     }
   } else {
-    return("Unknown option.");
+    return("Unknown option.$");
   }
   return(NULL);
 }
@@ -506,7 +506,7 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
   }
   /* check if at least a MIDI filename have been provided */
   if ((params->midifile == NULL) && (params->playlist == NULL)) {
-    return("You have to provide the path to a MIDI file or a playlist to play.");
+    return("You have to provide the path to a MIDI file or a playlist to play.$");
   }
   /* all good */
   return(NULL);
@@ -1305,7 +1305,8 @@ int main(int argc, char **argv) {
   if (errstr == NULL) errstr = parseargv(argc, argv, &params);
   if (errstr != NULL) {
     if (*errstr != 0) {
-      printf("Error: %s\nRun DOSMID /? for additional help", errstr);
+      dos_puts(errstr);
+      dos_puts("Run DOSMID /? for additional help$");
     } else {
       dos_puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste\r\n"
                "a MIDI player that plays MID, RMI and MUS files.\r\n"
