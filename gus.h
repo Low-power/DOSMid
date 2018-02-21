@@ -29,6 +29,7 @@
  */
 
 #ifndef gus_h_sentinel
+#define gus_h_sentinel
 
 /* detect whether or not a GUS is present in the system (relying on the
  * ultramid API), returns ULTRAMID's vector, or -1 on error */
