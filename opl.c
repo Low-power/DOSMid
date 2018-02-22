@@ -32,12 +32,12 @@
 #include <conio.h> /* inp(), out() */
 #include <dos.h>
 #include <i86.h>   /* delay() */
-#include <stdio.h>
 #include <stdlib.h> /* calloc() */
 #include <string.h> /* strdup() */
 
 #include "opl.h"
 
+#include "fio.h"
 #include "opl-gm.h"
 
 struct voicealloc_t {
@@ -509,27 +509,25 @@ void opl_midi_noteoff(unsigned short port, int channel, int note) {
 static int opl_loadbank_internal(char *file, int offset) {
   unsigned char buff[16];
   int i;
-  FILE *fd;
+  int fhandle;
   /* open the IBK file */
-  fd = fopen(file, "rb");
-  if (fd == NULL) return(-1);
+  if (fio_open(file, FIO_OPEN_RD, &fhandle) != 0) return(-1);
   /* file must be exactly 3204 bytes long */
-  fseek(fd, 0, SEEK_END);
-  if (ftell(fd) != 3204) {
-    fclose(fd);
+  if (fio_seek(fhandle, FIO_SEEK_END, 0) != 3204) {
+    fio_close(fhandle);
     return(-2);
   }
-  rewind(fd);
+  fio_seek(fhandle, FIO_SEEK_START, 0);
   /* file must start with an IBK header */
-  if ((fread(buff, 1, 4, fd) != 4) || (buff[0] != 'I') || (buff[1] != 'B') || (buff[2] != 'K') || (buff[3] != 0x1A)) {
-    fclose(fd);
+  if ((fio_read(fhandle, buff, 4) != 4) || (buff[0] != 'I') || (buff[1] != 'B') || (buff[2] != 'K') || (buff[3] != 0x1A)) {
+    fio_close(fhandle);
     return(-3);
   }
   /* load 128 instruments from the IBK file */
   for (i = offset; i < 128 + offset; i++) {
     /* load instruments */
-    if (fread(buff, 1, 16, fd) != 16) {
-      fclose(fd);
+    if (fio_read(fhandle, buff, 16) != 16) {
+      fio_close(fhandle);
       return(-4);
     }
     /* load modulator */
@@ -556,7 +554,7 @@ static int opl_loadbank_internal(char *file, int offset) {
     gmtimbres[i].finetune = buff[12]; /* used only in some IBK files */
   }
   /* close file and return success */
-  fclose(fd);
+  fio_close(fhandle);
   return(0);
 }
 
