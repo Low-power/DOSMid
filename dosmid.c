@@ -34,6 +34,7 @@
 #include <string.h> /* strcmp() */
 
 #include "bitfield.h"
+#include "fio.h"
 #include "gus.h"
 #include "mem.h"
 #include "midi.h"
@@ -471,19 +472,18 @@ static char *loadconfigfile(struct clioptions *params) {
   char buff[128 + 12]; /* 128 for exepath plus 8+3 for the config file */
   int r;
   char *res = NULL;
-  FILE *fd;
+  int fhandle;
   /* prepare config file's full path */
   r = exepath(buff);
   if (r < 1) return(NULL);
   /* append the config file itself */
   sprintf(buff + r, "dosmid.cfg");
   /* open file */
-  fd = fopen(buff, "r");
-  if (fd == NULL) return(NULL);
+  if (fio_open(buff, FIO_OPEN_RD, &fhandle) != 0) return(NULL);
   for (;;) {
     /* read line & trim */
-    res = fgets(buff, sizeof(buff) - 1, fd);
-    if (res == NULL) break; /* stop on EOF */
+    r = fio_getline(fhandle, buff, sizeof(buff));
+    if (r < 0) break; /* stop on EOF */
     if (*buff == '#') continue; /* skip comments */
     rtrim(buff);
     if (*buff == 0) continue; /* skip empty lines */
@@ -492,7 +492,7 @@ static char *loadconfigfile(struct clioptions *params) {
     if (res != NULL) break;
   }
   /* close file */
-  fclose(fd);
+  fio_close(fhandle);
   return(res);
 }
 
