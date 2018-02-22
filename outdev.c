@@ -29,7 +29,6 @@
 
 #include <conio.h> /* outp(), inp() */
 #include <dos.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 #ifdef OPL
