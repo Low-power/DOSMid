@@ -23,8 +23,8 @@ int fio_open(char far *fname, int mode, int *fhandle);
 /* reads count bytes from file pointed at by fhandle, and writes the data into buff. returns the number of bytes actually read */
 int fio_read(int fhandle, void far *buff, int count);
 
-/* seek to offset position of file pointed at by fhandle. returns 0 on success, non-zero otherwise */
-unsigned short fio_seek(unsigned short fhandle, unsigned short origin, signed long offset);
+/* seek to offset position of file pointed at by fhandle. returns current file position on success, a negative error otherwise */
+signed long fio_seek(unsigned short fhandle, unsigned short origin, signed long offset);
 
 /* close file handle. returns 0 on success, non-zero otherwise */
 int fio_close(int fhandle);

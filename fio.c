@@ -12,8 +12,8 @@
 
 #include "fio.h" /* include self for control */
 
-/* seek to offset position of file pointed at by fhandle. returns 0 on success, non-zero otherwise */
-unsigned short fio_seek(unsigned short fhandle, unsigned short origin, signed long offset) {
+/* seek to offset position of file pointed at by fhandle. returns current file position on success, a negative error otherwise */
+signed long fio_seek(unsigned short fhandle, unsigned short origin, signed long offset) {
 /* DOS 2+ - LSEEK - SET CURRENT FILE POSITION
    AH = 42h
    AL = origin of move
@@ -21,7 +21,13 @@ unsigned short fio_seek(unsigned short fhandle, unsigned short origin, signed lo
      01h current file position
      02h end of file
    BX = file handle
-   CX:DX = (signed) offset from origin of new file position */
+   CX:DX = (signed) offset from origin of new file position
+   Return on success:
+     CF clear
+     DX:AX = new file position in bytes from start of file
+   Return on error:
+     CF set
+     AX = error code */
   union REGS regs;
   unsigned short *off = (unsigned short *)(&offset);
   regs.h.ah = 0x42;
@@ -31,7 +37,7 @@ unsigned short fio_seek(unsigned short fhandle, unsigned short origin, signed lo
   regs.x.dx = off[0];
   int86(0x21, &regs, &regs);
   if (regs.x.cflag != 0) return(0 - regs.x.ax);
-  return(0);
+  return(((long)regs.x.dx << 16) | regs.x.ax);
 }
 
 /* open file fname and set fhandle with the associated file handle. returns 0 on success, non-zero otherwise */
