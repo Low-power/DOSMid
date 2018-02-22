@@ -40,6 +40,29 @@ signed long fio_seek(unsigned short fhandle, unsigned short origin, signed long 
   return(((long)regs.x.dx << 16) | regs.x.ax);
 }
 
+/* reads a line from file pointed at by fhandle, fill buff up to buflen bytes. returns the line length (possibly longer than buflen), or -1 on EOF */
+int fio_getline(int fhandle, void far *buff, short buflen) {
+  unsigned char bytebuf;
+  short linelen = 0;
+  buflen--; /* leave space for the zero terminator */
+  for (;;) {
+    if (fio_read(fhandle, &bytebuf, 1) == 0) { /* EOF */
+      if (linelen == 0) linelen = -1;
+      break;
+    }
+    if (bytebuf == '\n') break;
+    if (bytebuf == '\r') continue;
+    linelen++;
+    if (buflen > 0) {
+      buflen--;
+      *((unsigned char far *)buff) = bytebuf;
+      buff = ((unsigned char far *)buff) + 1;
+    }
+  }
+  *((unsigned char far *)buff) = 0;
+  return(linelen);
+}
+
 /* open file fname and set fhandle with the associated file handle. returns 0 on success, non-zero otherwise */
 int fio_open(char far *fname, int mode, int *fhandle) {
   /* DOS 2+ - OPEN - OPEN EXISTING FILE

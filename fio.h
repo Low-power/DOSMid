@@ -26,6 +26,9 @@ int fio_read(int fhandle, void far *buff, int count);
 /* seek to offset position of file pointed at by fhandle. returns current file position on success, a negative error otherwise */
 signed long fio_seek(unsigned short fhandle, unsigned short origin, signed long offset);
 
+/* reads a line from file pointed at by fhandle, fill buff up to buflen bytes. returns the line length (possibly longer than buflen) */
+int fio_getline(int fhandle, void far *buff, short buflen);
+
 /* close file handle. returns 0 on success, non-zero otherwise */
 int fio_close(int fhandle);
 
