@@ -14,7 +14,7 @@ FEATURES = -DSBAWE -DOPL
 #  compact    64K  | 64K+
 #  medium     64K+ | 64K
 #  large      64K+ | 64K+
-MODE = s
+MODE = c
 
 all: dosmid.exe
 
