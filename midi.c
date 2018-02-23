@@ -58,7 +58,6 @@ static int midi_fetch_variablelen_fromfile(int fh, unsigned long *result) {
 static int midi_getchunkmap(int fh, struct midi_chunkmap_t *chunklist, int maxchunks) {
   int chunkid, i;
   unsigned char hdr[8];
-  /*unsigned long chunklen;*/
   for (chunkid = 0; chunkid < maxchunks; chunkid++) {
     if (fio_read(fh, hdr, 8) != 8) break;
     chunklist[chunkid].offset = fio_seek(fh, FIO_SEEK_CUR, 0);
