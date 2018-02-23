@@ -35,9 +35,9 @@
 #include "mem.h"
 #include "midi.h"   /* include self for control */
 
+#define BSWAPL(x) ((((unsigned long)(x) & 0x000000FFul) << 24) | (((unsigned long)(x) & 0x0000FF00ul) << 8) | (((unsigned long)(x) & 0x00FF0000ul) >> 8) | (((unsigned long)(x) & 0xFF000000ul) >> 24))
 
 /* PRIVATE ROUTINES USED FOR INTERNAL PROCESSING ONLY */
-
 
 /* fetch a variable length quantity value from a given offset. returns number of bytes read */
 static int midi_fetch_variablelen_fromfile(int fh, unsigned long *result) {
@@ -56,20 +56,15 @@ static int midi_fetch_variablelen_fromfile(int fh, unsigned long *result) {
 
 /* reads a MIDI file and computes a map of chunks (ie a list of offsets) */
 static int midi_getchunkmap(int fh, struct midi_chunkmap_t *chunklist, int maxchunks) {
-  int chunkid, i;
-  unsigned char hdr[8];
+  int chunkid;
   for (chunkid = 0; chunkid < maxchunks; chunkid++) {
-    if (fio_read(fh, hdr, 8) != 8) break;
-    chunklist[chunkid].offset = fio_seek(fh, FIO_SEEK_CUR, 0);
     /* read chunk's id */
-    for (i = 0; i < 4; i++) chunklist[chunkid].id[i] = hdr[i];
-    chunklist[chunkid].id[4] = 0; /* string terminator */
+    if (fio_read(fh, chunklist[chunkid].id, 4) != 4) break;
     /* compute the length */
-    chunklist[chunkid].len = 0;
-    for (i = 4; i < 8; i++) {
-      chunklist[chunkid].len <<= 8;
-      chunklist[chunkid].len |= hdr[i];
-    }
+    if (fio_read(fh, &(chunklist[chunkid].len), 4) != 4) break;
+    chunklist[chunkid].len = BSWAPL(chunklist[chunkid].len);
+    /* remember chunk data offset */
+    chunklist[chunkid].offset = fio_seek(fh, FIO_SEEK_CUR, 0);
     /* skip to next chunk */
     fio_seek(fh, FIO_SEEK_CUR, chunklist[chunkid].len);
   }
@@ -81,25 +76,22 @@ static int midi_getchunkmap(int fh, struct midi_chunkmap_t *chunklist, int maxch
 
 
 struct midi_chunk_t *midi_readchunk(int fh) {
-  unsigned char hdr[8];
-  int i;
+  unsigned char id[4];
   unsigned long len = 0;
   struct midi_chunk_t *res;
-  if (fio_read(fh, hdr, 8) != 8) return(NULL);
-  /* compute the length */
-  for (i = 4; i < 8; i++) {
-    len <<= 8;
-    len |= hdr[i];
-  }
+  if (fio_read(fh, id, 4) != 4) return(NULL);
+  /* fetch the length */
+  if (fio_read(fh, &len, 4) != 4) return(NULL);
+  /* */
   res = malloc(sizeof(struct midi_chunk_t) + (unsigned int)len);
   if (res == NULL) return(NULL);
   /* copy the id string */
-  res->id[0] = hdr[0];
-  res->id[1] = hdr[1];
-  res->id[2] = hdr[2];
-  res->id[3] = hdr[3];
+  res->id[0] = id[0];
+  res->id[1] = id[1];
+  res->id[2] = id[2];
+  res->id[3] = id[3];
   /* assign data length */
-  res->datalen = len;
+  res->datalen = BSWAPL(len);
   /* copy actual data */
   if (fio_read(fh, res->data, res->datalen) != res->datalen) {
     free(res);
