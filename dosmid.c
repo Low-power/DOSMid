@@ -539,10 +539,10 @@ static int compute_elapsed_time(unsigned long starttime, unsigned long *elapsed)
 
 /* check the event cache for a given event. to reset the cache, issue a single
  * call with trackpos < 0. */
-static struct midi_event_t far *getnexteventfromcache(struct midi_event_t *eventscache, long trackpos, int xmsdelay) {
+static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscache, long trackpos, int xmsdelay) {
   static unsigned int itemsincache = 0;
   static unsigned int curcachepos = 0;
-  struct midi_event_t far *res = NULL;
+  struct midi_event_t *res = NULL;
   long nextevent;
   /* if trackpos < 0 then this is only about flushing cache */
   if (trackpos < 0) {
@@ -1010,7 +1010,7 @@ static void init_trackinfo(struct trackinfodata *trackinfo, struct clioptions *p
 
 
 /* plays a file. returns 0 on success, non-zero if the program must exit */
-static enum playactions playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event_t far *eventscache) {
+static enum playactions playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event_t *eventscache) {
   static int volume = 100; /* volume is static because it needs to be retained between songs */
   int i;
   enum playactions exitaction;
@@ -1019,7 +1019,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   unsigned short refreshchans = 0xffffu;
   long trackpos;
   unsigned long midiplaybackstart;
-  struct midi_event_t far *curevent;
+  struct midi_event_t *curevent;
   unsigned long elticks = 0; /* used only to count clock ticks in debug mode */
   unsigned char *sysexbuff;
 
@@ -1291,12 +1291,13 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 
 
 int main(int argc, char **argv) {
-  struct clioptions params;
   char *errstr;
   enum playactions action = ACTION_NONE;
-  struct trackinfodata *trackinfo;
-  struct midi_event_t far *eventscache;
   int softerrcount = 0; /* counts soft errors - if too many occurs at once, dosmid quits */
+  /* below objects are declared static so they land in the data segment and not in stack */
+  static struct trackinfodata trackinfo;
+  static struct midi_event_t eventscache[EVENTSCACHESIZE];
+  static struct clioptions params;
 
   /* make sure to init all CLI params to empty values */
   memset(&params, 0, sizeof(params));
@@ -1354,18 +1355,8 @@ int main(int argc, char **argv) {
     return(1);
   }
 
-  /* allocate memory segments to be used later */
-  trackinfo = malloc(sizeof(struct trackinfodata));
-  eventscache = malloc(sizeof(struct midi_event_t) * EVENTSCACHESIZE);
-  if ((trackinfo == NULL) || (eventscache == NULL)) {
-    dos_puts("ERROR: Out of memory! Free some conventional memory.$");
-    mem_close();
-    if (trackinfo != NULL) free(trackinfo);
-    if (eventscache != NULL) free(eventscache);
-    return(1);
-  }
   /* populate trackinfo with initial data */
-  init_trackinfo(trackinfo, &params);
+  init_trackinfo(&trackinfo, &params);
 
   /* initialize the high resolution timer */
   timer_init();
@@ -1378,10 +1369,10 @@ int main(int argc, char **argv) {
   ui_hidecursor();
 
   /* init the sound device */
-  sprintf(trackinfo->title[0], "Sound hardware initialization...");
+  sprintf(trackinfo.title[0], "Sound hardware initialization...");
   {
     unsigned short rflags = 0xffffu, rchans = 0xffffu;
-    ui_draw(trackinfo, &rflags, &rchans, PVER, params.devname, params.devport, 100);
+    ui_draw(&trackinfo, &rflags, &rchans, PVER, params.devname, params.devport, 100);
   }
   if (params.logfd != NULL) fprintf(params.logfd, "INIT SOUND HARDWARE\n");
   errstr = dev_init(params.device, params.devport, params.sbnk);
@@ -1397,7 +1388,7 @@ int main(int argc, char **argv) {
   /* playlist loop */
   while (action != ACTION_EXIT) {
 
-    action = playfile(&params, trackinfo, eventscache);
+    action = playfile(&params, &trackinfo, eventscache);
     /* if I get three soft errors in a row, it's time to quit */
     if (action != ACTION_ERR_SOFT) softerrcount = 0;
 
@@ -1455,8 +1446,6 @@ int main(int argc, char **argv) {
 
   /* free allocated heap memory */
   if (params.logfd != NULL) fprintf(params.logfd, "Free heap memory\n");
-  free(trackinfo);
-  free(eventscache);
 
   /* free the allocated strings, if any */
   if (params.sbnk != NULL) free(params.sbnk);
