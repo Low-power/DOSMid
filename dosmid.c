@@ -48,7 +48,7 @@
 #define PVER "0.9.4 beta"
 #define PDATE "2014-2018"
 
-#define MAXTRACKS 32
+#define MAXTRACKS 64
 #define EVENTSCACHESIZE 64 /* *must* be a power of 2 !!! */
 #define EVENTSCACHEMASK 63 /* used by the circular events buffer */
 
