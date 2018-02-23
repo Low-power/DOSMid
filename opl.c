@@ -509,25 +509,25 @@ void opl_midi_noteoff(unsigned short port, int channel, int note) {
 static int opl_loadbank_internal(char *file, int offset) {
   unsigned char buff[16];
   int i;
-  int fhandle;
+  struct fiofile_t f;
   /* open the IBK file */
-  if (fio_open(file, FIO_OPEN_RD, &fhandle) != 0) return(-1);
+  if (fio_open(file, FIO_OPEN_RD, &f) != 0) return(-1);
   /* file must be exactly 3204 bytes long */
-  if (fio_seek(fhandle, FIO_SEEK_END, 0) != 3204) {
-    fio_close(fhandle);
+  if (fio_seek(&f, FIO_SEEK_END, 0) != 3204) {
+    fio_close(&f);
     return(-2);
   }
-  fio_seek(fhandle, FIO_SEEK_START, 0);
+  fio_seek(&f, FIO_SEEK_START, 0);
   /* file must start with an IBK header */
-  if ((fio_read(fhandle, buff, 4) != 4) || (buff[0] != 'I') || (buff[1] != 'B') || (buff[2] != 'K') || (buff[3] != 0x1A)) {
-    fio_close(fhandle);
+  if ((fio_read(&f, buff, 4) != 4) || (buff[0] != 'I') || (buff[1] != 'B') || (buff[2] != 'K') || (buff[3] != 0x1A)) {
+    fio_close(&f);
     return(-3);
   }
   /* load 128 instruments from the IBK file */
   for (i = offset; i < 128 + offset; i++) {
     /* load instruments */
-    if (fio_read(fhandle, buff, 16) != 16) {
-      fio_close(fhandle);
+    if (fio_read(&f, buff, 16) != 16) {
+      fio_close(&f);
       return(-4);
     }
     /* load modulator */
@@ -554,7 +554,7 @@ static int opl_loadbank_internal(char *file, int offset) {
     gmtimbres[i].finetune = buff[12]; /* used only in some IBK files */
   }
   /* close file and return success */
-  fio_close(fhandle);
+  fio_close(&f);
   return(0);
 }
 

@@ -17,19 +17,27 @@
 #define FIO_OPEN_WR 1
 #define FIO_OPEN_RW 2
 
+struct fiofile_t {
+  unsigned short fh;     /* file handle (as used by DOS) */
+  unsigned long flen;    /* file length */
+  unsigned long curpos;  /* current offset position (ftell) */
+  unsigned buff[32];     /* buffer storage   */
+  unsigned long bufoffs; /* offset of buffer */
+};
+
 /* open file fname and set fhandle with the associated file handle. returns 0 on success, non-zero otherwise */
-int fio_open(char far *fname, int mode, int *fhandle);
+int fio_open(char far *fname, int mode, struct fiofile_t *f);
 
 /* reads count bytes from file pointed at by fhandle, and writes the data into buff. returns the number of bytes actually read */
-int fio_read(int fhandle, void far *buff, int count);
+int fio_read(struct fiofile_t *f, void far *buff, int count);
 
 /* seek to offset position of file pointed at by fhandle. returns current file position on success, a negative error otherwise */
-signed long fio_seek(unsigned short fhandle, unsigned short origin, signed long offset);
+signed long fio_seek(struct fiofile_t *f, unsigned short origin, signed long offset);
 
 /* reads a line from file pointed at by fhandle, fill buff up to buflen bytes. returns the line length (possibly longer than buflen) */
-int fio_getline(int fhandle, void far *buff, short buflen);
+int fio_getline(struct fiofile_t *f, void far *buff, short buflen);
 
 /* close file handle. returns 0 on success, non-zero otherwise */
-int fio_close(int fhandle);
+int fio_close(struct fiofile_t *f);
 
 #endif

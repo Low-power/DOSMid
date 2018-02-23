@@ -472,17 +472,17 @@ static char *loadconfigfile(struct clioptions *params) {
   char buff[128 + 12]; /* 128 for exepath plus 8+3 for the config file */
   int r;
   char *res = NULL;
-  int fhandle;
+  struct fiofile_t f;
   /* prepare config file's full path */
   r = exepath(buff);
   if (r < 1) return(NULL);
   /* append the config file itself */
   sprintf(buff + r, "dosmid.cfg");
   /* open file */
-  if (fio_open(buff, FIO_OPEN_RD, &fhandle) != 0) return(NULL);
+  if (fio_open(buff, FIO_OPEN_RD, &f) != 0) return(NULL);
   for (;;) {
     /* read line & trim */
-    r = fio_getline(fhandle, buff, sizeof(buff));
+    r = fio_getline(&f, buff, sizeof(buff));
     if (r < 0) break; /* stop on EOF */
     if (*buff == '#') continue; /* skip comments */
     rtrim(buff);
@@ -492,7 +492,7 @@ static char *loadconfigfile(struct clioptions *params) {
     if (res != NULL) break;
   }
   /* close file */
-  fio_close(fhandle);
+  fio_close(&f);
   return(res);
 }
 
@@ -700,24 +700,24 @@ static char *getnextm3uitem(char *playlist, int randomize) {
   long fsize;
   static long pos = 0;
   int slen;
-  int fh;
+  struct fiofile_t f;
   /* open the playlist and read its size */
-  if (fio_open(playlist, FIO_OPEN_RD, &fh) != 0) return(NULL);
-  fsize = fio_seek(fh, FIO_SEEK_END, 0);
+  if (fio_open(playlist, FIO_OPEN_RD, &f) != 0) return(NULL);
+  fsize = fio_seek(&f, FIO_SEEK_END, 0);
   if (fsize < 3) { /* a one-entry m3u would be at least 3 bytes long */
-    fio_close(fh);
+    fio_close(&f);
     return(NULL);
   }
   if (randomize != 0) {
     /* go to a random position (avoid last bytes, could be an empty \r\n record) */
     pos = rand() % (fsize - 2);
   }
-  fio_seek(fh, FIO_SEEK_START, pos);
+  fio_seek(&f, FIO_SEEK_START, pos);
   /* rewind back to nearest \n or 0 position */
   while (pos > 0) {
-    fio_read(fh, tempstr, 1);
+    fio_read(&f, tempstr, 1);
     if (tempstr[0] != '\n') {
-      fio_seek(fh, FIO_SEEK_CUR, -2);
+      fio_seek(&f, FIO_SEEK_CUR, -2);
       pos--;
     } else {
       pos++;
@@ -730,7 +730,7 @@ static char *getnextm3uitem(char *playlist, int randomize) {
   fnamebuf[0] = 0;
   for (;;) {
     char c;
-    if ((fio_read(fh, &c, 1) != 1) || (c == '\r') || (c == '\n')) break;
+    if ((fio_read(&f, &c, 1) != 1) || (c == '\r') || (c == '\n')) break;
     pos++;
     fnamebuf[slen++] = c;
     if (slen == sizeof(fnamebuf)) { /* overflow! */
@@ -744,7 +744,7 @@ static char *getnextm3uitem(char *playlist, int randomize) {
   if (randomize == 0) {
     for (;;) {
       char c;
-      if (fio_read(fh, &c, 1) != 1) {
+      if (fio_read(&f, &c, 1) != 1) {
         pos = 0;
         break;
       } else if ((c == '\r') || (c == '\n')) {
@@ -756,7 +756,7 @@ static char *getnextm3uitem(char *playlist, int randomize) {
   }
 
   /* close the file descriptor */
-  fio_close(fh);
+  fio_close(&f);
   /* trim any leading spaces, if any */
   rtrim(fnamebuf);
   /* if empty, something went wrong */
@@ -800,7 +800,7 @@ static void copyline(char *d, int l, char *s) {
 }
 
 
-static enum playactions loadfile_midi(int fh, struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
+static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
   struct midi_chunkmap_t *chunkmap;
   int miditracks;
   int i;
@@ -816,7 +816,7 @@ static enum playactions loadfile_midi(int fh, struct clioptions *params, struct 
     return(ACTION_ERR_HARD);
   }
 
-  if (midi_readhdr(fh, &(trackinfo->midiformat), &miditracks, &(trackinfo->miditimeunitdiv), chunkmap, MAXTRACKS) != 0) {
+  if (midi_readhdr(f, &(trackinfo->midiformat), &miditracks, &(trackinfo->miditimeunitdiv), chunkmap, MAXTRACKS) != 0) {
     ui_puterrmsg(params->midifile, "Error: Invalid MIDI file format");
     free(chunkmap);
     return(ACTION_ERR_SOFT);
@@ -853,11 +853,11 @@ static enum playactions loadfile_midi(int fh, struct clioptions *params, struct 
     }
 
     if (params->logfd != NULL) fprintf(params->logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, chunkmap[i].offset);
-    fio_seek(fh, FIO_SEEK_START, chunkmap[i].offset);
+    fio_seek(f, FIO_SEEK_START, chunkmap[i].offset);
     if (i == 0) { /* copyright and text events are fetched from track 0 only */
-      newtrack = midi_track2events(fh, tracktitle, UI_TITLEMAXLEN, copystring, UI_TITLEMAXLEN, text, sizeof(text), &(trackinfo->channelsusage), params->logfd, &tracklen, trackinfo->reqpatches);
+      newtrack = midi_track2events(f, tracktitle, UI_TITLEMAXLEN, copystring, UI_TITLEMAXLEN, text, sizeof(text), &(trackinfo->channelsusage), params->logfd, &tracklen, trackinfo->reqpatches);
     } else {
-      newtrack = midi_track2events(fh, tracktitle, UI_TITLEMAXLEN, NULL, 0, NULL, 0, &(trackinfo->channelsusage), params->logfd, &tracklen, trackinfo->reqpatches);
+      newtrack = midi_track2events(f, tracktitle, UI_TITLEMAXLEN, NULL, 0, NULL, 0, &(trackinfo->channelsusage), params->logfd, &tracklen, trackinfo->reqpatches);
     }
     /* look for error conditions */
     if (newtrack == MIDI_OUTOFMEM) {
@@ -902,7 +902,7 @@ static enum playactions loadfile_midi(int fh, struct clioptions *params, struct 
 
 
 static enum playactions loadfile(struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
-  int fh;
+  struct fiofile_t f;
   unsigned char hdr[16];
   enum playactions res;
 
@@ -910,18 +910,18 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
   mem_clear();
 
   /* (try to) open the music file */
-  if (fio_open(params->midifile, FIO_OPEN_RD, &fh) != 0) {
+  if (fio_open(params->midifile, FIO_OPEN_RD, &f) != 0) {
     ui_puterrmsg(params->midifile, "Error: Failed to open the file");
     return(ACTION_ERR_SOFT);
   }
 
   /* read first few bytes of the file to detect its format, and rewind */
-  if (fio_read(fh, hdr, 16) != 16) {
-    fio_close(fh);
+  if (fio_read(&f, hdr, 16) != 16) {
+    fio_close(&f);
     ui_puterrmsg(params->midifile, "Error: Unknown file format");
     return(ACTION_ERR_SOFT);
   }
-  fio_seek(fh, FIO_SEEK_START, 0);
+  fio_seek(&f, FIO_SEEK_START, 0);
 
   /* analyze the header to guess the format of the file */
   trackinfo->fileformat = header2fileformat(hdr);
@@ -930,10 +930,10 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
   switch (trackinfo->fileformat) {
     case FORMAT_MIDI:
     case FORMAT_RMID:
-      res = loadfile_midi(fh, params, trackinfo, trackpos);
+      res = loadfile_midi(&f, params, trackinfo, trackpos);
       break;
     case FORMAT_MUS:
-      *trackpos = mus_load(fh, &(trackinfo->totlen), &(trackinfo->miditimeunitdiv), &(trackinfo->channelsusage), trackinfo->reqpatches);
+      *trackpos = mus_load(&f, &(trackinfo->totlen), &(trackinfo->miditimeunitdiv), &(trackinfo->channelsusage), trackinfo->reqpatches);
       if (*trackpos == MUS_OUTOFMEM) { /* detect out of memory */
         res = ACTION_ERR_SOFT;
         ui_puterrmsg(params->midifile, "Error: Out of memory");
@@ -951,7 +951,7 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
       ui_puterrmsg(params->midifile, "Error: Unknown file format");
       break;
   }
-  fio_close(fh);
+  fio_close(&f);
 
   /* if no text data could be found at all, add a note about that */
   if ((res == ACTION_NONE) && (trackinfo->titlescount == 0)) {

@@ -13,7 +13,7 @@
 #include "fio.h" /* include self for control */
 
 /* seek to offset position of file pointed at by fhandle. returns current file position on success, a negative error otherwise */
-signed long fio_seek(unsigned short fhandle, unsigned short origin, signed long offset) {
+signed long fio_seek(struct fiofile_t *f, unsigned short origin, signed long offset) {
 /* DOS 2+ - LSEEK - SET CURRENT FILE POSITION
    AH = 42h
    AL = origin of move
@@ -32,7 +32,7 @@ signed long fio_seek(unsigned short fhandle, unsigned short origin, signed long 
   unsigned short *off = (unsigned short *)(&offset);
   regs.h.ah = 0x42;
   regs.h.al = origin;
-  regs.x.bx = fhandle;
+  regs.x.bx = f->fh;
   regs.x.cx = off[1];
   regs.x.dx = off[0];
   int86(0x21, &regs, &regs);
@@ -41,12 +41,12 @@ signed long fio_seek(unsigned short fhandle, unsigned short origin, signed long 
 }
 
 /* reads a line from file pointed at by fhandle, fill buff up to buflen bytes. returns the line length (possibly longer than buflen), or -1 on EOF */
-int fio_getline(int fhandle, void far *buff, short buflen) {
+int fio_getline(struct fiofile_t *f, void far *buff, short buflen) {
   unsigned char bytebuf;
   short linelen = 0;
   buflen--; /* leave space for the zero terminator */
   for (;;) {
-    if (fio_read(fhandle, &bytebuf, 1) == 0) { /* EOF */
+    if (fio_read(f, &bytebuf, 1) == 0) { /* EOF */
       if (linelen == 0) linelen = -1;
       break;
     }
@@ -64,7 +64,7 @@ int fio_getline(int fhandle, void far *buff, short buflen) {
 }
 
 /* open file fname and set fhandle with the associated file handle. returns 0 on success, non-zero otherwise */
-int fio_open(char far *fname, int mode, int *fhandle) {
+int fio_open(char far *fname, int mode, struct fiofile_t *f) {
   /* DOS 2+ - OPEN - OPEN EXISTING FILE
      AH = 3Dh
      AL = access and sharing modes
@@ -81,13 +81,13 @@ int fio_open(char far *fname, int mode, int *fhandle) {
   sregs.ds = FP_SEG(fname);
   regs.x.dx = FP_OFF(fname);
   int86x(0x21, &regs, &regs, &sregs);
-  *fhandle = regs.x.ax;
+  f->fh = regs.x.ax;
   if (regs.x.cflag != 0) return(-1);
   return(0);
 }
 
 /* reads count bytes from file pointed at by fhandle, and writes the data into buff. returns the number of bytes actually read, or a negative number on error */
-int fio_read(int fhandle, void far *buff, int count) {
+int fio_read(struct fiofile_t *f, void far *buff, int count) {
 /* DOS 2+ - READ - READ FROM FILE OR DEVICE
  * AH = 3Fh
  * BX = file handle
@@ -101,7 +101,7 @@ int fio_read(int fhandle, void far *buff, int count) {
   union REGS regs;
   struct SREGS sregs;
   regs.h.ah = 0x3f;
-  regs.x.bx = fhandle;
+  regs.x.bx = f->fh;
   regs.x.cx = count;
   sregs.ds = FP_SEG(buff);
   regs.x.dx = FP_OFF(buff);
@@ -111,7 +111,7 @@ int fio_read(int fhandle, void far *buff, int count) {
 }
 
 /* close file handle. returns 0 on success, non-zero otherwise */
-int fio_close(int fhandle) {
+int fio_close(struct fiofile_t *f) {
   /* DOS 2+ - CLOSE - CLOSE FILE
      AH = 3Eh
      BX = file handle
@@ -123,7 +123,7 @@ int fio_close(int fhandle) {
        AX = error code */
   union REGS regs;
   regs.h.ah = 0x3e;
-  regs.x.bx = fhandle;
+  regs.x.bx = f->fh;
   int86(0x21, &regs, &regs);
   if (regs.x.cflag != 0) return(0 - regs.x.ax);
   return(0);

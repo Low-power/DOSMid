@@ -62,7 +62,7 @@ static unsigned short outport = 0;
 /* loads a SBK sound font to AWE hardware */
 #ifdef SBAWE
 static int awe_loadfont(char *filename) {
-  int fhandle;
+  struct fiofile_t f;
   SOUND_PACKET sp;
   long banks[1];
   int i;
@@ -75,21 +75,21 @@ static int awe_loadfont(char *filename) {
   sp.total_banks = 1; /* total number of banks */
   if (awe32DefineBankSizes(&sp) != 0) return(-1);
   /* Open SoundFont Bank */
-  if (fio_open(filename, FIO_OPEN_RD, &fhandle) != 0) return(-1);
-  fio_read(fhandle, buffer, PACKETSIZE); /* read sf header */
+  if (fio_open(filename, FIO_OPEN_RD, &f) != 0) return(-1);
+  fio_read(&f, buffer, PACKETSIZE); /* read sf header */
   /* prepare stuff */
   sp.bank_no = 0;
   sp.data = buffer;
   if (awe32SFontLoadRequest(&sp) != 0) {
-    fio_close(fhandle);
+    fio_close(&f);
     return(-1); /* invalid soundfont file */
   }
   /* stream sound samples into the hardware */
   if (sp.no_sample_packets > 0) {
-    fio_seek(fhandle, FIO_SEEK_START, sp.sample_seek); /* move pointer to where instruments begin */
+    fio_seek(&f, FIO_SEEK_START, sp.sample_seek); /* move pointer to where instruments begin */
     for (i = 0; i < sp.no_sample_packets; i++) {
-      if ((fio_read(fhandle, sp.data, PACKETSIZE) != PACKETSIZE) || (awe32StreamSample(&sp))) {
-        fio_close(fhandle);
+      if ((fio_read(&f, sp.data, PACKETSIZE) != PACKETSIZE) || (awe32StreamSample(&sp))) {
+        fio_close(&f);
         return(-1);
       }
     }
@@ -97,14 +97,14 @@ static int awe_loadfont(char *filename) {
   /* load presets to memory */
   presetbuf = (char *)malloc(sp.preset_read_size);
   if (presetbuf == NULL) { /* out of mem! */
-    fio_close(fhandle);
+    fio_close(&f);
     return(-1);
   }
   sp.presets = presetbuf;
-  fio_seek(fhandle, FIO_SEEK_START, sp.preset_seek);
-  fio_read(fhandle, sp.presets, sp.preset_read_size);
+  fio_seek(&f, FIO_SEEK_START, sp.preset_seek);
+  fio_read(&f, sp.presets, sp.preset_read_size);
   /* close the sf file */
-  fio_close(fhandle);
+  fio_close(&f);
   /* apply presets to hardware */
   if (awe32SetPresets(&sp) != 0) {
     free(presetbuf);
