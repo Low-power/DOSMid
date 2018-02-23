@@ -27,10 +27,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>
 #include <string.h> /* memcpy() */
 
 #include "bitfield.h"
+#include "fio.h"
 #include "mem.h"
 #include "midi.h"
 
@@ -43,10 +43,10 @@
 /* loads a MUS file into memory, returns the id of the first event on success,
  * or -1 on error. channelsusage contains 16 flags indicating what channels
  * are used. */
-long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsigned short *channelsusage, void *reqpatches) {
+long mus_load(int fh, unsigned long *totlen, unsigned short *timeunitdiv, unsigned short *channelsusage, void *reqpatches) {
   unsigned char hdr_or_chanvol[16];
   unsigned short scorestart;
-  int bytebuff, bytebuff2, loadflag = 0;
+  unsigned char bytebuff, bytebuff2, loadflag = 0;
   unsigned long event_dtime, nextwait = 0;
   unsigned short event_type;
   unsigned short event_channel;
@@ -55,15 +55,14 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
   long mslen = 0;
   struct midi_event_t midievent;
 
-  rewind(fd);
   /* read the 16 bytes header first, and populate hdr data */
-  if (fread(hdr_or_chanvol, 1, 16, fd) != 16) return(-8);
+  if (fio_read(fh, hdr_or_chanvol, 16) != 16) return(-8);
   if ((hdr_or_chanvol[0] != 'M') || (hdr_or_chanvol[1] != 'U') || (hdr_or_chanvol[2] != 'S') || (hdr_or_chanvol[3] != 0x1A)) {
     return(-9);
   }
   scorestart = hdr_or_chanvol[6] | (hdr_or_chanvol[7] << 8);
   /* position the next reading position to first event */
-  fseek(fd, scorestart, SEEK_SET);
+  fio_seek(fh, FIO_SEEK_START, scorestart);
   /* set tempo to 140 bpm (428571 us per quarter note) */
   memset(&midievent, 0, sizeof(struct midi_event_t));
   midievent.type = EVENT_TEMPO;
@@ -78,8 +77,7 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
 
   /* read events from the MUS file and translate them into midi events */
   for (;;) {
-    bytebuff = fgetc(fd);
-    if (bytebuff < 0) return(-5); /* if EOF, abort with error */
+    if (fio_read(fh, &bytebuff, 1) != 1) return(-5); /* if EOF, abort with error */
     event_channel = bytebuff & 0x0F;
     bytebuff >>= 4;
     event_type = bytebuff & 7;
@@ -96,7 +94,7 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
     /* read complementary data, if any */
     switch (event_type) {
       case 0: /* release note (1 byte follows) */
-        bytebuff = fgetc(fd);
+        fio_read(fh, &bytebuff, 1);
         if ((bytebuff & 128) != 0) return(-13); /* MSB should always be zero */
         midievent.type = EVENT_NOTEOFF;
         midievent.data.note.note = bytebuff;
@@ -105,12 +103,12 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
         break;
       case 1: /* play note (1 or 2 bytes follow) */
         *channelsusage |= (1 << event_channel); /* update the channel usage flags */
-        bytebuff = fgetc(fd);
+        fio_read(fh, &bytebuff, 1);
         midievent.type = EVENT_NOTEON;
         midievent.data.note.note = bytebuff & 127;
         midievent.data.note.chan = event_channel;
         if ((bytebuff & 128) != 0) {
-          midievent.data.note.velocity = fgetc(fd);
+          fio_read(fh, &(midievent.data.note.velocity), 1);
           hdr_or_chanvol[event_channel] = midievent.data.note.velocity; /* remember the last velocity, might be needed later */
         } else {
           midievent.data.note.velocity = hdr_or_chanvol[event_channel];
@@ -127,18 +125,19 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
          * 128  =  normal (default)
          * 192  =  one half-tone up
          * 255  =  two half-tones up  */
-        bytebuff = fgetc(fd);
+        fio_read(fh, &bytebuff, 1);
         midievent.type = EVENT_PITCH;
-        midievent.data.pitch.wheel = bytebuff << 6; /* convert wheel value to 14 bits as expected by MIDI */
+        midievent.data.pitch.wheel = bytebuff;
+        midievent.data.pitch.wheel <<= 6; /* convert wheel value to 14 bits as expected by MIDI */
         midievent.data.pitch.chan = event_channel;
         break;
       case 3: /* sysex (1 byte follows) - I ignore SYSEX messages */
-        bytebuff = fgetc(fd);
+        fio_read(fh, &bytebuff, 1);
         if ((bytebuff & 128) != 0) return(-11); /* MSB should always be zero */
         break;
       case 4: /* control (2 bytes follow) */
-        bytebuff = fgetc(fd);
-        bytebuff2 = fgetc(fd);
+        fio_read(fh, &bytebuff, 1);
+        fio_read(fh, &bytebuff2, 1);
         if ((bytebuff == 0) && (bytebuff2 < 128)) { /* change program */
           midievent.type = EVENT_PROGCHAN;
           midievent.data.prog.prog = bytebuff2;
@@ -150,7 +149,7 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
           midievent.data.control.chan = event_channel;
           midievent.data.control.id = tmpmap[bytebuff];
           midievent.data.control.val = bytebuff2;
-        } else { /* else it's an illegate byte pattern - abort mission, captain! */
+        } else { /* else it's an illegal byte pattern - abort mission, captain! */
           return(-91);
         }
         break;
@@ -169,8 +168,7 @@ long mus_load(FILE *fd, unsigned long *totlen, unsigned short *timeunitdiv, unsi
     /* if dtime is non-zero, read the number of ticks to wait before next note */
     nextwait = 0;
     while (event_dtime != 0) {
-      bytebuff = fgetc(fd);
-      if (bytebuff < 0) return(-6);
+      if (fio_read(fh, &bytebuff, 1) != 1) return(-6);
       event_dtime = bytebuff & 128;
       nextwait <<= 7;
       nextwait |= (bytebuff & 127);

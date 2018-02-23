@@ -31,6 +31,7 @@
 #include <string.h> /* strcmp() */
 
 #include "bitfield.h"
+#include "fio.h"
 #include "mem.h"
 #include "midi.h"   /* include self for control */
 
@@ -39,12 +40,12 @@
 
 
 /* fetch a variable length quantity value from a given offset. returns number of bytes read */
-static int midi_fetch_variablelen_fromfile(FILE *fd, unsigned long *result) {
-  int bytebuff;
+static int midi_fetch_variablelen_fromfile(int fh, unsigned long *result) {
+  unsigned char bytebuff;
   int offset = 0;
   *result = 0;
   for (;;) {
-    bytebuff = fgetc(fd);
+    fio_read(fh, &bytebuff, 1);
     *result <<= 7;
     *result |= (bytebuff & 127);
     if ((bytebuff & 128) == 0) break;
@@ -54,15 +55,13 @@ static int midi_fetch_variablelen_fromfile(FILE *fd, unsigned long *result) {
 
 
 /* reads a MIDI file and computes a map of chunks (ie a list of offsets) */
-static int midi_getchunkmap(FILE *fd, struct midi_chunkmap_t *chunklist, int maxchunks) {
+static int midi_getchunkmap(int fh, struct midi_chunkmap_t *chunklist, int maxchunks) {
   int chunkid, i;
   unsigned char hdr[8];
-  unsigned long readres;
   /*unsigned long chunklen;*/
   for (chunkid = 0; chunkid < maxchunks; chunkid++) {
-    readres = fread(hdr, 1, 8, fd);
-    if (readres != 8) break;
-    chunklist[chunkid].offset = ftell(fd);
+    if (fio_read(fh, hdr, 8) != 8) break;
+    chunklist[chunkid].offset = fio_seek(fh, FIO_SEEK_CUR, 0);
     /* read chunk's id */
     for (i = 0; i < 4; i++) chunklist[chunkid].id[i] = hdr[i];
     chunklist[chunkid].id[4] = 0; /* string terminator */
@@ -73,7 +72,7 @@ static int midi_getchunkmap(FILE *fd, struct midi_chunkmap_t *chunklist, int max
       chunklist[chunkid].len |= hdr[i];
     }
     /* skip to next chunk */
-    fseek(fd, chunklist[chunkid].len, SEEK_CUR);
+    fio_seek(fh, FIO_SEEK_CUR, chunklist[chunkid].len);
   }
   return(chunkid);
 }
@@ -82,14 +81,12 @@ static int midi_getchunkmap(FILE *fd, struct midi_chunkmap_t *chunklist, int max
 /* PUBLIC INTERFACE */
 
 
-struct midi_chunk_t *midi_readchunk(FILE *fd) {
+struct midi_chunk_t *midi_readchunk(int fh) {
   unsigned char hdr[8];
-  unsigned long readres;
   int i;
   unsigned long len = 0;
   struct midi_chunk_t *res;
-  readres = fread(hdr, 1, 8, fd);
-  if (readres != 8) return(NULL);
+  if (fio_read(fh, hdr, 8) != 8) return(NULL);
   /* compute the length */
   for (i = 4; i < 8; i++) {
     len <<= 8;
@@ -102,12 +99,10 @@ struct midi_chunk_t *midi_readchunk(FILE *fd) {
   res->id[1] = hdr[1];
   res->id[2] = hdr[2];
   res->id[3] = hdr[3];
-  res->id[4] = 0;
   /* assign data length */
   res->datalen = len;
   /* copy actual data */
-  readres = fread(res->data, 1, (unsigned int)res->datalen, fd);
-  if (readres != res->datalen) {
+  if (fio_read(fh, res->data, res->datalen) != res->datalen) {
     free(res);
     return(NULL);
   }
@@ -115,25 +110,25 @@ struct midi_chunk_t *midi_readchunk(FILE *fd) {
 }
 
 
-int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned short *timeunitdiv, struct midi_chunkmap_t *chunklist, int maxchunks) {
+int midi_readhdr(int fh, int *format, int *tracks, unsigned short *timeunitdiv, struct midi_chunkmap_t *chunklist, int maxchunks) {
   struct midi_chunk_t *chunk;
   unsigned char rmidbuff[12];
   /* test for RMID format and rewind if not found */
   /* a RMID file starts with RIFFxxxxRMID (xxxx being the data size) */
   /* read first 12 bytes - if unable, return an error */
-  if (fread(rmidbuff, 1, 12, fd) != 12) return(-7);
+  if (fio_read(fh, rmidbuff, 12) != 12) return(-7);
   /* if no RMID header, then rewind the file assuming it's normal MIDI */
   if ((rmidbuff[0] != 'R') || (rmidbuff[1] != 'I')  || (rmidbuff[2] != 'F') || (rmidbuff[3] != 'F')
    || (rmidbuff[8] != 'R') || (rmidbuff[9] != 'M') || (rmidbuff[10] != 'I') || (rmidbuff[11] != 'D')) {
-    rewind(fd);
+    fio_seek(fh, FIO_SEEK_START, 0);
   }
   /* Read the first chunk of data (should be the MIDI header) */
-  chunk = midi_readchunk(fd);
+  chunk = midi_readchunk(fh);
   if (chunk == NULL) {
     return(-6);
   }
   /* check id */
-  if (strcmp(chunk->id, "MThd") != 0) {
+  if (bcmp(chunk->id, "MThd", 4) != 0) {
     free(chunk);
     return(-5);
   }
@@ -167,18 +162,19 @@ int midi_readhdr(FILE *fd, int *format, int *tracks, unsigned short *timeunitdiv
     return(-1);
   }
   /* read the chunk map */
-  midi_getchunkmap(fd, chunklist, maxchunks);
+  midi_getchunkmap(fh, chunklist, maxchunks);
   return(0);
 }
 
 
 /* returns a negative value on error, 0 on success, 1 on end of track */
-static int ld_meta(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned long *tracklen, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen) {
+static int ld_meta(struct midi_event_t *event, int fh, FILE *logfd, unsigned long *tracklen, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen) {
   unsigned long metalen;
   unsigned long i;
-  int subtype, result = 0;
-  subtype = fgetc(fd); /* fetch the META subtype fields */
-  midi_fetch_variablelen_fromfile(fd, &metalen);
+  int result = 0;
+  unsigned char subtype;
+  fio_read(fh, &subtype, 1); /* fetch the META subtype fields */
+  midi_fetch_variablelen_fromfile(fh, &metalen);
   /* printf("got META[0x%02X] of %ld bytes\n", subtype, metalen); */
   switch (subtype) {
     case 1: /* text or marker - often used to describe the file... */
@@ -187,7 +183,7 @@ static int ld_meta(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned l
       if ((text != NULL) && (text[0] == 0) && (textmaxlen > 3)) { /* title might be NULL */
         for (; i < metalen; i++) {
           if (i+1 >= textmaxlen) break; /* avoid overflow */
-          text[i] = fgetc(fd);
+          fio_read(fh, text + i, 1);
         }
         text[i] = 0;
         /* recompute the available maxlen */
@@ -202,7 +198,7 @@ static int ld_meta(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned l
         }
       }
       /* skip the rest, if we had to truncate the string */
-      fseek(fd, metalen - i, SEEK_CUR);
+      fio_seek(fh, FIO_SEEK_CUR, metalen - i);
       if (logfd != NULL) fprintf(logfd, "%lu: TEXT OR MARKER EVENT\n", *tracklen);
       break;
     case 2: /* copyright notice */
@@ -210,33 +206,33 @@ static int ld_meta(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned l
       if ((copyright != NULL) && (copyright[0] == 0)) { /* take care, copyright might be NULL */
         for (; i < metalen; i++) {
           if (i+1 >= copyrightmaxlen) break; /* avoid overflow */
-          copyright[i] = fgetc(fd);
+          fio_read(fh, copyright + i, 1);
         }
         copyright[i] = 0;
       }
-      fseek(fd, metalen - i, SEEK_CUR); /* skip the rest, if we had to truncate the string */
+      fio_seek(fh, FIO_SEEK_CUR, metalen - i); /* skip the rest, if we had to truncate the string */
       break;
     case 3: /* track name */
       i = 0;
       if (title != NULL) { /* title might be NULL */
         for (; i < metalen; i++) {
           if (i+1 >= titlemaxlen) break; /* avoid overflow */
-          title[i] = fgetc(fd);
+          fio_read(fh, title + i, 1);
         }
         title[i] = 0;
       }
-      fseek(fd, metalen - i, SEEK_CUR); /* skip the rest, if we had to truncate the string */
+      fio_seek(fh, FIO_SEEK_CUR, metalen - i); /* skip the rest, if we had to truncate the string */
       break;
     case 4: /* instrument name */
-      fseek(fd, metalen, SEEK_CUR);
+      fio_seek(fh, FIO_SEEK_CUR, metalen);
       if (logfd != NULL) fprintf(logfd, "%lu: INSTRUMENT EVENT (ignored)\n", *tracklen);
       break;
     case 5: /* lyric */
-      fseek(fd, metalen, SEEK_CUR);
+      fio_seek(fh, FIO_SEEK_CUR, metalen);
       if (logfd != NULL) fprintf(logfd, "%lu: LYRIC EVENT (ignored)\n", *tracklen);
       break;
     case 0x21:  /* MIDI port -- no support for multi-MIDI files, I just ignore it */
-      fseek(fd, metalen, SEEK_CUR);
+      fio_seek(fh, FIO_SEEK_CUR, metalen);
       if (logfd != NULL) fprintf(logfd, "%lu: MIDI PORT EVENT (ignored)\n", *tracklen);
       break;
     case 0x2F: /* end of track */
@@ -248,17 +244,19 @@ static int ld_meta(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned l
         if (logfd != NULL) fprintf(logfd, "%lu: TEMPO ERROR\n", *tracklen);
         return(-1);
       } else {
+        unsigned char b[3];
         event->type = EVENT_TEMPO;
-        event->data.tempoval = fgetc(fd);
+        fio_read(fh, b, 3);
+        event->data.tempoval = b[0];
         event->data.tempoval <<= 8;
-        event->data.tempoval |= fgetc(fd);
+        event->data.tempoval |= b[1];
         event->data.tempoval <<= 8;
-        event->data.tempoval |= fgetc(fd);
+        event->data.tempoval |= b[2];
         if (logfd != NULL) fprintf(logfd, "%lu: TEMPO -> %lu\n", *tracklen, event->data.tempoval);
       }
       break;
     case 0x54:  /* SMPTE offset -> since I expect only format 0/1 files, I ignore this because I want to start playing asap anyway */
-      fseek(fd, metalen, SEEK_CUR);
+      fio_seek(fh, FIO_SEEK_CUR, metalen);
       if (logfd != NULL) fprintf(logfd, "%lu: SMPTE OFFSET (ignored)\n", *tracklen);
       break;
     case 0x58:  /* Time signature */
@@ -266,7 +264,7 @@ static int ld_meta(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned l
         if (logfd != NULL) fprintf(logfd, "%lu: INVALID TIME SIGNATURE!\n", *tracklen);
         return(-1);
       } else {
-        fseek(fd, metalen, SEEK_CUR);
+        fio_seek(fh, FIO_SEEK_CUR, metalen);
         if (logfd != NULL) fprintf(logfd, "%lu: TIME SIGNATURE (ignored)\n", *tracklen);
       }
       break;
@@ -275,16 +273,16 @@ static int ld_meta(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned l
         if (logfd != NULL) fprintf(logfd, "%lu: INVALID KEY SIGNATURE!\n", *tracklen);
         return(-1);
       } else {
-        fseek(fd, metalen, SEEK_CUR);
+        fio_seek(fh, FIO_SEEK_CUR, metalen);
         if (logfd != NULL) fprintf(logfd, "%lu: KEY SIGNATURE (ignored)\n", *tracklen);
       }
       break;
     case 0x7F:  /* proprietary event -> this is non-standard stuff, I ignore it */
-      fseek(fd, metalen, SEEK_CUR);
+      fio_seek(fh, FIO_SEEK_CUR, metalen);
       if (logfd != NULL) fprintf(logfd, "%lu: PROPRIETARY EVENT (ignored)\n", *tracklen);
       break;
     default:
-      fseek(fd, metalen, SEEK_CUR);  /* skip the meta data */
+      fio_seek(fh, FIO_SEEK_CUR, metalen); /* skip the meta data */
       if (logfd != NULL) fprintf(logfd, "%lu: UNHANDLED META EVENT [0x%02Xh] (ignored)\n", *tracklen, subtype);
       break;
   }
@@ -293,15 +291,15 @@ static int ld_meta(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned l
 
 
 /* returns a negative value on error, 0 on success, 1 on end of track */
-static int ld_sysex(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned char statusbyte, unsigned long *tracklen) {
+static int ld_sysex(struct midi_event_t *event, int fh, FILE *logfd, unsigned char statusbyte, unsigned long *tracklen) {
   unsigned long sysexlen;
   int sysexleneven; /* can be int, guaranteed to be less than 4K */
   unsigned char *sysexbuff;
-  midi_fetch_variablelen_fromfile(fd, &sysexlen); /* get length */
+  midi_fetch_variablelen_fromfile(fh, &sysexlen); /* get length */
   sysexlen += 1; /* add one byte for the status byte that is not counted, but that we will add to the top of the buffer later */
   if (logfd != NULL) fprintf(logfd, "%lu: SYSEX EVENT OF %ld BYTES ON CHAN #%d\n", *tracklen, sysexlen, statusbyte & 0x0F);
   if (sysexlen > 4096) { /* skip SYSEX events that are more than 4K big */
-    fseek(fd, sysexlen, SEEK_CUR);
+    fio_seek(fh, FIO_SEEK_CUR, sysexlen);
     return(0);
   }
   /* read the sysex string */
@@ -316,7 +314,7 @@ static int ld_sysex(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned 
 
   ((unsigned short *)sysexbuff)[0] = sysexlen;
   sysexbuff[2] = statusbyte; /* I store the entire sysex string in memory */
-  fread(sysexbuff + 3, 1, sysexlen - 1, fd); /* read sysexlen-1 because I have already read the status byte */
+  fio_read(fh, sysexbuff + 3, sysexlen - 1); /* read sysexlen-1 because I have already read the status byte */
   event->data.sysex.sysexptr = mem_alloc(sysexleneven);
   if (event->data.sysex.sysexptr >= 0) {
     mem_push(sysexbuff, event->data.sysex.sysexptr, sysexleneven);
@@ -332,18 +330,18 @@ static int ld_sysex(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned 
 }
 
 
-static int ld_note(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned char statusbyte, unsigned long *tracklen, unsigned short *channelsusage, void *reqpatches) {
+static int ld_note(struct midi_event_t *event, int fh, FILE *logfd, unsigned char statusbyte, unsigned long *tracklen, unsigned short *channelsusage, void *reqpatches) {
   unsigned char ubuff[2]; /* micro buffer for loading data */
   switch (statusbyte & 0xF0) { /* I care only about NoteOn/NoteOff events */
     case 0x80:  /* Note OFF */
-      fread(ubuff, 1, 2, fd);
+      fio_read(fh, ubuff, 2);
       event->type = EVENT_NOTEOFF;
       event->data.note.chan = statusbyte & 0x0F;
       event->data.note.note = ubuff[0] & 127; /* a note must be in range 0..127 */
       event->data.note.velocity = ubuff[1];
       break;
     case 0x90:  /* Note ON */
-      fread(ubuff, 1, 2, fd);
+      fio_read(fh, ubuff, 2);
       event->type = EVENT_NOTEON;
       event->data.note.chan = statusbyte & 0x0F;
       event->data.note.note = ubuff[0] & 127;
@@ -357,32 +355,34 @@ static int ld_note(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned c
       if (event->data.note.chan == 9) BIT_SET(reqpatches, event->data.note.note | 128);
       break;
     case 0xA0:  /* key after-touch */
-      fread(ubuff, 1, 2, fd);
+      fio_read(fh, ubuff, 2);
       event->type = EVENT_KEYPRESSURE;
       event->data.keypressure.chan = statusbyte & 0x0F;
       event->data.keypressure.note = ubuff[0];
       event->data.keypressure.pressure = ubuff[1];
       break;
     case 0xB0:  /* control change */
-      fread(ubuff, 1, 2, fd);
+      fio_read(fh, ubuff, 2);
       event->type = EVENT_CONTROL;
       event->data.control.chan = statusbyte & 0x0F;
       event->data.control.id = ubuff[0];
       event->data.control.val = ubuff[1];
       break;
     case 0xC0:  /* program (patch) change */
+      fio_read(fh, ubuff, 1);
       event->type = EVENT_PROGCHAN;
       event->data.prog.chan = statusbyte & 0x0F;
-      event->data.prog.prog = fgetc(fd) & 127;
+      event->data.prog.prog = ubuff[0] & 127;
       BIT_SET(reqpatches, event->data.prog.prog);
       break;
     case 0xD0:  /* channel after-touch (aka "channel pressure") */
+      fio_read(fh, ubuff, 1);
       event->type = EVENT_CHANPRESSURE;
       event->data.chanpressure.chan = statusbyte & 0x0F;
-      event->data.chanpressure.pressure = fgetc(fd);
+      event->data.chanpressure.pressure = ubuff[0];
       break;
     case 0xE0:  /* pitch wheel change */
-      fread(ubuff, 1, 2, fd);
+      fio_read(fh, ubuff, 2);
       event->type = EVENT_PITCH;
       event->data.pitch.chan = statusbyte & 0x0F;
       event->data.pitch.wheel = ubuff[1];
@@ -405,7 +405,7 @@ static int ld_note(struct midi_event_t *event, FILE *fd, FILE *logfd, unsigned c
  * returns MIDI_EMPTYTRACK if no event found in the track
  * returns MIDI_TRACKERROR if the track is corrupted
  * returns MIDI_OUTOFMEM if failed to store events in memory */
-long midi_track2events(FILE *fd, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen, unsigned short *channelsusage, FILE *logfd, unsigned long *tracklen, void *reqpatches) {
+long midi_track2events(int fh, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen, unsigned short *channelsusage, FILE *logfd, unsigned long *tracklen, void *reqpatches) {
   unsigned long deltatime;
   unsigned char statusbyte = 0;
   struct midi_event_t event;
@@ -421,33 +421,33 @@ long midi_track2events(FILE *fd, char *title, int titlemaxlen, char *copyright, 
 
   for (;;) {
     int r;
+    unsigned char bytebuff;
     /* read the delta time first - variable length */
-    midi_fetch_variablelen_fromfile(fd, &deltatime);
+    midi_fetch_variablelen_fromfile(fh, &deltatime);
     *tracklen += deltatime;
     /* check the type of the event */
     /* if it's a byte with MSB set, we are dealing with running status (so it's same status as last time */
-    r = fgetc(fd);
-    if (r == EOF) return(MIDI_TRACKERROR);
-    if ((r & 128) != 0) {
-      statusbyte = r;
+    if (fio_read(fh, &bytebuff, 1) == 0) return(MIDI_TRACKERROR);
+    if ((bytebuff & 128) != 0) {
+      statusbyte = bytebuff;
     } else { /* get back one byte */
-      fseek(fd, -1, SEEK_CUR);
+      fio_seek(fh, FIO_SEEK_CUR, -1);
     }
     event.type = EVENT_NONE;
     event.deltatime = deltatime;
     event.next = -1;
     if (statusbyte == 0xFF) { /* META event */
-      r = ld_meta(&event, fd, logfd, tracklen, title, titlemaxlen, copyright, copyrightmaxlen, text, textmaxlen);
+      r = ld_meta(&event, fh, logfd, tracklen, title, titlemaxlen, copyright, copyrightmaxlen, text, textmaxlen);
       if (r < 0) return(MIDI_TRACKERROR);
       if (r == 1) break; /* end of track */
     } else if ((statusbyte >= 0xF0) && (statusbyte <= 0xF7)) { /* SYSEX event */
-      r = ld_sysex(&event, fd, logfd, statusbyte, tracklen);
+      r = ld_sysex(&event, fh, logfd, statusbyte, tracklen);
       if (r != 0) return(MIDI_TRACKERROR);
     } else if ((statusbyte >= 0x80) && (statusbyte <= 0xEF)) { /* else it's a note-related command */
-      r = ld_note(&event, fd, logfd, statusbyte, tracklen, channelsusage, reqpatches);
+      r = ld_note(&event, fh, logfd, statusbyte, tracklen, channelsusage, reqpatches);
       if (r != 0) return(MIDI_TRACKERROR);
     } else { /* else it's an error - free memory we allocated and return NULL */
-      if (logfd != NULL) fprintf(logfd, "Err. at offset %04lX (bytebuff = 0x%02X)\n", ftell(fd), statusbyte);
+      if (logfd != NULL) fprintf(logfd, "Err. at offset %04lX (bytebuff = 0x%02X)\n", fio_seek(fh, FIO_SEEK_CUR, 0), statusbyte);
       return(MIDI_TRACKERROR);
     }
     /* add the event to the queue */

@@ -48,7 +48,7 @@
 #define PVER "0.9.4 beta"
 #define PDATE "2014-2018"
 
-#define MAXTRACKS 64
+#define MAXTRACKS 32
 #define EVENTSCACHESIZE 64 /* *must* be a power of 2 !!! */
 #define EVENTSCACHEMASK 63 /* used by the circular events buffer */
 
@@ -539,10 +539,10 @@ static int compute_elapsed_time(unsigned long starttime, unsigned long *elapsed)
 
 /* check the event cache for a given event. to reset the cache, issue a single
  * call with trackpos < 0. */
-static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscache, long trackpos, int xmsdelay) {
+static struct midi_event_t far *getnexteventfromcache(struct midi_event_t *eventscache, long trackpos, int xmsdelay) {
   static unsigned int itemsincache = 0;
   static unsigned int curcachepos = 0;
-  struct midi_event_t *res = NULL;
+  struct midi_event_t far *res = NULL;
   long nextevent;
   /* if trackpos < 0 then this is only about flushing cache */
   if (trackpos < 0) {
@@ -801,7 +801,7 @@ static void copyline(char *d, int l, char *s) {
 }
 
 
-static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
+static enum playactions loadfile_midi(int fh, struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
   struct midi_chunkmap_t *chunkmap;
   int miditracks;
   int i;
@@ -811,15 +811,13 @@ static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struc
 
   *trackpos = -1;
 
-  if (fd == NULL) return(ACTION_ERR_HARD);
-
   chunkmap = malloc(sizeof(struct midi_chunkmap_t) * MAXTRACKS);
   if (chunkmap == NULL) {
     ui_puterrmsg(params->midifile, "Error: Out of memory");
     return(ACTION_ERR_HARD);
   }
 
-  if (midi_readhdr(fd, &(trackinfo->midiformat), &miditracks, &(trackinfo->miditimeunitdiv), chunkmap, MAXTRACKS) != 0) {
+  if (midi_readhdr(fh, &(trackinfo->midiformat), &miditracks, &(trackinfo->miditimeunitdiv), chunkmap, MAXTRACKS) != 0) {
     ui_puterrmsg(params->midifile, "Error: Invalid MIDI file format");
     free(chunkmap);
     return(ACTION_ERR_SOFT);
@@ -847,7 +845,7 @@ static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struc
     char tracktitle[UI_TITLEMAXLEN];
     unsigned long tracklen;
     /* is it really a track we got here? */
-    if (strcmp(chunkmap[i].id, "MTrk") != 0) {
+    if (bcmp(chunkmap[i].id, "MTrk", 4) != 0) {
       char errstr[64];
       sprintf(errstr, "Error: Unexpected chunk (expecting mtrk #%d)", i);
       ui_puterrmsg(params->midifile, errstr);
@@ -856,11 +854,11 @@ static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struc
     }
 
     if (params->logfd != NULL) fprintf(params->logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, chunkmap[i].offset);
-    fseek(fd, chunkmap[i].offset, SEEK_SET);
+    fio_seek(fh, FIO_SEEK_START, chunkmap[i].offset);
     if (i == 0) { /* copyright and text events are fetched from track 0 only */
-      newtrack = midi_track2events(fd, tracktitle, UI_TITLEMAXLEN, copystring, UI_TITLEMAXLEN, text, sizeof(text), &(trackinfo->channelsusage), params->logfd, &tracklen, trackinfo->reqpatches);
+      newtrack = midi_track2events(fh, tracktitle, UI_TITLEMAXLEN, copystring, UI_TITLEMAXLEN, text, sizeof(text), &(trackinfo->channelsusage), params->logfd, &tracklen, trackinfo->reqpatches);
     } else {
-      newtrack = midi_track2events(fd, tracktitle, UI_TITLEMAXLEN, NULL, 0, NULL, 0, &(trackinfo->channelsusage), params->logfd, &tracklen, trackinfo->reqpatches);
+      newtrack = midi_track2events(fh, tracktitle, UI_TITLEMAXLEN, NULL, 0, NULL, 0, &(trackinfo->channelsusage), params->logfd, &tracklen, trackinfo->reqpatches);
     }
     /* look for error conditions */
     if (newtrack == MIDI_OUTOFMEM) {
@@ -905,7 +903,7 @@ static enum playactions loadfile_midi(FILE *fd, struct clioptions *params, struc
 
 
 static enum playactions loadfile(struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
-  FILE *fd;
+  int fh;
   unsigned char hdr[16];
   enum playactions res;
 
@@ -913,19 +911,18 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
   mem_clear();
 
   /* (try to) open the music file */
-  fd = fopen(params->midifile, "rb");
-  if (fd == NULL) {
+  if (fio_open(params->midifile, FIO_OPEN_RD, &fh) != 0) {
     ui_puterrmsg(params->midifile, "Error: Failed to open the file");
     return(ACTION_ERR_SOFT);
   }
 
   /* read first few bytes of the file to detect its format, and rewind */
-  if (fread(hdr, 1, 16, fd) != 16) {
-    fclose(fd);
+  if (fio_read(fh, hdr, 16) != 16) {
+    fio_close(fh);
     ui_puterrmsg(params->midifile, "Error: Unknown file format");
     return(ACTION_ERR_SOFT);
   }
-  rewind(fd);
+  fio_seek(fh, FIO_SEEK_START, 0);
 
   /* analyze the header to guess the format of the file */
   trackinfo->fileformat = header2fileformat(hdr);
@@ -934,10 +931,10 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
   switch (trackinfo->fileformat) {
     case FORMAT_MIDI:
     case FORMAT_RMID:
-      res = loadfile_midi(fd, params, trackinfo, trackpos);
+      res = loadfile_midi(fh, params, trackinfo, trackpos);
       break;
     case FORMAT_MUS:
-      *trackpos = mus_load(fd, &(trackinfo->totlen), &(trackinfo->miditimeunitdiv), &(trackinfo->channelsusage), trackinfo->reqpatches);
+      *trackpos = mus_load(fh, &(trackinfo->totlen), &(trackinfo->miditimeunitdiv), &(trackinfo->channelsusage), trackinfo->reqpatches);
       if (*trackpos == MUS_OUTOFMEM) { /* detect out of memory */
         res = ACTION_ERR_SOFT;
         ui_puterrmsg(params->midifile, "Error: Out of memory");
@@ -955,7 +952,7 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
       ui_puterrmsg(params->midifile, "Error: Unknown file format");
       break;
   }
-  fclose(fd);
+  fio_close(fh);
 
   /* if no text data could be found at all, add a note about that */
   if ((res == ACTION_NONE) && (trackinfo->titlescount == 0)) {
@@ -1014,7 +1011,7 @@ static void init_trackinfo(struct trackinfodata *trackinfo, struct clioptions *p
 
 
 /* plays a file. returns 0 on success, non-zero if the program must exit */
-static enum playactions playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event_t *eventscache) {
+static enum playactions playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event_t far *eventscache) {
   static int volume = 100; /* volume is static because it needs to be retained between songs */
   int i;
   enum playactions exitaction;
@@ -1023,7 +1020,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   unsigned short refreshchans = 0xffffu;
   long trackpos;
   unsigned long midiplaybackstart;
-  struct midi_event_t *curevent;
+  struct midi_event_t far *curevent;
   unsigned long elticks = 0; /* used only to count clock ticks in debug mode */
   unsigned char *sysexbuff;
 
@@ -1299,7 +1296,7 @@ int main(int argc, char **argv) {
   char *errstr;
   enum playactions action = ACTION_NONE;
   struct trackinfodata *trackinfo;
-  struct midi_event_t *eventscache;
+  struct midi_event_t far *eventscache;
   int softerrcount = 0; /* counts soft errors - if too many occurs at once, dosmid quits */
 
   /* make sure to init all CLI params to empty values */
