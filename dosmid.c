@@ -700,25 +700,24 @@ static char *getnextm3uitem(char *playlist, int randomize) {
   long fsize;
   static long pos = 0;
   int slen;
-  FILE *fd;
+  int fh;
   /* open the playlist and read its size */
-  fd = fopen(playlist, "rb");
-  if (fd == NULL) return(NULL);
-  fseek(fd, 0, SEEK_END);
-  fsize = ftell(fd);
+  if (fio_open(playlist, FIO_OPEN_RD, &fh) != 0) return(NULL);
+  fsize = fio_seek(fh, FIO_SEEK_END, 0);
   if (fsize < 3) { /* a one-entry m3u would be at least 3 bytes long */
-    fclose(fd);
+    fio_close(fh);
     return(NULL);
   }
   if (randomize != 0) {
     /* go to a random position (avoid last bytes, could be an empty \r\n record) */
     pos = rand() % (fsize - 2);
   }
-  fseek(fd, pos, SEEK_SET);
+  fio_seek(fh, FIO_SEEK_START, pos);
   /* rewind back to nearest \n or 0 position */
   while (pos > 0) {
-    if (fgetc(fd) != '\n') {
-      fseek(fd, -2, SEEK_CUR);
+    fio_read(fh, tempstr, 1);
+    if (tempstr[0] != '\n') {
+      fio_seek(fh, FIO_SEEK_CUR, -2);
       pos--;
     } else {
       pos++;
@@ -730,8 +729,8 @@ static char *getnextm3uitem(char *playlist, int randomize) {
   slen = 0;
   fnamebuf[0] = 0;
   for (;;) {
-    int c = fgetc(fd);
-    if ((c == EOF) || (c == '\r') || (c == '\n')) break;
+    char c;
+    if ((fio_read(fh, &c, 1) != 1) || (c == '\r') || (c == '\n')) break;
     pos++;
     fnamebuf[slen++] = c;
     if (slen == sizeof(fnamebuf)) { /* overflow! */
@@ -744,12 +743,12 @@ static char *getnextm3uitem(char *playlist, int randomize) {
   /* if sequential reading of the playlist, then jump to next entry */
   if (randomize == 0) {
     for (;;) {
-      int c = fgetc(fd);
-      if ((c == '\r') || (c == '\n')) {
-        pos++;
-      } else if (c == EOF) {
+      char c;
+      if (fio_read(fh, &c, 1) != 1) {
         pos = 0;
         break;
+      } else if ((c == '\r') || (c == '\n')) {
+        pos++;
       } else {
         break;
       }
@@ -757,7 +756,7 @@ static char *getnextm3uitem(char *playlist, int randomize) {
   }
 
   /* close the file descriptor */
-  fclose(fd);
+  fio_close(fh);
   /* trim any leading spaces, if any */
   rtrim(fnamebuf);
   /* if empty, something went wrong */
