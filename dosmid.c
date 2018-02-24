@@ -28,7 +28,7 @@
  */
 
 #include <dos.h>
-#include <stdio.h>  /* printf(), fopen()... */
+#include <stdio.h>  /* printf() */
 #include <limits.h> /* ULONG_MAX */
 #include <stdlib.h> /* malloc(), free(), rand() */
 #include <string.h> /* strcmp() */
@@ -1057,26 +1057,25 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   /* if a SYX init file is provided, feed it to the MIDI synth now */
   if (params->syxrst != NULL) {
     int syxlen;
-    FILE *syxfd;
+    struct fiofile_t syxfh;
     /* open the syx file */
-    syxfd = fopen(params->syxrst, "rb");
-    if (syxfd == NULL) {
+    if (fio_open(params->syxrst, FIO_OPEN_RD, &syxfh) != 0) {
       ui_puterrmsg(params->syxrst, "Error: Failed to open the SYX file");
       return(ACTION_ERR_HARD);
     }
     /* alloc a temporary buffer to hold sysex messages */
     sysexbuff = malloc(8192);
     if (sysexbuff == NULL) {
-      fclose(syxfd);
+      fio_close(&syxfh);
       ui_puterrmsg(params->syxrst, "Error: Out of memory");
       return(ACTION_ERR_HARD);
     }
     /* read SYSEX messages until EOF */
     for (;;) {
-      syxlen = syx_fetchnext(syxfd, sysexbuff, 8192);
+      syxlen = syx_fetchnext(&syxfh, sysexbuff, 8192);
       if (syxlen == 0) break; /* EOF */
       if (syxlen < 0) { /* error condition */
-        fclose(syxfd); /* close the syx file */
+        fio_close(&syxfh); /* close the syx file */
         free(sysexbuff);
         ui_puterrmsg(params->syxrst, "Error: Failed to process the SYX file");
         return(ACTION_ERR_HARD);
@@ -1090,7 +1089,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         udelay(250000lu);          /* a very long time to be processed on    */
       }                            /* MT32 rev00 gears.                      */
     }
-    fclose(syxfd); /* close the syx file */
+    fio_close(&syxfh); /* close the syx file */
     free(sysexbuff);
   }
 

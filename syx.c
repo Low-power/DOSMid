@@ -6,21 +6,21 @@
 
 #include <stdio.h>
 
+#include "fio.h"
 #include "syx.h" /* include self for control */
 
 
 /* fetch the next sysex event from file *fd, and copies it into *buff, up to
  * bufflen bytes. returns the length of the sysex string on success, 0 on
  * end of file, and a negative value on error. */
-int syx_fetchnext(FILE *fd, unsigned char *buff, int bufflen) {
-  int bytebuff, reslen = 0;
+int syx_fetchnext(struct fiofile_t *fh, unsigned char *buff, int bufflen) {
+  int reslen = 0;
+  unsigned char bytebuff;
   /* quit immediately if any of the arguments is invalid */
-  if ((fd == NULL) || (buff == NULL) || (bufflen < 1)) return(SYXERR_INVALIDPARAM);
+  if ((fh == NULL) || (buff == NULL) || (bufflen < 1)) return(SYXERR_INVALIDPARAM);
   /* */
   for (;;) {
-    bytebuff = fgetc(fd);
-    /* check for eof or i/o error */
-    if (bytebuff < 0) {
+    if (fio_read(fh, &bytebuff, 1) != 1) { /* check for eof or i/o error */
       if (reslen == 0) return(0); /* clean end of file */
       return(SYXERR_UNEXPECTEDEOF); /* error - I expect sysex data to be terminated with F0 */
     }
