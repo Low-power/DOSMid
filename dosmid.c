@@ -81,7 +81,9 @@ struct clioptions {
   int delay;        /* additional delay to apply before playing a file */
   char *playlist;   /* the playlist to read files from */
   char *sbnk;       /* optional sound bank to use (IBK file or so) */
+#ifdef DBGFILE
   FILE *logfd;      /* an open file descriptor to the debug log file */
+#endif
 };
 
 
@@ -418,6 +420,7 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
     params->device = DEV_SBMIDI;
     params->devport = hexstr2uint(arg + 8);
     if (params->devport < 1) return("Invalid SBMIDI port provided. Example: /sbmidi=220$");
+#ifdef DBGFILE
   } else if (stringstartswith(arg, "/log=") == 0) {
     if (params->logfd == NULL) {
       params->logfd = fopen(arg + 5, "wb");
@@ -425,6 +428,7 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
         return("Failed to open the debug log file.$");
       }
     }
+#endif
   } else if (stringstartswith(arg, "/syx=") == 0) {
     params->syxrst = strdup(arg + 5);
   } else if (stringstartswith(arg, "/delay=") == 0) {
@@ -822,7 +826,9 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
     return(ACTION_ERR_SOFT);
   }
 
+#ifdef DBGFILE
   if (params->logfd != NULL) fprintf(params->logfd, "LOADED FILE '%s': format=%d tracks=%d timeunitdiv=%u\n", params->midifile, trackinfo->midiformat, miditracks, trackinfo->miditimeunitdiv);
+#endif
 
   if ((trackinfo->midiformat != 0) && (trackinfo->midiformat != 1)) {
     char errstr[64];
@@ -852,12 +858,25 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
       return(ACTION_ERR_SOFT);
     }
 
+#ifdef DBGFILE
     if (params->logfd != NULL) fprintf(params->logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, chunkmap[i].offset);
+#endif
     fio_seek(f, FIO_SEEK_START, chunkmap[i].offset);
     if (i == 0) { /* copyright and text events are fetched from track 0 only */
-      newtrack = midi_track2events(f, tracktitle, UI_TITLEMAXLEN, copystring, UI_TITLEMAXLEN, text, sizeof(text), &(trackinfo->channelsusage), params->logfd, &tracklen, trackinfo->reqpatches);
+      newtrack = midi_track2events(f, tracktitle, UI_TITLEMAXLEN, copystring,
+                                   UI_TITLEMAXLEN, text, sizeof(text),
+                                   &(trackinfo->channelsusage),
+#ifdef DBGFILE
+                                   params->logfd,
+#endif
+                                   &tracklen, trackinfo->reqpatches);
     } else {
-      newtrack = midi_track2events(f, tracktitle, UI_TITLEMAXLEN, NULL, 0, NULL, 0, &(trackinfo->channelsusage), params->logfd, &tracklen, trackinfo->reqpatches);
+      newtrack = midi_track2events(f, tracktitle, UI_TITLEMAXLEN, NULL, 0,
+                                   NULL, 0, &(trackinfo->channelsusage),
+#ifdef DBGFILE
+                                   params->logfd,
+#endif
+                                   &tracklen, trackinfo->reqpatches);
     }
     /* look for error conditions */
     if (newtrack == MIDI_OUTOFMEM) {
@@ -881,7 +900,9 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
     /* merge the track now */
     if (newtrack >= 0) {
       *trackpos = midi_mergetrack(*trackpos, newtrack, &(trackinfo->totlen), trackinfo->miditimeunitdiv);
+#ifdef DBGFILE
       if (params->logfd != NULL) fprintf(params->logfd, "TRACK %d MERGED (start id=%ld) -> TOTAL TIME: %ld\n", i, *trackpos, trackinfo->totlen);
+#endif
     }
   }
   /* free memory */
@@ -1045,7 +1066,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   timer_reset();
   timer_read(&nexteventtime); /* save current time, to schedule when the song shall start */
 
+#ifdef DBGFILE
   if (params->logfd != NULL) fprintf(params->logfd, "Reset MPU\n");
+#endif
 
   /* load piano to all channels (even real MIDI synths do not always reset
    * those properly) - this could just as well happen during dev_clear(), but
@@ -1112,7 +1135,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     for (i = 0; i < 256; i++) {
       if (BIT_GET(trackinfo->reqpatches, i) != 0) {
         dev_preloadpatch(params->device, i);
+#ifdef DBGFILE
         if (params->logfd != NULL) fprintf(params->logfd, "preloading patch %d\n", i);
+#endif
       }
     }
   }
@@ -1188,44 +1213,60 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 
     switch (curevent->type) {
       case EVENT_NOTEON:
+#ifdef DBGFILE
         if (params->logfd != NULL) fprintf(params->logfd, "%lu: NOTE ON chan: %d / note: %d / vel: %d\n", trackinfo->elapsedsec, curevent->data.note.chan, curevent->data.note.note, curevent->data.note.velocity);
+#endif
         dev_noteon(curevent->data.note.chan, curevent->data.note.note, (volume * curevent->data.note.velocity) / 100);
         trackinfo->notestates[curevent->data.note.note] |= (1 << curevent->data.note.chan);
         refreshflags |= UI_REFRESH_NOTES;
         refreshchans |= (1 << curevent->data.note.chan);
         break;
       case EVENT_NOTEOFF:
+#ifdef DBGFILE
         if (params->logfd != NULL) fprintf(params->logfd, "%lu: NOTE OFF chan: %d / note: %d\n", trackinfo->elapsedsec, curevent->data.note.chan, curevent->data.note.note);
+#endif
         dev_noteoff(curevent->data.note.chan, curevent->data.note.note);
         trackinfo->notestates[curevent->data.note.note] &= (0xFFFF ^ (1 << curevent->data.note.chan));
         refreshflags |= UI_REFRESH_NOTES;
         refreshchans |= (1 << curevent->data.note.chan);
         break;
       case EVENT_TEMPO:
+#ifdef DBGFILE
         if (params->logfd != NULL) fprintf(params->logfd, "%lu (%lu): TEMPO change from %lu to %lu\n", trackinfo->elapsedsec, elticks, trackinfo->tempo, curevent->data.tempoval);
+#endif
         trackinfo->tempo = curevent->data.tempoval;
         refreshflags |= UI_REFRESH_TEMPO;
         break;
       case EVENT_PROGCHAN:
+#ifdef DBGFILE
         if (params->logfd != NULL) fprintf(params->logfd, "%lu: CHANNEL #%d PROG: %d\n", trackinfo->elapsedsec, curevent->data.prog.chan, curevent->data.prog.prog);
+#endif
         trackinfo->chanprogs[curevent->data.prog.chan] = curevent->data.prog.prog;
         dev_setprog(curevent->data.prog.chan, curevent->data.prog.prog);
         refreshflags |= UI_REFRESH_PROGS;
         break;
       case EVENT_PITCH:
+#ifdef DBGFILE
         if (params->logfd != NULL) fprintf(params->logfd, "%lu: PITCH WHEEL ON CHAN #%d: %d\n", trackinfo->elapsedsec, curevent->data.pitch.chan, curevent->data.pitch.wheel);
+#endif
         dev_pitchwheel(curevent->data.pitch.chan, curevent->data.pitch.wheel);
         break;
       case EVENT_CONTROL:
+#ifdef DBGFILE
         if (params->logfd != NULL) fprintf(params->logfd, "%lu: CONTROLLER %d ON CHAN #%d -> val %d\n", trackinfo->elapsedsec, curevent->data.control.id, curevent->data.control.chan, curevent->data.control.val);
+#endif
         dev_controller(curevent->data.control.chan, curevent->data.control.id, curevent->data.control.val);
         break;
       case EVENT_CHANPRESSURE:
+#ifdef DBGFILE
         if (params->logfd != NULL) fprintf(params->logfd, "%lu: CHANNEL PRESSURE %d ON CHAN #%d\n", trackinfo->elapsedsec, curevent->data.chanpressure.pressure, curevent->data.chanpressure.chan);
+#endif
         dev_chanpressure(curevent->data.chanpressure.chan, curevent->data.chanpressure.pressure);
         break;
       case EVENT_KEYPRESSURE:
+#ifdef DBGFILE
         if (params->logfd != NULL) fprintf(params->logfd, "%lu: KEY PRESSURE %d ON CHAN #%d, KEY %d\n", trackinfo->elapsedsec, curevent->data.keypressure.pressure, curevent->data.keypressure.chan, curevent->data.keypressure.note);
+#endif
         dev_keypressure(curevent->data.keypressure.chan, curevent->data.keypressure.note, curevent->data.keypressure.pressure);
         break;
       case EVENT_SYSEX:
@@ -1233,9 +1274,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         unsigned short sysexlen;
         /* read two bytes from sysexptr so I know how long the thing is */
         mem_pull(curevent->data.sysex.sysexptr, &sysexlen, 2);
-        if (params->logfd != NULL) {
-          fprintf(params->logfd, "%lu: SYSEX is %d bytes long", trackinfo->elapsedsec, sysexlen);
-        }
+#ifdef DBGFILE
+        if (params->logfd != NULL) fprintf(params->logfd, "%lu: SYSEX is %d bytes long", trackinfo->elapsedsec, sysexlen);
+#endif
         /* */
         i = sysexlen;
         if ((i & 1) != 0) i++; /* XMS moves MUST occur on even-aligned data only */
@@ -1243,22 +1284,26 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         if (sysexbuff != NULL) {
           mem_pull(curevent->data.sysex.sysexptr, sysexbuff, i + 2);
           dev_sysex(sysexbuff[2] & 0x0F, sysexbuff + 2, sysexlen);
+#ifdef DBGFILE
           if (params->logfd != NULL) {
             for (i = 0; i < sysexlen; i++) {
               fprintf(params->logfd, " %02Xh", sysexbuff[i + 2]);
             }
             fprintf(params->logfd, "\n");
           }
+#endif
           free(sysexbuff);
+#ifdef DBGFILE
         } else {
           if (params->logfd != NULL) fprintf(params->logfd, " ERROR\n");
+#endif
         }
         break;
       }
       default:
-        if (params->logfd != NULL) {
-          fprintf(params->logfd, "%lu: ILLEGAL COMMAND: 0x%02X\n", trackinfo->elapsedsec, curevent->type);
-        }
+#ifdef DBGFILE
+        if (params->logfd != NULL) fprintf(params->logfd, "%lu: ILLEGAL COMMAND: 0x%02X\n", trackinfo->elapsedsec, curevent->type);
+#endif
         break;
     }
 
@@ -1267,7 +1312,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 
   }
 
+#ifdef DBGFILE
   if (params->logfd != NULL) fprintf(params->logfd, "Clear notes\n");
+#endif
 
   /* Look for notes that are still ON and turn them OFF */
   for (i = 0; i < 128; i++) {
@@ -1330,9 +1377,11 @@ int main(int argc, char **argv) {
       dos_puts(" /com[=XXX] output MIDI messages to the RS-232 port at I/O address XXX\r\n"
                " /comX      same as /com=XXX, but takes a COM port instead (example: /com1)\r\n"
                " /gus       use the Gravis UltraSound card (requires ULTRAMID)\r\n"
-               " /syx=FILE  use SYSEX instructions from FILE for MIDI initialization\r\n"
-               " /sbnk=FILE load a custom sound bank file(s) (IBK on OPL, SBK on AWE)$");
-      dos_puts(" /log=FILE  write highly verbose logs about DOSMid's activity to FILE\r\n"
+               " /syx=FILE  use SYSEX instructions from FILE for MIDI initialization$");
+      dos_puts(" /sbnk=FILE load a custom sound bank file(s) (IBK on OPL, SBK on AWE)\r\n"
+#ifdef DBGFILE
+               " /log=FILE  write highly verbose logs about DOSMid's activity to FILE\r\n"
+#endif
                " /fullcpu   do not let DOSMid try to be CPU-friendly\r\n"
                " /dontstop  never wait for a keypress on error and continue the playlist\r\n"
                " /random    randomize playlist order\r\n"
@@ -1373,7 +1422,9 @@ int main(int argc, char **argv) {
     unsigned short rflags = 0xffffu, rchans = 0xffffu;
     ui_draw(&trackinfo, &rflags, &rchans, PVER, params.devname, params.devport, 100);
   }
+#ifdef DBGFILE
   if (params.logfd != NULL) fprintf(params.logfd, "INIT SOUND HARDWARE\n");
+#endif
   errstr = dev_init(params.device, params.devport, params.sbnk);
   if (errstr != NULL) {
     ui_puterrmsg("Hardware initialization failure", errstr);
@@ -1443,18 +1494,17 @@ int main(int argc, char **argv) {
   /* unload XMS memory */
   mem_close();
 
-  /* free allocated heap memory */
-  if (params.logfd != NULL) fprintf(params.logfd, "Free heap memory\n");
-
   /* free the allocated strings, if any */
   if (params.sbnk != NULL) free(params.sbnk);
   if (params.syxrst != NULL) free(params.syxrst);
 
   /* if a verbose log file was used, close it now */
+#ifdef DBGFILE
   if (params.logfd != NULL) {
     fprintf(params.logfd, "Closing the log file\n");
     fclose(params.logfd);
   }
+#endif
 
   dos_puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste$");
 

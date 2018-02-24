@@ -159,7 +159,12 @@ int midi_readhdr(struct fiofile_t *f, int *format, int *tracks, unsigned short *
 
 
 /* returns a negative value on error, 0 on success, 1 on end of track */
+#ifdef DBGFILE
 static int ld_meta(struct midi_event_t *event, struct fiofile_t *f, FILE *logfd, unsigned long *tracklen, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen) {
+#else
+static int ld_meta(struct midi_event_t *event, struct fiofile_t *f, unsigned long *tracklen, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen) {
+#endif
+
   unsigned long metalen;
   unsigned long i;
   int result = 0;
@@ -190,7 +195,9 @@ static int ld_meta(struct midi_event_t *event, struct fiofile_t *f, FILE *logfd,
       }
       /* skip the rest, if we had to truncate the string */
       fio_seek(f, FIO_SEEK_CUR, metalen - i);
+#ifdef DBGFILE
       if (logfd != NULL) fprintf(logfd, "%lu: TEXT OR MARKER EVENT\n", *tracklen);
+#endif
       break;
     case 2: /* copyright notice */
       i = 0;
@@ -216,23 +223,33 @@ static int ld_meta(struct midi_event_t *event, struct fiofile_t *f, FILE *logfd,
       break;
     case 4: /* instrument name */
       fio_seek(f, FIO_SEEK_CUR, metalen);
+#ifdef DBGFILE
       if (logfd != NULL) fprintf(logfd, "%lu: INSTRUMENT EVENT (ignored)\n", *tracklen);
+#endif
       break;
     case 5: /* lyric */
       fio_seek(f, FIO_SEEK_CUR, metalen);
+#ifdef DBGFILE
       if (logfd != NULL) fprintf(logfd, "%lu: LYRIC EVENT (ignored)\n", *tracklen);
+#endif
       break;
     case 0x21:  /* MIDI port -- no support for multi-MIDI files, I just ignore it */
       fio_seek(f, FIO_SEEK_CUR, metalen);
+#ifdef DBGFILE
       if (logfd != NULL) fprintf(logfd, "%lu: MIDI PORT EVENT (ignored)\n", *tracklen);
+#endif
       break;
     case 0x2F: /* end of track */
+#ifdef DBGFILE
       if (logfd != NULL) fprintf(logfd, "%lu: END OF TRACK\n", *tracklen);
+#endif
       result = 1;
       break;
     case 0x51:  /* set tempo */
       if (metalen != 3) {
+#ifdef DBGFILE
         if (logfd != NULL) fprintf(logfd, "%lu: TEMPO ERROR\n", *tracklen);
+#endif
         return(-1);
       } else {
         unsigned char b[3];
@@ -243,38 +260,54 @@ static int ld_meta(struct midi_event_t *event, struct fiofile_t *f, FILE *logfd,
         event->data.tempoval |= b[1];
         event->data.tempoval <<= 8;
         event->data.tempoval |= b[2];
+#ifdef DBGFILE
         if (logfd != NULL) fprintf(logfd, "%lu: TEMPO -> %lu\n", *tracklen, event->data.tempoval);
+#endif
       }
       break;
     case 0x54:  /* SMPTE offset -> since I expect only format 0/1 files, I ignore this because I want to start playing asap anyway */
       fio_seek(f, FIO_SEEK_CUR, metalen);
+#ifdef DBGFILE
       if (logfd != NULL) fprintf(logfd, "%lu: SMPTE OFFSET (ignored)\n", *tracklen);
+#endif
       break;
     case 0x58:  /* Time signature */
       if (metalen != 4) {
+#ifdef DBGFILE
         if (logfd != NULL) fprintf(logfd, "%lu: INVALID TIME SIGNATURE!\n", *tracklen);
+#endif
         return(-1);
       } else {
         fio_seek(f, FIO_SEEK_CUR, metalen);
+#ifdef DBGFILE
         if (logfd != NULL) fprintf(logfd, "%lu: TIME SIGNATURE (ignored)\n", *tracklen);
+#endif
       }
       break;
     case 0x59:  /* key signature */
       if (metalen != 2) {
+#ifdef DBGFILE
         if (logfd != NULL) fprintf(logfd, "%lu: INVALID KEY SIGNATURE!\n", *tracklen);
+#endif
         return(-1);
       } else {
         fio_seek(f, FIO_SEEK_CUR, metalen);
+#ifdef DBGFILE
         if (logfd != NULL) fprintf(logfd, "%lu: KEY SIGNATURE (ignored)\n", *tracklen);
+#endif
       }
       break;
     case 0x7F:  /* proprietary event -> this is non-standard stuff, I ignore it */
       fio_seek(f, FIO_SEEK_CUR, metalen);
+#ifdef DBGFILE
       if (logfd != NULL) fprintf(logfd, "%lu: PROPRIETARY EVENT (ignored)\n", *tracklen);
+#endif
       break;
     default:
       fio_seek(f, FIO_SEEK_CUR, metalen); /* skip the meta data */
+#ifdef DBGFILE
       if (logfd != NULL) fprintf(logfd, "%lu: UNHANDLED META EVENT [0x%02Xh] (ignored)\n", *tracklen, subtype);
+#endif
       break;
   }
   return(result);
@@ -282,13 +315,19 @@ static int ld_meta(struct midi_event_t *event, struct fiofile_t *f, FILE *logfd,
 
 
 /* returns a negative value on error, 0 on success, 1 on end of track */
+#ifdef DBGFILE
 static int ld_sysex(struct midi_event_t *event, struct fiofile_t *f, FILE *logfd, unsigned char statusbyte, unsigned long *tracklen) {
+#else
+static int ld_sysex(struct midi_event_t *event, struct fiofile_t *f, unsigned char statusbyte, unsigned long *tracklen) {
+#endif
   unsigned long sysexlen;
   int sysexleneven; /* can be int, guaranteed to be less than 4K */
   unsigned char *sysexbuff;
   midi_fetch_variablelen_fromfile(f, &sysexlen); /* get length */
   sysexlen += 1; /* add one byte for the status byte that is not counted, but that we will add to the top of the buffer later */
+#ifdef DBGFILE
   if (logfd != NULL) fprintf(logfd, "%lu: SYSEX EVENT OF %ld BYTES ON CHAN #%d\n", *tracklen, sysexlen, statusbyte & 0x0F);
+#endif
   if (sysexlen > 4096) { /* skip SYSEX events that are more than 4K big */
     fio_seek(f, FIO_SEEK_CUR, sysexlen);
     return(0);
@@ -298,7 +337,9 @@ static int ld_sysex(struct midi_event_t *event, struct fiofile_t *f, FILE *logfd
   if ((sysexleneven & 1) != 0) sysexleneven++; /* make sysexleneven an even number (XMS moves MUST occur on even numbers of bytes) */
   sysexbuff = malloc(sysexleneven);
   if (sysexbuff == NULL) {
+#ifdef DBGFILE
     if (logfd != NULL) fprintf(logfd, "%lu: SYSEX MALLOC FAILED FOR %ld BYTES\n", *tracklen, sysexleneven);
+#endif
     return(MIDI_OUTOFMEM);
   }
   event->type = EVENT_SYSEX;
@@ -313,7 +354,9 @@ static int ld_sysex(struct midi_event_t *event, struct fiofile_t *f, FILE *logfd
     event->type = EVENT_NONE;
     free(sysexbuff);
     sysexbuff = NULL;
+#ifdef DBGFILE
     if (logfd != NULL) fprintf(logfd, "%lu: SYSEX MEM_ALLOC FAILED FOR %ld BYTES\n", *tracklen, sysexlen);
+#endif
     return(MIDI_OUTOFMEM);
   }
   free(sysexbuff);
@@ -321,7 +364,11 @@ static int ld_sysex(struct midi_event_t *event, struct fiofile_t *f, FILE *logfd
 }
 
 
+#ifdef DBGFILE
 static int ld_note(struct midi_event_t *event, struct fiofile_t *f, FILE *logfd, unsigned char statusbyte, unsigned long *tracklen, unsigned short *channelsusage, void *reqpatches) {
+#else
+static int ld_note(struct midi_event_t *event, struct fiofile_t *f, unsigned char statusbyte, unsigned long *tracklen, unsigned short *channelsusage, void *reqpatches) {
+#endif
   unsigned char ubuff[2]; /* micro buffer for loading data */
   switch (statusbyte & 0xF0) { /* I care only about NoteOn/NoteOff events */
     case 0x80:  /* Note OFF */
@@ -381,7 +428,9 @@ static int ld_note(struct midi_event_t *event, struct fiofile_t *f, FILE *logfd,
       event->data.pitch.wheel |= ubuff[0];
       break;
     default:
+#ifdef DBGFILE
       if (logfd != NULL) fprintf(logfd, "%lu: Unknown note data\n", *tracklen);
+#endif
       return(-1);
       break;
   }
@@ -396,7 +445,11 @@ static int ld_note(struct midi_event_t *event, struct fiofile_t *f, FILE *logfd,
  * returns MIDI_EMPTYTRACK if no event found in the track
  * returns MIDI_TRACKERROR if the track is corrupted
  * returns MIDI_OUTOFMEM if failed to store events in memory */
+#ifdef DBGFILE
 long midi_track2events(struct fiofile_t *f, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen, unsigned short *channelsusage, FILE *logfd, unsigned long *tracklen, void *reqpatches) {
+#else
+long midi_track2events(struct fiofile_t *f, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen, unsigned short *channelsusage, unsigned long *tracklen, void *reqpatches) {
+#endif
   unsigned long deltatime;
   unsigned char statusbyte = 0;
   struct midi_event_t event;
@@ -428,17 +481,31 @@ long midi_track2events(struct fiofile_t *f, char *title, int titlemaxlen, char *
     event.deltatime = deltatime;
     event.next = -1;
     if (statusbyte == 0xFF) { /* META event */
+#ifdef DBGFILE
       r = ld_meta(&event, f, logfd, tracklen, title, titlemaxlen, copyright, copyrightmaxlen, text, textmaxlen);
+#else
+      r = ld_meta(&event, f, tracklen, title, titlemaxlen, copyright, copyrightmaxlen, text, textmaxlen);
+#endif
       if (r < 0) return(MIDI_TRACKERROR);
       if (r == 1) break; /* end of track */
     } else if ((statusbyte >= 0xF0) && (statusbyte <= 0xF7)) { /* SYSEX event */
+#ifdef DBGFILE
       r = ld_sysex(&event, f, logfd, statusbyte, tracklen);
+#else
+      r = ld_sysex(&event, f, statusbyte, tracklen);
+#endif
       if (r != 0) return(MIDI_TRACKERROR);
     } else if ((statusbyte >= 0x80) && (statusbyte <= 0xEF)) { /* else it's a note-related command */
+#ifdef DBGFILE
       r = ld_note(&event, f, logfd, statusbyte, tracklen, channelsusage, reqpatches);
+#else
+      r = ld_note(&event, f, statusbyte, tracklen, channelsusage, reqpatches);
+#endif
       if (r != 0) return(MIDI_TRACKERROR);
     } else { /* else it's an error - free memory we allocated and return NULL */
+#ifdef DBGFILE
       if (logfd != NULL) fprintf(logfd, "Err. at offset %04lX (bytebuff = 0x%02X)\n", fio_seek(f, FIO_SEEK_CUR, 0), statusbyte);
+#endif
       return(MIDI_TRACKERROR);
     }
     /* add the event to the queue */

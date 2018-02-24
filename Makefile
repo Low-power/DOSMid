@@ -6,6 +6,7 @@
 # you can control the availability of some features with the FEATURES string:
 #  -DSBAWE    enables SoundBlaster AWE drivers (+36K)
 #  -DOPL      enables MIDI emulation over OPL output (+7K)
+#  -DDBGFILE   enables debug output to file (+10K)
 FEATURES = -DSBAWE -DOPL
 
 # memory segmentation mode (s = small ; c = compact ; m = medium ; l = large)
