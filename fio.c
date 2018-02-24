@@ -9,11 +9,11 @@
 #include <dos.h>
 #include <fcntl.h>
 #include <share.h>
+#include <string.h> /* _fmemcpy() */
 
 #include "fio.h" /* include self for control */
 
-/* seek to offset position of file pointed at by fhandle. returns current file position on success, a negative error otherwise */
-signed long fio_seek(struct fiofile_t *f, unsigned short origin, signed long offset) {
+static void fio_seek_sync(struct fiofile_t *f) {
 /* DOS 2+ - LSEEK - SET CURRENT FILE POSITION
    AH = 42h
    AL = origin of move
@@ -29,15 +29,39 @@ signed long fio_seek(struct fiofile_t *f, unsigned short origin, signed long off
      CF set
      AX = error code */
   union REGS regs;
-  unsigned short *off = (unsigned short *)(&offset);
-  regs.h.ah = 0x42;
-  regs.h.al = origin;
+  unsigned short *off;
+  long offset;
+  if ((f->flags & FIO_FLAG_SEEKSYNC) == 0) return;
+  offset = f->curpos;
+  off = (unsigned short *)(&offset);
+  regs.x.ax = 0x4200u;
   regs.x.bx = f->fh;
   regs.x.cx = off[1];
   regs.x.dx = off[0];
   int86(0x21, &regs, &regs);
-  if (regs.x.cflag != 0) return(0 - regs.x.ax);
-  return(((long)regs.x.dx << 16) | regs.x.ax);
+  f->flags &= ~FIO_FLAG_SEEKSYNC;
+  /* if (regs.x.cflag != 0) return(0 - regs.x.ax);
+  return(((long)regs.x.dx << 16) | regs.x.ax); */
+}
+
+/* seek to offset position of file pointed at by fhandle. returns current file position on success, a negative error otherwise */
+signed long fio_seek(struct fiofile_t *f, unsigned short origin, signed long offset) {
+  switch (origin) {
+    case FIO_SEEK_START:
+      if (offset < 1) {
+        f->curpos = 0;
+      } else {
+        f->curpos = offset;
+      }
+      break;
+    case FIO_SEEK_END:
+      f->curpos = f->flen;
+    case FIO_SEEK_CUR:
+      f->curpos += offset;
+      break;
+  }
+  f->flags |= FIO_FLAG_SEEKSYNC;
+  return(f->curpos);
 }
 
 /* reads a line from file pointed at by fhandle, fill buff up to buflen bytes. returns the line length (possibly longer than buflen), or -1 on EOF */
@@ -63,6 +87,20 @@ int fio_getline(struct fiofile_t *f, void far *buff, short buflen) {
   return(linelen);
 }
 
+static void loadcache(struct fiofile_t *f) {
+  union REGS regs;
+  struct SREGS sregs;
+  fio_seek_sync(f);
+  f->flags |= FIO_FLAG_SEEKSYNC;
+  f->bufoffs = f->curpos;
+  regs.h.ah = 0x3f;
+  regs.x.bx = f->fh;
+  regs.x.cx = FIO_CACHE;
+  sregs.ds = FP_SEG(f->buff);
+  regs.x.dx = FP_OFF(f->buff);
+  int86x(0x21, &regs, &regs, &sregs);
+}
+
 /* open file fname and set fhandle with the associated file handle. returns 0 on success, non-zero otherwise */
 int fio_open(char far *fname, int mode, struct fiofile_t *f) {
   /* DOS 2+ - OPEN - OPEN EXISTING FILE
@@ -76,6 +114,7 @@ int fio_open(char far *fname, int mode, struct fiofile_t *f) {
      CF set on error */
   union REGS regs;
   struct SREGS sregs;
+  /* */
   regs.h.ah = 0x3d;
   regs.h.al = mode;
   sregs.ds = FP_SEG(fname);
@@ -83,6 +122,24 @@ int fio_open(char far *fname, int mode, struct fiofile_t *f) {
   int86x(0x21, &regs, &regs, &sregs);
   f->fh = regs.x.ax;
   if (regs.x.cflag != 0) return(-1);
+  /* */
+  f->curpos = 0;
+  loadcache(f);
+  /* fseek to end so I know the file length */
+  regs.x.ax = 0x4202u;
+  regs.x.bx = f->fh;
+  regs.x.cx = 0;
+  regs.x.dx = 0;
+  int86(0x21, &regs, &regs);
+  f->flen = (((long)regs.x.dx << 16) | regs.x.ax);
+  /* fseek to start */
+  regs.x.ax = 0x4200u;
+  regs.x.bx = f->fh;
+  regs.x.cx = 0;
+  regs.x.dx = 0;
+  int86(0x21, &regs, &regs);
+  /* */
+  f->flags = 0;
   return(0);
 }
 
@@ -100,6 +157,19 @@ int fio_read(struct fiofile_t *f, void far *buff, int count) {
  * AX = error code (05h,06h) (see #01680 at AH=59h/BX=0000h) */
   union REGS regs;
   struct SREGS sregs;
+  if (f->curpos + count > f->flen) count = f->flen - f->curpos;
+  if (count == 0) return(0);
+  if ((f->curpos >= f->bufoffs) && (f->curpos + count <= f->bufoffs + FIO_CACHE)) {
+    _fmemcpy(buff, f->buff + (f->curpos - f->bufoffs), count);
+    f->curpos += count;
+    return(count);
+  } else if (count <= FIO_CACHE) {
+    loadcache(f);
+    _fmemcpy(buff, f->buff, count);
+    f->curpos += count;
+    return(count);
+  }
+  fio_seek_sync(f);
   regs.h.ah = 0x3f;
   regs.x.bx = f->fh;
   regs.x.cx = count;
@@ -107,6 +177,7 @@ int fio_read(struct fiofile_t *f, void far *buff, int count) {
   regs.x.dx = FP_OFF(buff);
   int86x(0x21, &regs, &regs, &sregs);
   if (regs.x.cflag != 0) return(0 - regs.x.ax);
+  f->curpos += regs.x.ax;
   return(regs.x.ax);
 }
 

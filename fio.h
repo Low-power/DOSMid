@@ -17,12 +17,17 @@
 #define FIO_OPEN_WR 1
 #define FIO_OPEN_RW 2
 
+#define FIO_FLAG_SEEKSYNC 1
+
+#define FIO_CACHE 32
+
 struct fiofile_t {
-  unsigned short fh;     /* file handle (as used by DOS) */
-  unsigned long flen;    /* file length */
-  unsigned long curpos;  /* current offset position (ftell) */
-  unsigned buff[32];     /* buffer storage   */
-  unsigned long bufoffs; /* offset of buffer */
+  unsigned short fh;        /* file handle (as used by DOS) */
+  unsigned long flen;       /* file length */
+  unsigned long curpos;     /* current offset position (ftell) */
+  unsigned char buff[FIO_CACHE]; /* buffer storage   */
+  unsigned long bufoffs;    /* offset of buffer */
+  unsigned char flags;      /* flags */
 };
 
 /* open file fname and set fhandle with the associated file handle. returns 0 on success, non-zero otherwise */
