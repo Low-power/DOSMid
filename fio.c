@@ -159,13 +159,11 @@ int fio_read(struct fiofile_t *f, void far *buff, int count) {
   struct SREGS sregs;
   if (f->curpos + count > f->flen) count = f->flen - f->curpos;
   if (count == 0) return(0);
-  if ((f->curpos >= f->bufoffs) && (f->curpos + count <= f->bufoffs + FIO_CACHE)) {
+  if (count <= FIO_CACHE) {
+    if ((f->curpos < f->bufoffs) || (f->curpos + count > f->bufoffs + FIO_CACHE)) {
+      loadcache(f);
+    }
     _fmemcpy(buff, f->buff + (f->curpos - f->bufoffs), count);
-    f->curpos += count;
-    return(count);
-  } else if (count <= FIO_CACHE) {
-    loadcache(f);
-    _fmemcpy(buff, f->buff, count);
     f->curpos += count;
     return(count);
   }
