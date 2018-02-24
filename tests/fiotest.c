@@ -14,7 +14,7 @@ int main(void) {
   int i;
   struct fiofile_t f;
   long pos;
-  unsigned char buff[1024];
+  static unsigned char buff[1024];
 
   /* try opening a non-existing file - should fail */
   if (fio_open(FNAME, FIO_OPEN_RD, &f) == 0) {
@@ -90,7 +90,16 @@ int main(void) {
   /* try reading 500 bytes - should succeed only for 400 */
   pos = fio_read(&f, buff, 500);
   if (pos != 400) {
-    printf("ERR: fio_read() read an unexpected amount of bytes (%ld)\n", pos);
+    printf("ERR: fio_read() read an unexpected amount of bytes (%ld instead of 400)\n", pos);
+    fio_close(&f);
+    return(1);
+  }
+
+  /* go back 3 bytes, and read 4 bytes (only 3 should succeed) */
+  fio_seek(&f, FIO_SEEK_CUR, -3);
+  pos = fio_read(&f, buff, 4);
+  if (pos != 3) {
+    printf("ERR: fio_read() read an unexpected amount of bytes (%ld instead of 3)\n", pos);
     fio_close(&f);
     return(1);
   }
