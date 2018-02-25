@@ -27,7 +27,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h> /* malloc */
 #include <string.h> /* strcmp() */
 
 #include "bitfield.h"
@@ -36,6 +35,8 @@
 #include "midi.h"   /* include self for control */
 
 #define BSWAPL(x) ((((unsigned long)(x) & 0x000000FFul) << 24) | (((unsigned long)(x) & 0x0000FF00ul) << 8) | (((unsigned long)(x) & 0x00FF0000ul) >> 8) | (((unsigned long)(x) & 0xFF000000ul) >> 24))
+
+extern unsigned char wbuff[];
 
 /* PRIVATE ROUTINES USED FOR INTERNAL PROCESSING ONLY */
 
@@ -78,13 +79,11 @@ static int midi_getchunkmap(struct fiofile_t *f, struct midi_chunkmap_t *chunkli
 struct midi_chunk_t *midi_readchunk(struct fiofile_t *f) {
   unsigned char id[4];
   unsigned long len = 0;
-  struct midi_chunk_t *res;
+  struct midi_chunk_t *res = (void *)wbuff;
   if (fio_read(f, id, 4) != 4) return(NULL);
   /* fetch the length */
   if (fio_read(f, &len, 4) != 4) return(NULL);
   /* */
-  res = malloc(sizeof(struct midi_chunk_t) + (unsigned int)len);
-  if (res == NULL) return(NULL);
   /* copy the id string */
   res->id[0] = id[0];
   res->id[1] = id[1];
@@ -94,7 +93,6 @@ struct midi_chunk_t *midi_readchunk(struct fiofile_t *f) {
   res->datalen = BSWAPL(len);
   /* copy actual data */
   if (fio_read(f, res->data, res->datalen) != res->datalen) {
-    free(res);
     return(NULL);
   }
   return(res);
@@ -119,7 +117,6 @@ int midi_readhdr(struct fiofile_t *f, int *format, int *tracks, unsigned short *
 
   /* check id (MThd) and len (must be at least 6 bytes) */
   if ((bcmp(chunk->id, "MThd", 4) != 0) || (chunk->datalen < 6)) {
-    free(chunk);
     return(-5);
   }
 
@@ -129,7 +126,6 @@ int midi_readhdr(struct fiofile_t *f, int *format, int *tracks, unsigned short *
   *timeunitdiv = chunk->data[4];
   *timeunitdiv <<= 8;
   *timeunitdiv |= chunk->data[5];
-  free(chunk); /* won't be used any more*/
 
   /* timeunitdiv must be a positive number */
   if (*timeunitdiv < 1) return(-3);
@@ -323,13 +319,7 @@ static int ld_sysex(struct midi_event_t *event, struct fiofile_t *f, unsigned ch
   /* read the sysex string */
   sysexleneven = sysexlen + 2; /* add two bytes for the sysex length that I will add in front of the actual sysex string */
   if ((sysexleneven & 1) != 0) sysexleneven++; /* make sysexleneven an even number (XMS moves MUST occur on even numbers of bytes) */
-  sysexbuff = malloc(sysexleneven);
-  if (sysexbuff == NULL) {
-#ifdef DBGFILE
-    if (logfd != NULL) fprintf(logfd, "%lu: SYSEX MALLOC FAILED FOR %ld BYTES\n", *tracklen, sysexleneven);
-#endif
-    return(MIDI_OUTOFMEM);
-  }
+  sysexbuff = wbuff;
   event->type = EVENT_SYSEX;
 
   ((unsigned short *)sysexbuff)[0] = sysexlen;
@@ -340,14 +330,11 @@ static int ld_sysex(struct midi_event_t *event, struct fiofile_t *f, unsigned ch
     mem_push(sysexbuff, event->data.sysex.sysexptr, sysexleneven);
   } else {
     event->type = EVENT_NONE;
-    free(sysexbuff);
-    sysexbuff = NULL;
 #ifdef DBGFILE
     if (logfd != NULL) fprintf(logfd, "%lu: SYSEX MEM_ALLOC FAILED FOR %ld BYTES\n", *tracklen, sysexlen);
 #endif
     return(MIDI_OUTOFMEM);
   }
-  free(sysexbuff);
   return(0);
 }
 

@@ -30,7 +30,7 @@
 #include <dos.h>
 #include <stdio.h>  /* printf() */
 #include <limits.h> /* ULONG_MAX */
-#include <stdlib.h> /* malloc(), free(), rand() */
+#include <stdlib.h> /* rand() */
 #include <string.h> /* strcmp() */
 
 #include "bitfield.h"
@@ -51,6 +51,9 @@
 #define MAXTRACKS 64
 #define EVENTSCACHESIZE 64 /* *must* be a power of 2 !!! */
 #define EVENTSCACHEMASK 63 /* used by the circular events buffer */
+
+/* define a work buffer that will be used instead of malloc() calls whenever a temporary buffer is required */
+unsigned char wbuff[8192];
 
 enum playactions {
   ACTION_NONE = 0,
@@ -814,15 +817,10 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
 
   *trackpos = -1;
 
-  chunkmap = malloc(sizeof(struct midi_chunkmap_t) * MAXTRACKS);
-  if (chunkmap == NULL) {
-    ui_puterrmsg(params->midifile, "Error: Out of memory");
-    return(ACTION_ERR_HARD);
-  }
+  chunkmap = (void *)wbuff;
 
   if (midi_readhdr(f, &(trackinfo->midiformat), &miditracks, &(trackinfo->miditimeunitdiv), chunkmap, MAXTRACKS) != 0) {
     ui_puterrmsg(params->midifile, "Error: Invalid MIDI file format");
-    free(chunkmap);
     return(ACTION_ERR_SOFT);
   }
 
@@ -834,7 +832,6 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
     char errstr[64];
     sprintf(errstr, "Error: Unsupported MIDI format (%d)", trackinfo->midiformat);
     ui_puterrmsg(params->midifile, errstr);
-    free(chunkmap);
     return(ACTION_ERR_SOFT);
   }
 
@@ -842,7 +839,6 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
     char errstr[64];
     sprintf(errstr, "Error: Too many tracks (%d, max: %d)", miditracks, MAXTRACKS);
     ui_puterrmsg(params->midifile, errstr);
-    free(chunkmap);
     return(ACTION_ERR_SOFT);
   }
 
@@ -854,7 +850,6 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
       char errstr[64];
       sprintf(errstr, "Error: Unexpected chunk (expecting mtrk #%d)", i);
       ui_puterrmsg(params->midifile, errstr);
-      free(chunkmap);
       return(ACTION_ERR_SOFT);
     }
 
@@ -881,11 +876,9 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
     /* look for error conditions */
     if (newtrack == MIDI_OUTOFMEM) {
       ui_puterrmsg(params->midifile, "Error: Out of memory");
-      free(chunkmap);
       return(ACTION_ERR_SOFT);
     } else if (newtrack == MIDI_TRACKERROR) {
       ui_puterrmsg(params->midifile, "Error: Malformed MIDI file");
-      free(chunkmap);
       return(ACTION_ERR_SOFT);
     }
     /* there is a non-written rule saying that useful text is written into
@@ -905,8 +898,6 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
 #endif
     }
   }
-  /* free memory */
-  free(chunkmap);
   /* if we got any 'text', but no 'titles', then push the text into titles */
   if ((text[0] != 0) && (trackinfo->titlescount == 0)) {
     char *l;
@@ -1087,19 +1078,13 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
       return(ACTION_ERR_HARD);
     }
     /* alloc a temporary buffer to hold sysex messages */
-    sysexbuff = malloc(8192);
-    if (sysexbuff == NULL) {
-      fio_close(&syxfh);
-      ui_puterrmsg(params->syxrst, "Error: Out of memory");
-      return(ACTION_ERR_HARD);
-    }
+    sysexbuff = (void *)wbuff;
     /* read SYSEX messages until EOF */
     for (;;) {
       syxlen = syx_fetchnext(&syxfh, sysexbuff, 8192);
       if (syxlen == 0) break; /* EOF */
       if (syxlen < 0) { /* error condition */
         fio_close(&syxfh); /* close the syx file */
-        free(sysexbuff);
         ui_puterrmsg(params->syxrst, "Error: Failed to process the SYX file");
         return(ACTION_ERR_HARD);
       }
@@ -1113,7 +1098,6 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
       }                            /* MT32 rev00 gears.                      */
     }
     fio_close(&syxfh); /* close the syx file */
-    free(sysexbuff);
   }
 
   /* load the file into memory */
@@ -1280,24 +1264,17 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         /* */
         i = sysexlen;
         if ((i & 1) != 0) i++; /* XMS moves MUST occur on even-aligned data only */
-        sysexbuff = malloc(i);
-        if (sysexbuff != NULL) {
-          mem_pull(curevent->data.sysex.sysexptr, sysexbuff, i + 2);
-          dev_sysex(sysexbuff[2] & 0x0F, sysexbuff + 2, sysexlen);
+        sysexbuff = (void *)wbuff;
+        mem_pull(curevent->data.sysex.sysexptr, sysexbuff, i + 2);
+        dev_sysex(sysexbuff[2] & 0x0F, sysexbuff + 2, sysexlen);
 #ifdef DBGFILE
-          if (params->logfd != NULL) {
-            for (i = 0; i < sysexlen; i++) {
-              fprintf(params->logfd, " %02Xh", sysexbuff[i + 2]);
-            }
-            fprintf(params->logfd, "\n");
+        if (params->logfd != NULL) {
+          for (i = 0; i < sysexlen; i++) {
+            fprintf(params->logfd, " %02Xh", sysexbuff[i + 2]);
           }
-#endif
-          free(sysexbuff);
-#ifdef DBGFILE
-        } else {
-          if (params->logfd != NULL) fprintf(params->logfd, " ERROR\n");
-#endif
+          fprintf(params->logfd, "\n");
         }
+#endif
         break;
       }
       default:
