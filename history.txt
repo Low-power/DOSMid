@@ -6,6 +6,7 @@ DOSMid v0.9.4 [xx xxx xxxx]
  - UI displays channels as 'piano' if no instrument is explicitely loaded,
  - reduced libc dependencies (smaller footprint),
  - fixed a memory leak in midi code,
+ - adaptations to compile in small memory model (smaller, faster),
  - removed /log from the default build,
  - GUS support (requires the ULTRAMID TSR).
 
