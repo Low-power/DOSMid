@@ -58,7 +58,7 @@ struct oplstate_t {
 
 struct oplstate_t *oplmem = NULL; /* memory area holding all OPL's current states */
 
-static unsigned short freqtable[128] = {                         /* note # */
+const unsigned short freqtable[128] = {                          /* note # */
         345, 365, 387, 410, 435, 460, 488, 517, 547, 580, 615, 651,  /*  0 */
         690, 731, 774, 820, 869, 921, 975, 517, 547, 580, 615, 651,  /* 12 */
         690, 731, 774, 820, 869, 921, 975, 517, 547, 580, 615, 651,  /* 24 */
@@ -71,7 +71,7 @@ static unsigned short freqtable[128] = {                         /* note # */
         690, 731, 774, 820, 869, 921, 975, 517, 547, 580, 615, 651, /* 108 */
         690, 731, 774, 820, 869, 921, 975, 517};                    /* 120 */
 
-static unsigned char octavetable[128] = {                        /* note # */
+const unsigned char octavetable[128] = {                         /* note # */
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,                          /*  0 */
         0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1,                          /* 12 */
         1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2,                          /* 24 */
@@ -84,7 +84,7 @@ static unsigned char octavetable[128] = {                        /* note # */
         8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9,                         /* 108 */
         9, 9, 9, 9, 9, 9, 9,10};                                    /* 120 */
 
-static unsigned short pitchtable[256] = {                   /* pitch wheel */
+const unsigned short pitchtable[256] = {                    /* pitch wheel */
          29193U,29219U,29246U,29272U,29299U,29325U,29351U,29378U,  /* -128 */
          29405U,29431U,29458U,29484U,29511U,29538U,29564U,29591U,  /* -120 */
          29618U,29644U,29671U,29698U,29725U,29752U,29778U,29805U,  /* -112 */
