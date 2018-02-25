@@ -11,16 +11,16 @@
 #include "ui.h"  /* include self for control */
 
 /* color scheme 0xBF00 (Background/Foreground/0/0): mono, color */
-static unsigned int COLOR_TUI[2]       = {0x0700u, 0x1700u};
-static unsigned int COLOR_NOTES[2]     = {0x0700u, 0x1E00u};
-static unsigned int COLOR_NOTES_HI[2]  = {0x0000u, 0x8000u}; /* a bit mask for highlighten columns */
-static unsigned int COLOR_TEXT[2]      = {0x0700u, 0x1700u};
-static unsigned int COLOR_TEMPO[2]     = {0x0700u, 0x1300u};
-static unsigned int COLOR_CHANS[2]     = {0x0700u, 0x1200u};
-static unsigned int COLOR_CHANS_DIS[2] = {0x0000u, 0x1800u};
-static unsigned int COLOR_PROGRESS1[2] = {0x7000u, 0x2000u}; /* elapsed time */
-static unsigned int COLOR_PROGRESS2[2] = {0x0700u, 0x8000u}; /* not yet elapsed */
-static unsigned int COLOR_ERRMSG[2]    = {0x7000u, 0x4700u};
+const unsigned short COLOR_TUI[2]       = {0x0700u, 0x1700u};
+const unsigned short COLOR_NOTES[2]     = {0x0700u, 0x1E00u};
+const unsigned short COLOR_NOTES_HI[2]  = {0x0000u, 0x8000u}; /* a bit mask for highlighten columns */
+const unsigned short COLOR_TEXT[2]      = {0x0700u, 0x1700u};
+const unsigned short COLOR_TEMPO[2]     = {0x0700u, 0x1300u};
+const unsigned short COLOR_CHANS[2]     = {0x0700u, 0x1200u};
+const unsigned short COLOR_CHANS_DIS[2] = {0x0000u, 0x1800u};
+const unsigned short COLOR_PROGRESS1[2] = {0x7000u, 0x2000u}; /* elapsed time */
+const unsigned short COLOR_PROGRESS2[2] = {0x0700u, 0x8000u}; /* not yet elapsed */
+const unsigned short COLOR_ERRMSG[2]    = {0x7000u, 0x4700u};
 
 unsigned short far *screenptr = NULL;
 static int oldmode = 0;
