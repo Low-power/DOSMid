@@ -44,9 +44,7 @@
 #include "syx.h"
 #include "timer.h"
 #include "ui.h"
-
-#define PVER "0.9.4 beta"
-#define PDATE "2014-2018"
+#include "version.h"
 
 #define MAXTRACKS 64
 #define EVENTSCACHESIZE 64 /* *must* be a power of 2 !!! */
@@ -1041,7 +1039,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 
   /* update screen with the next operation */
   sprintf(trackinfo->title[0], "Loading file...");
-  ui_draw(trackinfo, &refreshflags, &refreshchans, PVER, params->devname, params->devport, volume);
+  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, volume);
   refreshflags = 0xffffu;
 
   /* if running on a playlist, load next song */
@@ -1104,7 +1102,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   sprintf(trackinfo->title[0], "Loading...");
   filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
   ucasestr(trackinfo->filename);
-  ui_draw(trackinfo, &refreshflags, &refreshchans, PVER, params->devname, params->devport, volume);
+  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, volume);
   memset(trackinfo->title[0], 0, 16);
   refreshflags = 0xff;
 
@@ -1126,7 +1124,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     }
   }
   /* draw the gui with track's data */
-  ui_draw(trackinfo, &refreshflags, &refreshchans, PVER, params->devname, params->devport, volume);
+  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, volume);
   for (;;) {
     timer_read(&midiplaybackstart); /* save start time so we can compute elapsed time later */
     if (midiplaybackstart >= nexteventtime) break; /* wait until the scheduled start time is met */
@@ -1186,7 +1184,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         }
         /* do I need to refresh the screen now? if not, just call INT28h */
         if (refreshflags != 0) {
-          ui_draw(trackinfo, &refreshflags, &refreshchans, PVER, params->devname, params->devport, volume);
+          ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, volume);
         } else if (params->nopowersave == 0) { /* if no screen refresh is     */
           union REGS regs;                     /* needed, and power saver not */
           int86(0x28, &regs, &regs);           /* disabled, then call INT 28h */
@@ -1397,7 +1395,7 @@ int main(int argc, char **argv) {
   sprintf(trackinfo.title[0], "Sound hardware initialization...");
   {
     unsigned short rflags = 0xffffu, rchans = 0xffffu;
-    ui_draw(&trackinfo, &rflags, &rchans, PVER, params.devname, params.devport, 100);
+    ui_draw(&trackinfo, &rflags, &rchans, params.devname, params.devport, 100);
   }
 #ifdef DBGFILE
   if (params.logfd != NULL) fprintf(params.logfd, "INIT SOUND HARDWARE\n");

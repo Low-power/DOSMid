@@ -54,7 +54,7 @@ void ui_hidecursor(void);
 void ui_puterrmsg(char *title, char *errmsg);
 
 /* draws the UI screen */
-void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsigned short *refreshchans, char *pver, char *devname, unsigned int mpuport, int volume);
+void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsigned short *refreshchans, char *devname, unsigned int mpuport, int volume);
 
 /* waits for a keypress and return it. Returns 0 for extended keystroke, then
    function must be called again to return scan code. */

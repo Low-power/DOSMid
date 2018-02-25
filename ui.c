@@ -9,6 +9,7 @@
 #include <string.h>  /* strlen() */
 
 #include "ui.h"  /* include self for control */
+#include "version.h"
 
 /* color scheme 0xBF00 (Background/Foreground/0/0): mono, color */
 const unsigned short COLOR_TUI[2]       = {0x0700u, 0x1700u};
@@ -113,7 +114,7 @@ void ui_puterrmsg(char *title, char *errmsg) {
 }
 
 /* draws the UI screen */
-void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsigned short *refreshchans, char *pver, char *devname, unsigned int mpuport, int volume) {
+void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsigned short *refreshchans, char *devname, unsigned int mpuport, int volume) {
   #include "gm.h"  /* GM instruments names */
   int x, y;
   /* draw ascii graphic frames, etc */
@@ -135,8 +136,7 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
     ui_printchar(17, 79, 187 | COLOR_TUI[colorflag]);
     ui_printchar(24, 0, 200 | COLOR_TUI[colorflag]);
     ui_printchar(24, 79, 188 | COLOR_TUI[colorflag]);
-    sprintf(tempstr, "[ DOSMid v%s ]", pver);
-    ui_printstr(24, 78 - strlen(tempstr), tempstr, -1, COLOR_TUI[colorflag]);
+    ui_printstr(24, 78 - strlen("[ DOSMid v" PVER " ]"), "[ DOSMid v" PVER " ]", -1, COLOR_TUI[colorflag]);
     /* clear out the background on the 'messages' part of the screen */
     for (y = 18; y < 23; y++) {
       ui_printstr(y, 1, "", 78, COLOR_TEXT[colorflag]);
