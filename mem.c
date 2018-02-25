@@ -28,7 +28,6 @@
  */
 
 #include <malloc.h>  /* _ffree(), _fmalloc() */
-#include <stdlib.h>  /* malloc(), free() */
 #include <string.h>  /* memcpy() */
 
 #include "xms.h"
