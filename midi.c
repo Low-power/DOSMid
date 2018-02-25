@@ -115,45 +115,33 @@ int midi_readhdr(struct fiofile_t *f, int *format, int *tracks, unsigned short *
   }
   /* Read the first chunk of data (should be the MIDI header) */
   chunk = midi_readchunk(f);
-  if (chunk == NULL) {
-    return(-6);
-  }
-  /* check id */
-  if (bcmp(chunk->id, "MThd", 4) != 0) {
+  if (chunk == NULL) return(-6);
+
+  /* check id (MThd) and len (must be at least 6 bytes) */
+  if ((bcmp(chunk->id, "MThd", 4) != 0) || (chunk->datalen < 6)) {
     free(chunk);
     return(-5);
   }
-  /* check len - must be at least 6 bytes */
-  if (chunk->datalen < 6) {
-    free(chunk);
-    return(-4);
-  }
+
   *format = (chunk->data[0] << 8) | chunk->data[1];
   *tracks = (chunk->data[2] << 8) | chunk->data[3];
 
   *timeunitdiv = chunk->data[4];
   *timeunitdiv <<= 8;
   *timeunitdiv |= chunk->data[5];
+  free(chunk); /* won't be used any more*/
+
   /* timeunitdiv must be a positive number */
-  if (*timeunitdiv < 1) {
-    free(chunk);
-    return(-3);
-  }
+  if (*timeunitdiv < 1) return(-3);
 
   /* default tempo -> quarter note (1 beat) == 500'000 microseconds (0.5s), ie 120 bpm.
      a delta time unit is therefore (0.5s / DIV) long. */
-  /* check the timeunit */
-  if (chunk->data[4] & 128) {
-    free(chunk);
-    return(-2);
-  }
-  /* check format - must be 0, 1 or 2 */
-  if ((*format < 0) || (*format > 2)) {
-    free(chunk);
-    return(-1);
-  }
+
+  if ((*format < 0) || (*format > 2)) return(-1);
+
   /* read the chunk map */
   midi_getchunkmap(f, chunklist, maxchunks);
+
   return(0);
 }
 
