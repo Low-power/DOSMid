@@ -6,9 +6,7 @@
  * Copyright (C) 2018 Mateusz Viste
  */
 
-#include <dos.h>
-#include <fcntl.h>
-#include <share.h>
+#include <dos.h>    /* REGS */
 #include <string.h> /* _fmemcpy() */
 
 #include "fio.h" /* include self for control */

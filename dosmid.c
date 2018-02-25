@@ -27,11 +27,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dos.h>
+#include <dos.h>    /* REGS */
 #include <stdio.h>  /* printf() */
 #include <limits.h> /* ULONG_MAX */
 #include <stdlib.h> /* rand() */
-#include <string.h> /* strcmp() */
+#include <string.h> /* memset(), strcpy(), strncat(), bcmp(), memcpy() */
 
 #include "bitfield.h"
 #include "fio.h"

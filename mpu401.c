@@ -27,9 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dos.h>
 #include <conio.h>  /* inp() and outp() */
-#include <stdlib.h> /* NULL */
 
 #include "timer.h"
 #include "mpu401.h"  /* include self for control */

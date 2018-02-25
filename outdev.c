@@ -27,8 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <conio.h> /* outp(), inp() */
-#include <dos.h>
+#include <conio.h>  /* outp(), inp() */
+#include <dos.h>    /* _disable(), _enable() */
 #include <malloc.h> /* _fmalloc(), _ffree() */
 
 #ifdef OPL

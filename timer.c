@@ -12,8 +12,8 @@
  * program exit.
  */
 
-#include <stdlib.h>
-#include <dos.h>
+#include <stdlib.h> /* atexit() */
+#include <dos.h>   /* _chain_intr(), _disable(), _enable(), _dos_setvect() */
 #include <conio.h> /* outp() */
 #include "timer.h" /* include self for control */
 

@@ -29,9 +29,7 @@
  */
 
 
-#include <dos.h>
-#include <stdlib.h>
-#include <string.h>
+#include <dos.h>   /* _dos_getvect(), MK_FP, FP_SEG */
 
 #include "gus.h"
 

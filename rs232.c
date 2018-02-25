@@ -28,8 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <conio.h>
-#include <dos.h>
+#include <conio.h> /* inp() */
+#include <dos.h>   /* MK_FP() */
 
 #include "rs232.h"
 

@@ -27,8 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <dos.h>
-#include <stdlib.h>
+#include <dos.h> /* REGS */
 
 #include "xms.h" /* include self for control */
 

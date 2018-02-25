@@ -30,7 +30,6 @@
 #ifdef OPL
 
 #include <conio.h> /* inp(), out() */
-#include <dos.h>
 #include <i86.h>   /* delay() */
 #include <stdlib.h> /* calloc() */
 #include <string.h> /* strdup() */

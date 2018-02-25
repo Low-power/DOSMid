@@ -27,7 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h> /* strcmp() */
+#include <string.h> /* bcmp() */
 
 #include "bitfield.h"
 #include "fio.h"

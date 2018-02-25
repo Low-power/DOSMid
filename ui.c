@@ -3,8 +3,8 @@
  * Copyright (C) 2014-2016 Mateusz Viste
  */
 
-#include <dos.h>
-#include <stdlib.h>  /* ultoaf() */
+#include <dos.h>     /* REGS */
+#include <stdlib.h>  /* ultoa() */
 #include <stdio.h>   /* sprintf() */
 #include <string.h>  /* strlen() */
 

@@ -3,9 +3,6 @@
  * This file is part of the DOSMid project. Copyright (C) Mateusz Viste.
  */
 
-
-#include <stdio.h>
-
 #include "fio.h"
 #include "syx.h" /* include self for control */
 
@@ -17,7 +14,7 @@ int syx_fetchnext(struct fiofile_t *fh, unsigned char *buff, int bufflen) {
   int reslen = 0;
   unsigned char bytebuff;
   /* quit immediately if any of the arguments is invalid */
-  if ((fh == NULL) || (buff == NULL) || (bufflen < 1)) return(SYXERR_INVALIDPARAM);
+  if ((fh == 0L) || (buff == 0L) || (bufflen < 1)) return(SYXERR_INVALIDPARAM);
   /* */
   for (;;) {
     if (fio_read(fh, &bytebuff, 1) != 1) { /* check for eof or i/o error */

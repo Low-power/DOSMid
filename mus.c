@@ -27,7 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h> /* memcpy() */
+#include <string.h> /* memset() */
 
 #include "bitfield.h"
 #include "fio.h"
