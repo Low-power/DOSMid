@@ -29,7 +29,7 @@
 
 #include <conio.h> /* outp(), inp() */
 #include <dos.h>
-#include <stdlib.h>
+#include <malloc.h> /* _fmalloc(), _ffree() */
 
 #ifdef OPL
 #include "opl.h"
@@ -43,7 +43,7 @@
 
 #ifdef SBAWE
 #include "awe32/ctaweapi.h"
-static char *presetbuf = NULL; /* used to allocate presets for custom sound banks */
+static char far *presetbuf = NULL; /* used to allocate presets for custom sound banks */
 #endif
 
 #include "outdev.h" /* include self for control */
@@ -95,7 +95,7 @@ static int awe_loadfont(char *filename) {
     }
   }
   /* load presets to memory */
-  presetbuf = (char *)malloc(sp.preset_read_size);
+  presetbuf = _fmalloc(sp.preset_read_size);
   if (presetbuf == NULL) { /* out of mem! */
     fio_close(&f);
     return(-1);
@@ -107,7 +107,7 @@ static int awe_loadfont(char *filename) {
   fio_close(&f);
   /* apply presets to hardware */
   if (awe32SetPresets(&sp) != 0) {
-    free(presetbuf);
+    _ffree(presetbuf);
     presetbuf = NULL;
     return(-1);
   }
@@ -247,7 +247,7 @@ void dev_close(void) {
       _enable();
       /* free memory used by custom sound banks */
       if (presetbuf != NULL) {
-        free(presetbuf);
+        _ffree(presetbuf);
         presetbuf = NULL;
       }
 #endif
