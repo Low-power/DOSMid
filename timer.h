@@ -39,4 +39,7 @@ void timer_init(void);
  * clock from changing while it is being read. */
 void timer_read(unsigned long *res);
 
+/* high resolution sleeping routine, waits n microseconds */
+void udelay(unsigned long us);
+
 #endif

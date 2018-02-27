@@ -157,3 +157,18 @@ void timer_read(unsigned long *res) {
   /* Enable interrupts */
   enable();
 }
+
+
+/* high resolution sleeping routine, waits n microseconds */
+void udelay(unsigned long us) {
+  unsigned long t1, t2;
+  timer_read(&t1);
+  for (;;) {
+    timer_read(&t2);
+    if (t2 < t1) { /* detect timer wraparound */
+      break;
+    } else if (t2 - t1 >= us) {
+      break;
+    }
+  }
+}

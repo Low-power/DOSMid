@@ -266,21 +266,6 @@ static unsigned int hexstr2uint(char *hexstr) {
 }
 
 
-/* high resolution sleeping routine, waits n microseconds */
-static void udelay(unsigned long us) {
-  unsigned long t1, t2;
-  timer_read(&t1);
-  for (;;) {
-    timer_read(&t2);
-    if (t2 < t1) { /* detect timer wraparound */
-      break;
-    } else if (t2 - t1 >= us) {
-      break;
-    }
-  }
-}
-
-
 static char *devtoname(enum outdev_types device, int devicesubtype) {
   switch (device) {
     case DEV_NONE:   return("NONE");

@@ -19,21 +19,6 @@
 #define IO_RDSTAT (port+0x0E)
 
 
-/* high resolution sleeping routine, waits n microseconds */
-static void udelay(unsigned long us) {
-  unsigned long t1, t2;
-  timer_read(&t1);
-  for (;;) {
-    timer_read(&t2);
-    if (t2 < t1) { /* detect timer wraparound */
-      break;
-    } else if (t2 - t1 >= us) {
-      break;
-    }
-  }
-}
-
-
 int dsp_reset(unsigned short port) {
   /* 1. Write a "1" to the Reset port (2x6h) and wait for 3 microseconds.
    * 2. Write a "0" to the Reset port.
