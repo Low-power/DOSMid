@@ -30,7 +30,6 @@
 #ifdef OPL
 
 #include <conio.h> /* inp(), out() */
-#include <i86.h>   /* delay() */
 #include <stdlib.h> /* calloc() */
 #include <string.h> /* strdup() */
 
@@ -38,6 +37,7 @@
 
 #include "fio.h"
 #include "opl-gm.h"
+#include "timer.h"
 
 struct voicealloc_t {
   unsigned short priority;
@@ -194,10 +194,10 @@ int opl_init(unsigned short port) {
   x = inp(port) & 0xE0; /* read the status register (port 388h) and store the result */
   oplregwr(port, 0x02, 0xff); /* write FFh to register 2 (Timer 1) */
   oplregwr(port, 0x04, 0x21); /* start timer 1 by writing 21h to register 4 */
-  delay(90);  /* delay for at least 80 microseconds (I delay for 90ms to make
-                 sure that the DOS timing resolution won't zero out my delay).
-                 DO NOT perform inp() calls for delay here, some cards do not
-                 initialize well then (reported for CT2760) */
+  udelay(500); /* Creative Labs recommends a delay of at least 80 microseconds
+                  I delay for 500us just to be sure. DO NOT perform inp()
+                  calls for delay here, some cards do not initialize well then
+                  (reported for CT2760) */
   y = inp(port) & 0xE0;  /* read the upper bits of the status register */
   oplregwr(port, 0x04, 0x60); /* reset both timers and interrupts (see steps 1 and 2) */
   oplregwr(port, 0x04, 0x80); /* reset both timers and interrupts (see steps 1 and 2) */
