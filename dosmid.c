@@ -65,15 +65,11 @@ enum playactions {
 
 struct clioptions {
   int memmode;          /* type of memory to use: MEM_XMS or MEM_MALLOC */
-  int xmsdelay;
   unsigned short devport;
   unsigned short port_mpu;
   unsigned short port_awe;
   unsigned short port_opl;
   unsigned short port_sb;
-  int nopowersave;
-  int dontstop;
-  int random;       /* randomize playlist order */
   enum outdev_types device;
   int devicesubtype;
   char *devname;    /* the human name of the out device (MPU, AWE..) */
@@ -85,6 +81,11 @@ struct clioptions {
 #ifdef DBGFILE
   FILE *logfd;      /* an open file descriptor to the debug log file */
 #endif
+  /* 'flags' */
+  unsigned char xmsdelay;
+  unsigned char nopowersave;
+  unsigned char dontstop;
+  unsigned char random;       /* randomize playlist order */
 };
 
 
