@@ -30,8 +30,8 @@
 #ifndef mem_h_sentinel
   #define mem_h_sentinel
 
-  #define MEM_MALLOC 0
-  #define MEM_XMS 1
+  #define MEM_MALLOC 1
+  #define MEM_XMS 0
 
   unsigned int mem_init(int mode);
   int mem_pull(long addr, void far *ptr, int sz);

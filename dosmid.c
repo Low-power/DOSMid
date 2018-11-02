@@ -492,8 +492,6 @@ static char *loadconfigfile(struct clioptions *params) {
    NULL on sucess, or a pointer to an error string otherwise. */
 static char *parseargv(int argc, char **argv, struct clioptions *params) {
   int i;
-  /* set default memory mode */
-  params->memmode = MEM_XMS;
   /* if no params at all, don't waste time */
   if (argc == 0) return("");
   /* now read params */

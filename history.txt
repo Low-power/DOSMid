@@ -8,6 +8,7 @@ DOSMid v0.9.4 [xx xxx xxxx]
  - fixed a memory leak in midi code,
  - adaptations to compile in small memory model (smaller, faster),
  - removed /log from the default build,
+ - /noxms can be passed via config file now,
  - GUS support (requires the ULTRAMID TSR).
 
 DOSMid v0.9.3 [06 Feb 2018]
