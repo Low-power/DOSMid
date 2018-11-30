@@ -790,7 +790,7 @@ static void copyline(char *d, int l, char *s) {
 
 
 static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
-  struct midi_chunkmap_t *chunkmap;
+  static struct midi_chunkmap_t chunkmap[MAXTRACKS];
   int miditracks;
   int i;
   long newtrack;
@@ -798,8 +798,6 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
   char text[256];
 
   *trackpos = -1;
-
-  chunkmap = (void *)wbuff;
 
   if (midi_readhdr(f, &(trackinfo->midiformat), &miditracks, &(trackinfo->miditimeunitdiv), chunkmap, MAXTRACKS) != 0) {
     ui_puterrmsg(params->midifile, "Error: Invalid MIDI file format");

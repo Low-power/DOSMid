@@ -72,14 +72,10 @@ static int midi_getchunkmap(struct fiofile_t *f, struct midi_chunkmap_t *chunkli
   return(chunkid);
 }
 
-
-/* PUBLIC INTERFACE */
-
-
-struct midi_chunk_t *midi_readchunk(struct fiofile_t *f) {
+static struct midi_chunk_t *midi_readchunk(void *dstbuf, struct fiofile_t *f) {
   unsigned char id[4];
   unsigned long len = 0;
-  struct midi_chunk_t *res = (void *)wbuff;
+  struct midi_chunk_t *res = dstbuf;
   if (fio_read(f, id, 4) != 4) return(NULL);
   /* fetch the length */
   if (fio_read(f, &len, 4) != 4) return(NULL);
@@ -99,6 +95,9 @@ struct midi_chunk_t *midi_readchunk(struct fiofile_t *f) {
 }
 
 
+/* PUBLIC INTERFACE */
+
+
 int midi_readhdr(struct fiofile_t *f, int *format, int *tracks, unsigned short *timeunitdiv, struct midi_chunkmap_t *chunklist, int maxchunks) {
   struct midi_chunk_t *chunk;
   unsigned char rmidbuff[12];
@@ -112,7 +111,7 @@ int midi_readhdr(struct fiofile_t *f, int *format, int *tracks, unsigned short *
     fio_seek(f, FIO_SEEK_START, 0);
   }
   /* Read the first chunk of data (should be the MIDI header) */
-  chunk = midi_readchunk(f);
+  chunk = midi_readchunk(chunklist, f); /* I abuse the chunklist pointer here */
   if (chunk == NULL) return(-6);
 
   /* check id (MThd) and len (must be at least 6 bytes) */

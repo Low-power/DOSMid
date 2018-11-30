@@ -115,8 +115,6 @@ struct midi_event_t {
   enum midi_midievents type;
 };
 
-struct midi_chunk_t *midi_readchunk(struct fiofile_t *f);
-
 int midi_readhdr(struct fiofile_t *f, int *format, int *tracks, unsigned short *timeunitdiv, struct midi_chunkmap_t *chunklist, int maxchunks);
 
 /* parse a track object and returns the id of the first events in the linked list */
