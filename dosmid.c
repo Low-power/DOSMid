@@ -164,12 +164,16 @@ static void dos_puts(char *s) {
   }
 }
 
-/* returns a pseudo-random number to be used as a seed for srand(), based on the DOS system timer */
-static unsigned short rnd_seed(void) {
+/* returns a pseudo-random number, based on the DOS system timer */
+static unsigned long rnd(void) {
+  unsigned long res;
   union REGS regs;
-  regs.h.ah = 0x2C;
-  int86(0x21, &regs, &regs);
-  return(regs.x.dx); /* dh = seconds, dl = 1/100 seconds */
+  regs.h.ah = 0;
+  int86(0x1A, &regs, &regs);
+  res = regs.x.cx; /* number of clock ticks since midnight (high word) */
+  res <<= 16;
+  res |= regs.x.dx; /* number of clock ticks since midnight (low word) */
+  return(res);
 }
 
 /* copies the base name of a file (ie without directory path) into a string */
@@ -699,7 +703,7 @@ static char *getnextm3uitem(char *playlist, int randomize) {
   }
   if (randomize != 0) {
     /* go to a random position (avoid last bytes, could be an empty \r\n record) */
-    pos = rand() % (fsize - 2);
+    pos = rnd() % (fsize - 2);
   }
   fio_seek(&f, FIO_SEEK_START, pos);
   /* rewind back to nearest \n or 0 position */
@@ -1363,9 +1367,6 @@ int main(int argc, char **argv) {
 
   /* initialize the high resolution timer */
   timer_init();
-
-  /* init random numbers */
-  srand(rnd_seed());
 
   /* init ui and hide the blinking cursor */
   ui_init();
