@@ -99,7 +99,7 @@ int midi_readhdr(struct fiofile_t *f, int *format, unsigned short *timeunitdiv, 
    && (wbuff[8] == 'R') && (wbuff[9] == 'M') && (wbuff[10] == 'I') && (wbuff[11] == 'D')) {
     /* skip 6 bytes and there we should have our MThd MIDI header */
     fio_seek(f, FIO_SEEK_CUR, 6);
-    if (fio_read(f, wbuff, 12) != 12) return(-7);
+    if (fio_read(f, wbuff, 14) != 14) return(-7);
   }
 
   /* check id (MThd) and len (must be exactly 6 bytes) */
