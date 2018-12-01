@@ -790,7 +790,7 @@ static void copyline(char *d, int l, char *s) {
 
 
 static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
-  static struct midi_trackmap_t trackmap[MAXTRACKS];
+  static unsigned long trackmap[MAXTRACKS];
   int miditracks;
   int i;
   long newtrack;
@@ -828,9 +828,9 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
     unsigned long tracklen;
 
 #ifdef DBGFILE
-    if (params->logfd != NULL) fprintf(params->logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, trackmap[i].offset);
+    if (params->logfd != NULL) fprintf(params->logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, trackmap[i]);
 #endif
-    fio_seek(f, FIO_SEEK_START, trackmap[i].offset);
+    fio_seek(f, FIO_SEEK_START, trackmap[i]);
     if (i == 0) { /* copyright and text events are fetched from track 0 only */
       newtrack = midi_track2events(f, tracktitle, UI_TITLEMAXLEN, copystring,
                                    UI_TITLEMAXLEN, text, sizeof(text),

@@ -56,11 +56,6 @@ struct midi_chunk_t {
   unsigned char data[1];
 };
 
-struct midi_trackmap_t {
-  long offset;
-  long len;
-};
-
 struct midi_event_note_t {
   unsigned char note;
   unsigned char chan;
@@ -115,7 +110,7 @@ struct midi_event_t {
 };
 
 /* returns number of tracks in midi file on success, neg val otherwise */
-int midi_readhdr(struct fiofile_t *f, int *format, unsigned short *timeunitdiv, struct midi_trackmap_t *tracklist, int maxtracks);
+int midi_readhdr(struct fiofile_t *f, int *format, unsigned short *timeunitdiv, unsigned long *tracklist, int maxtracks);
 
 /* parse a track object and returns the id of the first events in the linked list */
 long midi_track2events(struct fiofile_t *f, char *title, int titlemaxlen,

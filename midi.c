@@ -56,20 +56,20 @@ static int midi_fetch_variablelen_fromfile(struct fiofile_t *f, unsigned long *r
 
 
 /* reads a MIDI file and computes a map of chunks (ie a list of offsets) */
-static int midi_gettrackmap(struct fiofile_t *f, struct midi_trackmap_t *tracklist, int maxchunks) {
+static int midi_gettrackmap(struct fiofile_t *f, unsigned long *tracklist, int maxchunks) {
   short i;
-  unsigned char chunkid[4];
+  unsigned long ulvar;
   for (i = 0; i < maxchunks; i++) {
     /* read and validate chunk's id */
-    if (fio_read(f, chunkid, 4) != 4) break;
-    if (bcmp(chunkid, "MTrk", 4) != 0) return(-1);
+    if (fio_read(f, &ulvar, 4) != 4) break;
+    if (ulvar != 0x6b72544dL) return(-1); /* if header != "MTrk" */
     /* compute the track's byte length */
-    if (fio_read(f, &(tracklist[i].len), 4) != 4) break;
-    tracklist[i].len = BSWAPL(tracklist[i].len);
+    if (fio_read(f, &ulvar, 4) != 4) break;
+    ulvar = BSWAPL(ulvar);
     /* remember chunk data offset */
-    tracklist[i].offset = fio_seek(f, FIO_SEEK_CUR, 0);
+    tracklist[i] = fio_seek(f, FIO_SEEK_CUR, 0);
     /* skip to next chunk */
-    fio_seek(f, FIO_SEEK_CUR, tracklist[i].len);
+    fio_seek(f, FIO_SEEK_CUR, ulvar);
   }
   return(i);
 }
@@ -100,7 +100,7 @@ static struct midi_chunk_t *midi_readchunk(void *dstbuf, struct fiofile_t *f) {
 /* PUBLIC INTERFACE */
 
 
-int midi_readhdr(struct fiofile_t *f, int *format, unsigned short *timeunitdiv, struct midi_trackmap_t *tracklist, int maxtracks) {
+int midi_readhdr(struct fiofile_t *f, int *format, unsigned short *timeunitdiv, unsigned long *tracklist, int maxtracks) {
   struct midi_chunk_t *chunk;
   unsigned char rmidbuff[12];
   /* test for RMID format and rewind if not found */
@@ -113,7 +113,7 @@ int midi_readhdr(struct fiofile_t *f, int *format, unsigned short *timeunitdiv, 
     fio_seek(f, FIO_SEEK_START, 0);
   }
   /* Read the first chunk of data (should be the MIDI header) */
-  chunk = midi_readchunk(tracklist, f); /* I abuse the chunklist pointer here */
+  chunk = midi_readchunk(tracklist, f); /* I abuse the tracklist pointer here */
   if (chunk == NULL) return(-6);
 
   /* check id (MThd) and len (must be at least 6 bytes) */
