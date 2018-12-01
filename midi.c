@@ -88,23 +88,22 @@ int midi_readhdr(struct fiofile_t *f, int *format, unsigned short *timeunitdiv, 
    *  E7 28           Each increment of delta-time represents a millisecond
    */
 
-  /* test for RMID format and rewind if not found */
-  /* a RMID file starts with RIFFxxxxRMID (xxxx being the data size) */
-  /* read first 12 bytes - if unable, return an error */
-  if (fio_read(f, wbuff, 12) != 12) return(-8);
-  /* if no RMID header, then rewind the file assuming it's normal MIDI */
-  if ((wbuff[0] != 'R') || (wbuff[1] != 'I')  || (wbuff[2] != 'F') || (wbuff[3] != 'F')
-   || (wbuff[8] != 'R') || (wbuff[9] != 'M') || (wbuff[10] != 'I') || (wbuff[11] != 'D')) {
-    /* if it's not a RMID header, then I got the 10-bytes MThd in there */
-    fio_seek(f, FIO_SEEK_START, -2);
-  } else {
-    /* Read the first chunk of data (should be the 10-bytes MThd MIDI header) */
-    if (fio_read(f, wbuff, 10) != 10) return(-7);
+  /* test for RMID header */
+  /* a RMID file starts with RIFFxxxxRMID (xxxx being the data size) followed
+   * by the word 'data' followed by a 32-bit data size. */
+  /* read first 14 bytes - if unable, return an error */
+  if (fio_read(f, wbuff, 14) != 14) return(-8);
+  /* if no RMID header, then assume it's normal MIDI */
+  if ((wbuff[0] == 'R') && (wbuff[1] == 'I')  && (wbuff[2] == 'F') && (wbuff[3] == 'F')
+   && (wbuff[8] == 'R') && (wbuff[9] == 'M') && (wbuff[10] == 'I') && (wbuff[11] == 'D')) {
+    /* skip 6 bytes and there we should have our MThd MIDI header */
+    fio_seek(f, FIO_SEEK_CUR, 6);
+    if (fio_read(f, wbuff, 12) != 12) return(-7);
   }
 
   /* check id (MThd) and len (must be exactly 6 bytes) */
   if ((((unsigned long *)wbuff)[0] != 0x6468544dL) || (wbuff[4] != 0) || (wbuff[5] != 0) || (wbuff[6] != 0) || (wbuff[7] != 6)) { /* 0x6468544dL == "MThd" */
-    return(-5);
+    return(-6);
   }
 
   if (wbuff[8] != 0) return(-5); /* format is 1 or 2 so 1st digit must be 0 */
