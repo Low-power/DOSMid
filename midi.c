@@ -79,6 +79,7 @@ static int midi_gettrackmap(struct fiofile_t *f, unsigned long *tracklist, int m
 
 
 int midi_readhdr(struct fiofile_t *f, int *format, unsigned short *timeunitdiv, unsigned long *tracklist, int maxtracks) {
+  unsigned short tracks;
   /*
    * Here's an example of a complete MThd chunk:
    *  4D 54 68 64     MThd ID
@@ -109,7 +110,12 @@ int midi_readhdr(struct fiofile_t *f, int *format, unsigned short *timeunitdiv, 
   if (wbuff[8] != 0) return(-5); /* format is 1 or 2 so 1st digit must be 0 */
   *format = wbuff[9];
 
-  /* *tracks = (chunk->data[2] << 8) | chunk->data[3]; */ /* not used - I rely on midi_gettrackmap() instead */
+  tracks = wbuff[10];
+  tracks <<= 8;
+  tracks |= wbuff[11];
+  /* midi_gettrackmap() should not try reading more tracks than declared in
+   * the header - some MIDI/RMI files may be trailed with some extra stuff */
+  if (tracks < maxtracks) maxtracks = tracks;
 
   *timeunitdiv = wbuff[12];
   *timeunitdiv <<= 8;
