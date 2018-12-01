@@ -13,6 +13,8 @@
 #define UI_REFRESH_PROGS     16
 #define UI_REFRESH_TIME      32
 #define UI_REFRESH_VOLUME    64
+#define UI_REFRESH_FNAME    128
+#define UI_REFRESH_ALL     0xff
 
 #define UI_TITLEMAXLEN 48
 #define UI_TITLENODES 12
@@ -37,6 +39,7 @@ struct trackinfodata {
   int titlescount;
   enum fileformats fileformat;
   int midiformat;
+  unsigned short trackscount; /* number of tracks that were found in the file */
   char title[UI_TITLENODES][UI_TITLEMAXLEN];
   char filename[UI_FILENAMEMAXLEN];
 };

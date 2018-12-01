@@ -146,7 +146,8 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
     ui_printstr(18, 79 - strlen(tempstr), tempstr, -1, COLOR_TEMPO[colorflag]);
     ui_printstr(19, 67, "Volume:", 7, COLOR_TEMPO[colorflag]);
     ui_printstr(20, 67, "Format:", 7, COLOR_TEMPO[colorflag]);
-    ui_printstr(21, 68, "Tempo:", 6, COLOR_TEMPO[colorflag]);
+    ui_printstr(21, 67, "Tracks:", 7, COLOR_TEMPO[colorflag]);
+    ui_printstr(22, 68, "Tempo:", 6, COLOR_TEMPO[colorflag]);
   }
   /* print notes states on every channel */
   if (*refreshflags & UI_REFRESH_NOTES) {
@@ -174,10 +175,9 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
     }
     *refreshchans = 0;
   }
-  /* tempo */
-  if (*refreshflags & UI_REFRESH_TEMPO) {
-    char tempstr[16], *sptr;
-    unsigned long miditempo;
+  /* filename and props (format, tracks) */
+  if (*refreshflags & UI_REFRESH_FNAME) {
+    char tempstr[4], *sptr;
     /* print filename (unless NULL - might happen early at playlist load) */
     if (trackinfo->filename != NULL) {
       ui_printstr(18, 50, trackinfo->filename, 12, COLOR_TEMPO[colorflag]);
@@ -206,6 +206,14 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
         break;
     }
     ui_printstr(20, 75, sptr, 4, COLOR_TEMPO[colorflag]);
+    /* print number of tracks */
+    utoa(trackinfo->trackscount, tempstr, 10);
+    ui_printstr(21, 75, tempstr, 4, COLOR_TEMPO[colorflag]);
+  }
+  /* tempo */
+  if (*refreshflags & UI_REFRESH_TEMPO) {
+    char tempstr[16];
+    unsigned long miditempo;
     /* print tempo */
     if (trackinfo->tempo > 0) {
       miditempo = 60000000lu / trackinfo->tempo;
@@ -214,7 +222,7 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
     }
     ultoa(miditempo, tempstr, 10);
     /*strcat(tempstr, "bpm");*/
-    ui_printstr(21, 75, tempstr, 4, COLOR_TEMPO[colorflag]);
+    ui_printstr(22, 75, tempstr, 4, COLOR_TEMPO[colorflag]);
   }
   /* volume */
   if (*refreshflags & UI_REFRESH_VOLUME) {

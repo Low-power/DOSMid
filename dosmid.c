@@ -806,6 +806,7 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
     ui_puterrmsg(params->midifile, errstr);
     return(ACTION_ERR_SOFT);
   }
+  trackinfo->trackscount = miditracks;
 
 #ifdef DBGFILE
   if (params->logfd != NULL) fprintf(params->logfd, "LOADED FILE '%s': format=%d tracks=%d timeunitdiv=%u\n", params->midifile, trackinfo->midiformat, miditracks, trackinfo->miditimeunitdiv);
@@ -931,6 +932,7 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
         snprintf(msg, 64, "Error: Failed to load the MUS file (%ld)", *trackpos);
         ui_puterrmsg(params->midifile, msg);
       } else { /* all right, now we're talking */
+        trackinfo->trackscount = 1;
         res = ACTION_NONE;
       }
       break;
@@ -1003,7 +1005,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   int i;
   enum playactions exitaction;
   unsigned long nexteventtime;
-  unsigned short refreshflags = 0xffffu;
+  unsigned short refreshflags = UI_REFRESH_ALL;
   unsigned short refreshchans = 0xffffu;
   long trackpos;
   unsigned long midiplaybackstart;
@@ -1018,7 +1020,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   /* update screen with the next operation */
   sprintf(trackinfo->title[0], "Loading file...");
   ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, volume);
-  refreshflags = 0xffffu;
+  refreshflags = UI_REFRESH_ALL;
 
   /* if running on a playlist, load next song */
   if (params->playlist != NULL) {
@@ -1082,7 +1084,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   ucasestr(trackinfo->filename);
   ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, volume);
   memset(trackinfo->title[0], 0, 16);
-  refreshflags = 0xff;
+  refreshflags = UI_REFRESH_ALL;
 
   if ((params->playlist != NULL) && (params->delay < 2000)) nexteventtime += (2000 - params->delay) * 1000; /* playback starts no sooner than in 2s (for playlist listening comfort) */
   nexteventtime += params->delay * 1000; /* add the extra custom delay */
@@ -1156,8 +1158,8 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
             break;
           case ' ':  /* pause */
             pauseplay(&midiplaybackstart, &nexteventtime, trackinfo);
-            refreshflags = 0xffffu; /* force a full-screen refresh to wipe */
-            refreshchans = 0xffffu; /* the pause message out of the screen */
+            refreshflags = UI_REFRESH_ALL; /* force a full-screen refresh to wipe */
+            refreshchans = 0xffffu;        /* the pause message out of the screen */
             break;
         }
         /* do I need to refresh the screen now? if not, just call INT28h */
