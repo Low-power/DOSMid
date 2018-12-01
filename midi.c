@@ -27,7 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h> /* bcmp() */
+#include <string.h>  /* memcpy() */
 
 #include "bitfield.h"
 #include "fio.h"
@@ -74,59 +74,47 @@ static int midi_gettrackmap(struct fiofile_t *f, unsigned long *tracklist, int m
   return(i);
 }
 
-static struct midi_chunk_t *midi_readchunk(void *dstbuf, struct fiofile_t *f) {
-  unsigned char id[4];
-  unsigned long len = 0;
-  struct midi_chunk_t *res = dstbuf;
-  if (fio_read(f, id, 4) != 4) return(NULL);
-  /* fetch the length */
-  if (fio_read(f, &len, 4) != 4) return(NULL);
-  /* */
-  /* copy the id string */
-  res->id[0] = id[0];
-  res->id[1] = id[1];
-  res->id[2] = id[2];
-  res->id[3] = id[3];
-  /* assign data length */
-  res->datalen = BSWAPL(len);
-  /* copy actual data */
-  if (fio_read(f, res->data, res->datalen) != res->datalen) {
-    return(NULL);
-  }
-  return(res);
-}
-
 
 /* PUBLIC INTERFACE */
 
 
 int midi_readhdr(struct fiofile_t *f, int *format, unsigned short *timeunitdiv, unsigned long *tracklist, int maxtracks) {
-  struct midi_chunk_t *chunk;
-  unsigned char rmidbuff[12];
+  /*
+   * Here's an example of a complete MThd chunk:
+   *  4D 54 68 64     MThd ID
+   *  00 00 00 06     Length of the MThd chunk is always 6
+   *  00 01           The Format type is 1
+   *  00 02           There are 2 MTrk chunks in this file
+   *  E7 28           Each increment of delta-time represents a millisecond
+   */
+
   /* test for RMID format and rewind if not found */
   /* a RMID file starts with RIFFxxxxRMID (xxxx being the data size) */
   /* read first 12 bytes - if unable, return an error */
-  if (fio_read(f, rmidbuff, 12) != 12) return(-7);
+  if (fio_read(f, wbuff, 12) != 12) return(-8);
   /* if no RMID header, then rewind the file assuming it's normal MIDI */
-  if ((rmidbuff[0] != 'R') || (rmidbuff[1] != 'I')  || (rmidbuff[2] != 'F') || (rmidbuff[3] != 'F')
-   || (rmidbuff[8] != 'R') || (rmidbuff[9] != 'M') || (rmidbuff[10] != 'I') || (rmidbuff[11] != 'D')) {
-    fio_seek(f, FIO_SEEK_START, 0);
+  if ((wbuff[0] != 'R') || (wbuff[1] != 'I')  || (wbuff[2] != 'F') || (wbuff[3] != 'F')
+   || (wbuff[8] != 'R') || (wbuff[9] != 'M') || (wbuff[10] != 'I') || (wbuff[11] != 'D')) {
+    /* if it's not a RMID header, then I got the 10-bytes MThd in there */
+    fio_seek(f, FIO_SEEK_START, -2);
+  } else {
+    /* Read the first chunk of data (should be the 10-bytes MThd MIDI header) */
+    if (fio_read(f, wbuff, 10) != 10) return(-7);
   }
-  /* Read the first chunk of data (should be the MIDI header) */
-  chunk = midi_readchunk(tracklist, f); /* I abuse the tracklist pointer here */
-  if (chunk == NULL) return(-6);
 
-  /* check id (MThd) and len (must be at least 6 bytes) */
-  if ((bcmp(chunk->id, "MThd", 4) != 0) || (chunk->datalen < 6)) {
+  /* check id (MThd) and len (must be exactly 6 bytes) */
+  if ((((unsigned long *)wbuff)[0] != 0x6468544dL) || (wbuff[4] != 0) || (wbuff[5] != 0) || (wbuff[6] != 0) || (wbuff[7] != 6)) { /* 0x6468544dL == "MThd" */
     return(-5);
   }
 
-  *format = (chunk->data[0] << 8) | chunk->data[1];
+  if (wbuff[8] != 0) return(-5); /* format is 1 or 2 so 1st digit must be 0 */
+  *format = wbuff[9];
+
   /* *tracks = (chunk->data[2] << 8) | chunk->data[3]; */ /* not used - I rely on midi_gettrackmap() instead */
 
-  *timeunitdiv = chunk->data[4];
+  *timeunitdiv = wbuff[12];
   *timeunitdiv <<= 8;
-  *timeunitdiv |= chunk->data[5];
+  *timeunitdiv |= wbuff[13];
 
   /* timeunitdiv must be a positive number */
   if (*timeunitdiv < 1) return(-3);
@@ -134,7 +122,7 @@ int midi_readhdr(struct fiofile_t *f, int *format, unsigned short *timeunitdiv, 
   /* default tempo -> quarter note (1 beat) == 500'000 microseconds (0.5s), ie 120 bpm.
      a delta time unit is therefore (0.5s / DIV) long. */
 
-  if ((*format < 0) || (*format > 2)) return(-2);
+  if (*format > 2) return(-2);
 
   /* read the tracks map and return number of tracks */
   return(midi_gettrackmap(f, tracklist, maxtracks));

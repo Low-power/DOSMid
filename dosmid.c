@@ -31,7 +31,7 @@
 #include <stdio.h>  /* printf() */
 #include <limits.h> /* ULONG_MAX */
 #include <stdlib.h> /* rand() */
-#include <string.h> /* memset(), strcpy(), strncat(), bcmp(), memcpy() */
+#include <string.h> /* memset(), strcpy(), strncat(), memcpy() */
 
 #include "bitfield.h"
 #include "fio.h"

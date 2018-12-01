@@ -50,12 +50,6 @@ enum midi_midievents {
   EVENT_NONE = 100
 };
 
-struct midi_chunk_t {
-  char id[5];
-  unsigned long datalen;
-  unsigned char data[1];
-};
-
 struct midi_event_note_t {
   unsigned char note;
   unsigned char chan;
