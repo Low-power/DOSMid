@@ -59,7 +59,6 @@ struct midi_chunk_t {
 struct midi_trackmap_t {
   long offset;
   long len;
-  char id[4];
 };
 
 struct midi_event_note_t {

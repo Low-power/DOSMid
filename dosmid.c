@@ -825,13 +825,6 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
   for (i = 0; i < miditracks; i++) {
     char tracktitle[UI_TITLEMAXLEN];
     unsigned long tracklen;
-    /* is it really a track we got here? */
-    if (bcmp(trackmap[i].id, "MTrk", 4) != 0) {
-      char errstr[64];
-      sprintf(errstr, "Error: Unexpected chunk (expecting mtrk #%d)", i);
-      ui_puterrmsg(params->midifile, errstr);
-      return(ACTION_ERR_SOFT);
-    }
 
 #ifdef DBGFILE
     if (params->logfd != NULL) fprintf(params->logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, trackmap[i].offset);

@@ -57,19 +57,21 @@ static int midi_fetch_variablelen_fromfile(struct fiofile_t *f, unsigned long *r
 
 /* reads a MIDI file and computes a map of chunks (ie a list of offsets) */
 static int midi_gettrackmap(struct fiofile_t *f, struct midi_trackmap_t *tracklist, int maxchunks) {
-  int chunkid;
-  for (chunkid = 0; chunkid < maxchunks; chunkid++) {
-    /* read chunk's id */
-    if (fio_read(f, tracklist[chunkid].id, 4) != 4) break;
-    /* compute the length */
-    if (fio_read(f, &(tracklist[chunkid].len), 4) != 4) break;
-    tracklist[chunkid].len = BSWAPL(tracklist[chunkid].len);
+  short i;
+  char chunkid[4];
+  for (i = 0; i < maxchunks; i++) {
+    /* read and validate chunk's id */
+    if (fio_read(f, chunkid, 4) != 4) break;
+    if (bcmp(chunkid, "MTrk", 4) != 0) return(-1);
+    /* compute the track's byte length */
+    if (fio_read(f, &(tracklist[i].len), 4) != 4) break;
+    tracklist[i].len = BSWAPL(tracklist[i].len);
     /* remember chunk data offset */
-    tracklist[chunkid].offset = fio_seek(f, FIO_SEEK_CUR, 0);
+    tracklist[i].offset = fio_seek(f, FIO_SEEK_CUR, 0);
     /* skip to next chunk */
-    fio_seek(f, FIO_SEEK_CUR, tracklist[chunkid].len);
+    fio_seek(f, FIO_SEEK_CUR, tracklist[i].len);
   }
-  return(chunkid);
+  return(i);
 }
 
 static struct midi_chunk_t *midi_readchunk(void *dstbuf, struct fiofile_t *f) {
@@ -132,12 +134,10 @@ int midi_readhdr(struct fiofile_t *f, int *format, int *tracks, unsigned short *
   /* default tempo -> quarter note (1 beat) == 500'000 microseconds (0.5s), ie 120 bpm.
      a delta time unit is therefore (0.5s / DIV) long. */
 
-  if ((*format < 0) || (*format > 2)) return(-1);
+  if ((*format < 0) || (*format > 2)) return(-2);
 
   /* read the tracks map */
-  midi_gettrackmap(f, tracklist, maxtracks);
-
-  return(0);
+  return(midi_gettrackmap(f, tracklist, maxtracks));
 }
 
 
