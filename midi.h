@@ -114,7 +114,8 @@ struct midi_event_t {
   enum midi_midievents type;
 };
 
-int midi_readhdr(struct fiofile_t *f, int *format, int *tracks, unsigned short *timeunitdiv, struct midi_trackmap_t *tracklist, int maxtracks);
+/* returns number of tracks in midi file on success, neg val otherwise */
+int midi_readhdr(struct fiofile_t *f, int *format, unsigned short *timeunitdiv, struct midi_trackmap_t *tracklist, int maxtracks);
 
 /* parse a track object and returns the id of the first events in the linked list */
 long midi_track2events(struct fiofile_t *f, char *title, int titlemaxlen,

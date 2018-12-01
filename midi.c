@@ -58,7 +58,7 @@ static int midi_fetch_variablelen_fromfile(struct fiofile_t *f, unsigned long *r
 /* reads a MIDI file and computes a map of chunks (ie a list of offsets) */
 static int midi_gettrackmap(struct fiofile_t *f, struct midi_trackmap_t *tracklist, int maxchunks) {
   short i;
-  char chunkid[4];
+  unsigned char chunkid[4];
   for (i = 0; i < maxchunks; i++) {
     /* read and validate chunk's id */
     if (fio_read(f, chunkid, 4) != 4) break;
@@ -100,7 +100,7 @@ static struct midi_chunk_t *midi_readchunk(void *dstbuf, struct fiofile_t *f) {
 /* PUBLIC INTERFACE */
 
 
-int midi_readhdr(struct fiofile_t *f, int *format, int *tracks, unsigned short *timeunitdiv, struct midi_trackmap_t *tracklist, int maxtracks) {
+int midi_readhdr(struct fiofile_t *f, int *format, unsigned short *timeunitdiv, struct midi_trackmap_t *tracklist, int maxtracks) {
   struct midi_chunk_t *chunk;
   unsigned char rmidbuff[12];
   /* test for RMID format and rewind if not found */
@@ -122,7 +122,7 @@ int midi_readhdr(struct fiofile_t *f, int *format, int *tracks, unsigned short *
   }
 
   *format = (chunk->data[0] << 8) | chunk->data[1];
-  *tracks = (chunk->data[2] << 8) | chunk->data[3];
+  /* *tracks = (chunk->data[2] << 8) | chunk->data[3]; */ /* not used - I rely on midi_gettrackmap() instead */
 
   *timeunitdiv = chunk->data[4];
   *timeunitdiv <<= 8;
@@ -136,7 +136,7 @@ int midi_readhdr(struct fiofile_t *f, int *format, int *tracks, unsigned short *
 
   if ((*format < 0) || (*format > 2)) return(-2);
 
-  /* read the tracks map */
+  /* read the tracks map and return number of tracks */
   return(midi_gettrackmap(f, tracklist, maxtracks));
 }
 

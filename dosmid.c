@@ -799,7 +799,8 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
 
   *trackpos = -1;
 
-  if (midi_readhdr(f, &(trackinfo->midiformat), &miditracks, &(trackinfo->miditimeunitdiv), trackmap, MAXTRACKS) != 0) {
+  miditracks = midi_readhdr(f, &(trackinfo->midiformat), &(trackinfo->miditimeunitdiv), trackmap, MAXTRACKS);
+  if (miditracks < 1) {
     ui_puterrmsg(params->midifile, "Error: Invalid MIDI file format");
     return(ACTION_ERR_SOFT);
   }
