@@ -790,7 +790,7 @@ static void copyline(char *d, int l, char *s) {
 
 
 static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
-  static struct midi_chunkmap_t chunkmap[MAXTRACKS];
+  static struct midi_trackmap_t trackmap[MAXTRACKS];
   int miditracks;
   int i;
   long newtrack;
@@ -799,7 +799,7 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
 
   *trackpos = -1;
 
-  if (midi_readhdr(f, &(trackinfo->midiformat), &miditracks, &(trackinfo->miditimeunitdiv), chunkmap, MAXTRACKS) != 0) {
+  if (midi_readhdr(f, &(trackinfo->midiformat), &miditracks, &(trackinfo->miditimeunitdiv), trackmap, MAXTRACKS) != 0) {
     ui_puterrmsg(params->midifile, "Error: Invalid MIDI file format");
     return(ACTION_ERR_SOFT);
   }
@@ -826,7 +826,7 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
     char tracktitle[UI_TITLEMAXLEN];
     unsigned long tracklen;
     /* is it really a track we got here? */
-    if (bcmp(chunkmap[i].id, "MTrk", 4) != 0) {
+    if (bcmp(trackmap[i].id, "MTrk", 4) != 0) {
       char errstr[64];
       sprintf(errstr, "Error: Unexpected chunk (expecting mtrk #%d)", i);
       ui_puterrmsg(params->midifile, errstr);
@@ -834,9 +834,9 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
     }
 
 #ifdef DBGFILE
-    if (params->logfd != NULL) fprintf(params->logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, chunkmap[i].offset);
+    if (params->logfd != NULL) fprintf(params->logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, trackmap[i].offset);
 #endif
-    fio_seek(f, FIO_SEEK_START, chunkmap[i].offset);
+    fio_seek(f, FIO_SEEK_START, trackmap[i].offset);
     if (i == 0) { /* copyright and text events are fetched from track 0 only */
       newtrack = midi_track2events(f, tracktitle, UI_TITLEMAXLEN, copystring,
                                    UI_TITLEMAXLEN, text, sizeof(text),
