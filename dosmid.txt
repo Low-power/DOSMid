@@ -39,7 +39,8 @@ During runtime, DOSMid can be controlled with the keyboard:
  ESC       Quits to DOS
  +/-       Volume up/down
  PAUSE     Pause the song (press any key to resume)
- ENTER     Skip to next song
+ ENTER     Skip to next song of the playlist
+ BKSPC     Jump to previous song of the playlist (doesn't work with /random)
 
 At the command-line, DOSMid accepts several options, as listed below:
 

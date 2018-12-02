@@ -685,9 +685,13 @@ static void preload_outdev(struct clioptions *params) {
 #endif
 }
 
-
+enum direction_t {
+  DIR_FWD,
+  DIR_REV,
+  DIR_RND
+};
 /* reads a position from an M3U file and returns a ptr from static mem */
-static char *getnextm3uitem(char *playlist, int randomize) {
+static char *getnextm3uitem(char *playlist, enum direction_t dir) {
   static char fnamebuf[256];
   char tempstr[256];
   long fsize;
@@ -701,10 +705,13 @@ static char *getnextm3uitem(char *playlist, int randomize) {
     fio_close(&f);
     return(NULL);
   }
-  if (randomize != 0) {
+  if (dir == DIR_RND) {
     /* go to a random position (avoid last bytes, could be an empty \r\n record) */
     pos = rnd() % (fsize - 2);
   }
+  if (dir == DIR_REV) pos -= 3;
+  GOHEREFORPREV:
+  if (pos < 0) pos = 0;
   fio_seek(&f, FIO_SEEK_START, pos);
   /* rewind back to nearest \n or 0 position */
   while (pos > 0) {
@@ -716,6 +723,11 @@ static char *getnextm3uitem(char *playlist, int randomize) {
       pos++;
       break;
     }
+  }
+  if (dir == DIR_REV) {
+    pos -= 3;
+    dir = DIR_FWD;
+    goto GOHEREFORPREV;
   }
 
   /* read the string into fnamebuf */
@@ -734,7 +746,7 @@ static char *getnextm3uitem(char *playlist, int randomize) {
   }
 
   /* if sequential reading of the playlist, then jump to next entry */
-  if (randomize == 0) {
+  if (dir == DIR_FWD) {
     for (;;) {
       char c;
       if (fio_read(&f, &c, 1) != 1) {
@@ -1001,7 +1013,7 @@ static void init_trackinfo(struct trackinfodata *trackinfo, struct clioptions *p
 
 
 /* plays a file. returns 0 on success, non-zero if the program must exit */
-static enum playactions playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event_t *eventscache) {
+static enum playactions playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event_t *eventscache, int playlistdir) {
   static int volume = 100; /* volume is static because it needs to be retained between songs */
   int i;
   enum playactions exitaction;
@@ -1028,7 +1040,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 
   /* if running on a playlist, load next song */
   if (params->playlist != NULL) {
-    params->midifile = getnextm3uitem(params->playlist, params->random);
+    params->midifile = getnextm3uitem(params->playlist, playlistdir);
     if (params->midifile == NULL) {
       ui_puterrmsg("Playlist error", "Failed to fetch an entry from the playlist");
       return(ACTION_ERR_HARD); /* this must be a hard error otherwise DOSMid might be trapped into a loop */
@@ -1149,6 +1161,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
             break;
           case 0x0D: /* return */
             exitaction = ACTION_NEXT;
+            break;
+          case 0x08: /* bkspc */
+            exitaction = ACTION_PREV;
             break;
           case '+':  /* volume up */
             volume += 5;                       /* note: I could also use a MIDI command to */
@@ -1303,6 +1318,7 @@ int main(int argc, char **argv) {
   static struct trackinfodata trackinfo;
   static struct midi_event_t eventscache[EVENTSCACHESIZE];
   static struct clioptions params;
+  enum direction_t playlistdir = DIR_FWD;
 
   /* make sure to init all CLI params to empty values */
   memset(&params, 0, sizeof(params));
@@ -1394,7 +1410,12 @@ int main(int argc, char **argv) {
   /* playlist loop */
   while (action != ACTION_EXIT) {
 
-    action = playfile(&params, &trackinfo, eventscache);
+    action = playfile(&params, &trackinfo, eventscache, playlistdir);
+    if (params.random != 0) {
+      playlistdir = DIR_RND;
+    } else {
+      playlistdir = DIR_FWD;
+    }
     /* if I get three soft errors in a row, it's time to quit */
     if (action != ACTION_ERR_SOFT) softerrcount = 0;
 
@@ -1403,7 +1424,7 @@ int main(int argc, char **argv) {
         /* do nothing, we will exit at the end of the loop anyway */
         break;
       case ACTION_PREV:
-        /* TODO to be implemented */
+        playlistdir = DIR_REV;
         break;
       case ACTION_NEXT:
         /* no explicit action - we will do a 'next' action by default */
