@@ -899,9 +899,6 @@ static enum playactions loadfile(struct clioptions *params, struct trackinfodata
   unsigned char hdr[16];
   enum playactions res;
 
-  /* flush all MIDI events from memory for new events to have where to load */
-  mem_clear();
-
   /* (try to) open the music file */
   if (fio_open(params->midifile, FIO_OPEN_RD, &f) != 0) {
     ui_puterrmsg(params->midifile, "Error: Failed to open the file");
@@ -1016,6 +1013,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   struct midi_event_t *curevent;
   unsigned long elticks = 0; /* used only to count clock ticks in debug mode */
   unsigned char *sysexbuff;
+
+  /* flush all MIDI events from memory for new events to have where to load */
+  mem_clear();
 
   /* init trackinfo & cache data */
   init_trackinfo(trackinfo, params);
@@ -1323,7 +1323,7 @@ int main(int argc, char **argv) {
                "usage: dosmid [options] file.mid (or m3u playlist)\r\n"
                "\r\n"
                "options:\r\n"
-               " /noxms     use conventional memory instead of XMS (loads tiny files only)$");
+               " /noxms     use conventional memory instead of XMS (loads small files only)$");
       dos_puts(" /xmsdelay  wait 2ms before accessing XMS memory (AWEUTIL compatibility)\r\n"
                " /mpu[=XXX] use MPU-401 on I/O port XXX. /mpu reads port address from BLASTER\r\n"
 #ifdef SBAWE
