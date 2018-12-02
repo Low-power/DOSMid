@@ -8,6 +8,7 @@
 #include <stdio.h>   /* sprintf() */
 #include <string.h>  /* strlen() */
 
+#include "mem.h" /* MEM_XMS */
 #include "ui.h"  /* include self for control */
 #include "version.h"
 
@@ -26,6 +27,9 @@ const unsigned short COLOR_ERRMSG[2]    = {0x7000u, 0x4700u};
 unsigned short far *screenptr = NULL;
 static int oldmode = 0;
 static int colorflag = 0;
+
+extern unsigned long MEM_TOTALLOC; /* total allocated memory from MEM.C */
+extern unsigned short MEM_MODE; /* memory mode (MEM_XMS or MEM_MALLOC) */
 
 /* prints a character on screen, at position [x,y]. charbyte is a 16bit
    value where higher 8 bits contain the attributes (colors) and lower
@@ -148,6 +152,12 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
     ui_printstr(20, 67, "Format:", 7, COLOR_TEMPO[colorflag]);
     ui_printstr(21, 67, "Tracks:", 7, COLOR_TEMPO[colorflag]);
     ui_printstr(22, 68, "Tempo:", 6, COLOR_TEMPO[colorflag]);
+    if (MEM_MODE == MEM_XMS) {
+      ui_printstr(22, 50, "XMS", 4, COLOR_TEMPO[colorflag]);
+    } else {
+      ui_printstr(22, 50, "MEM", 4, COLOR_TEMPO[colorflag]);
+    }
+    ui_printstr(22, 54, "used:", 9, COLOR_TEMPO[colorflag]);
   }
   /* print notes states on every channel */
   if (*refreshflags & UI_REFRESH_NOTES) {
@@ -184,6 +194,10 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
     } else {
       ui_printstr(18, 50, "", 12, COLOR_TEMPO[colorflag]);
     }
+    /* total allocated memory */
+    sprintf(tempstr, "%luK", MEM_TOTALLOC >> 10);
+    ui_printstr(22, 60, tempstr, 7, COLOR_TEMPO[colorflag]);
+
     /* print format */
     switch ((trackinfo->fileformat << 1) | trackinfo->midiformat) {
       case FORMAT_MIDI << 1:

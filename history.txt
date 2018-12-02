@@ -6,6 +6,7 @@ DOSMid v0.9.4 [xx xxx xxxx]
  - UI displays channels as 'piano' if no instrument is explicitely loaded,
  - reduced libc dependencies (smaller footprint),
  - displaying the MIDI tracks count,
+ - displaying the amount of memory used by the MIDI file,
  - minor memory optimizations,
  - fixed a memory leak in midi code,
  - fixed RIFF-RMID header decoding,
