@@ -39,17 +39,19 @@
 #define LOWMEMBUFSIZE  8192  /* how big each memory pool is, in bytes */
 
 static unsigned char far *mempool[LOWMEMBUFCOUNT];
-static int memmode = 0;
+unsigned short MEM_MODE = 0;
 static struct xms_struct xms;
 static long nexteventid = 0;
+unsigned long MEM_TOTALLOC = 0; /* total allocated memory counter (bytes) */
 
 
 /* initializes the memory module using 'mode' method, returns the number of
  * memory kilobytes allocated */
 unsigned int mem_init(int mode) {
-  memmode = mode;
+  MEM_MODE = mode;
   nexteventid = 0;
-  if (memmode == MEM_XMS) {
+  MEM_TOTALLOC = 0;
+  if (MEM_MODE == MEM_XMS) {
     return(xms_init(&xms, 16384));
   } else {
     /* try to allocate one mem pool so we have anything to start */
@@ -57,6 +59,7 @@ unsigned int mem_init(int mode) {
     if (mempool[0] == NULL) { /* if malloc() failed, then abort */
       return(0);
     }
+    MEM_TOTALLOC = LOWMEMBUFSIZE;
     return(LOWMEMBUFSIZE >> 10);
   }
 }
@@ -64,7 +67,7 @@ unsigned int mem_init(int mode) {
 
 /* pull an xms memory block into *ptr */
 int mem_pull(long addr, void far *ptr, int sz) {
-  if (memmode == MEM_XMS) {
+  if (MEM_MODE == MEM_XMS) {
     return(xms_pull(&xms, addr, ptr, sz));
   } else {
     _fmemcpy(ptr, mempool[addr >> 16] + (addr & 0xffffl), sz);
@@ -75,7 +78,7 @@ int mem_pull(long addr, void far *ptr, int sz) {
 
 /* push the memory block pointed by *ptr into xms */
 int mem_push(void far *ptr, long addr, int sz) {
-  if (memmode == MEM_XMS) {
+  if (MEM_MODE == MEM_XMS) {
     return(xms_push(&xms, ptr, sz, addr));
   } else {
     _fmemcpy(mempool[addr >> 16] + (addr & 0xffffl), ptr, sz);
@@ -120,10 +123,11 @@ int pusheventqueue(struct midi_event_t *event, long *root) {
 /* returns a free eventid for a new event of sz bytes */
 long mem_alloc(int sz) {
   long res;
-  if (memmode == MEM_XMS) {
+  if (MEM_MODE == MEM_XMS) {
     res = nexteventid;
     if ((nexteventid + sz) > xms.memsize) return(-1);
     nexteventid += sz;
+    MEM_TOTALLOC += sz;
     return(res);
   } else {
     long seg, offset;
@@ -138,6 +142,7 @@ long mem_alloc(int sz) {
       if (seg >= LOWMEMBUFCOUNT) return(-1);
       mempool[seg] = _fmalloc(LOWMEMBUFSIZE); /* try to alloc the extra mem pool */
       if (mempool[seg] == NULL) return(-1); /* abort if alloc failed */
+      MEM_TOTALLOC += LOWMEMBUFSIZE;
     }
     res = (seg << 16) | offset;
     /* */
@@ -149,14 +154,16 @@ long mem_alloc(int sz) {
 
 void mem_clear(void) {
   nexteventid = 0;
+  MEM_TOTALLOC = 0;
   /* if using low mem, then leave only one buffer */
-  if (memmode != MEM_XMS) {
+  if (MEM_MODE != MEM_XMS) {
     int i;
     for (i = 1; i < LOWMEMBUFCOUNT; i++) {
       if (mempool[i] == NULL) break;
       _ffree(mempool[i]);
       mempool[i] = NULL;
     }
+    MEM_TOTALLOC = LOWMEMBUFSIZE;
   }
 }
 
@@ -164,7 +171,7 @@ void mem_clear(void) {
 /* closes / deallocates the memory module */
 void mem_close(void) {
   xms.memsize = 0;
-  if (memmode == MEM_XMS) {
+  if (MEM_MODE == MEM_XMS) {
     xms_close(&xms);
   } else {
     int i;
