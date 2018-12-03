@@ -11,6 +11,7 @@ DOSMid v0.9.4 [xx xxx xxxx]
  - minor memory optimizations,
  - fixed a memory leak in midi code,
  - fixed RIFF-RMID header decoding,
+ - fixed playlist gap delay computation (fixed /delay behavior, too),
  - adaptations to compile in small memory model (smaller, faster),
  - removed /log from the default build,
  - /noxms can be passed via config file now,

@@ -1102,8 +1102,8 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   memset(trackinfo->title[0], 0, 16);
   refreshflags = UI_REFRESH_ALL;
 
-  if ((params->playlist != NULL) && (params->delay < 2000)) nexteventtime += (2000 - params->delay) * 1000; /* playback starts no sooner than in 2s (for playlist listening comfort) */
-  nexteventtime += params->delay * 1000; /* add the extra custom delay */
+  if ((params->playlist != NULL) && (params->delay < 2000)) nexteventtime += (2000 - params->delay) * 1000L; /* playback starts no sooner than in 2s (for playlist listening comfort) */
+  nexteventtime += params->delay * 1000L; /* add the extra custom delay */
   exitaction = loadfile(params, trackinfo, &trackpos);
   if (exitaction != ACTION_NONE) return(exitaction);
   /* if driving a GUS, preload needed MIDI patches up front */
@@ -1124,7 +1124,6 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   for (;;) {
     timer_read(&midiplaybackstart); /* save start time so we can compute elapsed time later */
     if (midiplaybackstart >= nexteventtime) break; /* wait until the scheduled start time is met */
-    if (midiplaybackstart + 10000000lu < nexteventtime) break; /* do not freeze on timer wraparound */
   }
   nexteventtime = midiplaybackstart;
 
@@ -1321,7 +1320,7 @@ int main(int argc, char **argv) {
   enum direction_t playlistdir;
 
   /* make sure to init all CLI params to empty values */
-  memset(&params, 0, sizeof(params));
+  /* memset(&params, 0, sizeof(params)); */ /* no need to (static storage) */
 
   /* preload the mpu port to be used (might be forced later via **argv) */
   preload_outdev(&params);
