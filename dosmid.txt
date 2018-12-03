@@ -5,20 +5,18 @@
 
 *** INTRO ***
 
-DOSMid is a MIDI and MUS player for DOS. It's a real mode application designed
-to run on very modest hardware configurations. It plays standard MIDI files,
-as well as MIDI in RIFF (ie. RMID), and MUS tunes (as used by Id Software in
-numerous games like Doom, Heretic, Hexen, etc).
-DOSMid requires MIDI-capable hardware available either via the standard
-MPU-401 interface, or an RS-232 port, or an EMU8000 engine (as found on
-SoundBlaster 32/64 AWE series). Note, that some sound cards provide an MPU-401
-interface natively, although many need an additional 'wavetable' daughterboard
-to produce actual MIDI sound.
-It is also possible to somewhat emulate MIDI via FM synthesis using an OPL
-chip (that is one of the Yamaha YM3812 or YMF262 chips, found on most sound
-cards from the nineties) - be warned however that, most of the time, such
-MIDI-over-OPL emulation will yeld less than desirable results, unless the MIDI
-file was specifically crafted for OPL.
+DOSMid is a MIDI, MUS and RMID player for DOS. It's a real mode application
+designed to run on very modest hardware configurations. It plays standard MIDI
+files (both format 0 and format 1), as well as MIDI in RIFF (ie. RMID), and
+even MUS tunes (as used by Id Software in numerous games like Doom, Heretic,
+Hexen, etc).
+DOSMid requires MIDI-capable hardware of some sort. Note, that some sound
+cards have an MPU-401 interface, although many need an additional 'wavetable' daughterboard to produce actual MIDI sound.
+DOSMid can also emulate MIDI through FM synthesis using an OPL chip (that is
+one of the Yamaha YM3812 or YMF262 chips, found on most sound cards from the
+nineties) - be warned however that, most of the time, such MIDI-over-OPL
+emulation will yeld less than desirable results, unless the MIDI file was
+specifically crafted for OPL.
 
 Minimum requirements:
  - a compatible synthesizer (wavetable, OPL or external - see the compat list)
@@ -42,7 +40,7 @@ During runtime, DOSMid can be controlled with the keyboard:
  ENTER     Skip to next song of the playlist
  BKSPC     Jump to previous song of the playlist (doesn't work with /random)
 
-At the command-line, DOSMid accepts several options, as listed below:
+DOSMid accepts several command-line options, as listed below:
 
 DOSMID [options] file.mid (or m3u playlist)
 
@@ -140,16 +138,16 @@ through the ULTRAMID TSR API.
 *** COMPATIBLE SOUND HARDWARE ***
 
 DOSMid supports a variety of MIDI hardware. Here below I list the types of
-hardware that DOSMid can talk to:
+hardware that DOSMid is able to talk to:
 
 External MIDI synthesizers:
  - Connected through a MIDI/game port: either using an industry standard
-   MPU-401 interface, or SoundBlaster MIDI port (pretty much all non-USB
-   external synthesizers have a 'MIDI IN' port),
- - Connected through a RS232 ("COM") port: many synthesizers come with an
-   RS-232 port that can be used instead of the standard MIDI port, like
-   Roland SoundCanvas models, Yamaha PSR series, the Miracle Piano, many Korg
-   devices, or even software solutions based on ttymidi...
+   MPU-401 interface, or SoundBlaster MIDI port,
+ - Connected through a "COM" (RS232) port: many synthesizers come with an
+   RS-232 port that can be used instead of the standard MIDI port. This is
+   supported by Roland SoundCanvas models, Yamaha PSR series, the Miracle
+   Piano, many Korg devices... You could even use a software solution based
+   on ttymidi...
 
 Internal MIDI synthesizers:
  - Available through a virtual MPU-401 interface: some AzTech Waverider 32
@@ -163,10 +161,10 @@ Internal MIDI synthesizers:
 
 *** BUILDING ***
 
-DOSMid is compiled with OpenWatcom. The entire build process is automated via
-a Makefile file, so if you wish to rebuild DOSMid, all you have to do is type
-"wmake". A few compile-time options are available to disable features you
-might not need: edit the Makefile and adapt FEATURES to your likeness. The
+DOSMid is compiled with OpenWatcom 1.9. The entire build process is automated
+through a Makefile file, so if you wish to rebuild DOSMid, all you have to do
+is type "wmake". A few compile-time options are available to disable features
+you might not want: edit the Makefile and adapt FEATURES to your likeness. The
 FEATURES list is documented in the Makefile. The default build comes with all
 features compiled in, so you really should fiddle with FEATURES only in case
 you desperately need to lower DOSMid's memory footprint.
@@ -175,8 +173,8 @@ you desperately need to lower DOSMid's memory footprint.
 *** CONTACT ***
 
 If you enjoy DOSMid, or noticed any bugs, I'd love to hear about it! You won't
-see my e-mail address here, but you will find contact information on my home
-page: http://mateusz.viste.fr
+see my e-mail address here, but you will surely find some contact pointers on
+my home page: http://mateusz.viste.fr
 
 
 *** LICENSE ***
