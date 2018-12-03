@@ -707,7 +707,7 @@ static char *getnextm3uitem(char *playlist, enum direction_t dir) {
   }
   if (dir == DIR_RND) {
     /* go to a random position (avoid last bytes, could be an empty \r\n record) */
-    pos = rnd() % (fsize - 2);
+    pos = (rnd() << 1) % (fsize - 2); /* mul rnd by 2 to speed up 'randomness' at the cost of getting only even offsets */
   }
   if (dir == DIR_REV) pos -= 3;
   GOHEREFORPREV:
