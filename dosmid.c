@@ -1318,7 +1318,7 @@ int main(int argc, char **argv) {
   static struct trackinfodata trackinfo;
   static struct midi_event_t eventscache[EVENTSCACHESIZE];
   static struct clioptions params;
-  enum direction_t playlistdir = DIR_FWD;
+  enum direction_t playlistdir;
 
   /* make sure to init all CLI params to empty values */
   memset(&params, 0, sizeof(params));
@@ -1408,6 +1408,11 @@ int main(int argc, char **argv) {
   params.devname = devtoname(params.device, params.devicesubtype);
 
   /* playlist loop */
+  if (params.random != 0) {
+    playlistdir = DIR_RND;
+  } else {
+    playlistdir = DIR_FWD;
+  }
   while (action != ACTION_EXIT) {
 
     action = playfile(&params, &trackinfo, eventscache, playlistdir);
