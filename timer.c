@@ -91,7 +91,9 @@ static void interrupt handle_clock(void) {
 /* reset the timer value, this can be used by the application to make sure
  * no timer wrap occurs during critical parts of the code flow */
 void timer_reset(void) {
+  disable();
   nowtime = 0;
+  enable();
 }
 
 
