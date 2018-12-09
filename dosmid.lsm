@@ -1,8 +1,8 @@
 Begin3
 Title:           DOSMid
-Version:         0.9.3
-Entered-date:    06 Feb 2018
-Description:     MIDI player for many synthesizers (AWE, MPU-401, OPL...)
+Version:         0.9.4
+Entered-date:    09 Dec 2018
+Description:     MIDI player for many synthesizers (AWE,MPU401,OPL,GUS...)
 Keywords:        midi,mus,rmid,player
 Author:          Mateusz Viste
 Maintained-by:
