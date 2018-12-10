@@ -1066,6 +1066,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   if (params->syxrst != NULL) {
     int syxlen;
     struct fiofile_t syxfh;
+#ifdef DBGFILE
+  if (params->logfd != NULL) fprintf(params->logfd, "loading SYSEX file %s\n", params->syxrst);
+#endif
     /* open the syx file */
     if (fio_open(params->syxrst, FIO_OPEN_RD, &syxfh) != 0) {
       ui_puterrmsg(params->syxrst, "Error: Failed to open the SYX file");
@@ -1076,6 +1079,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     /* read SYSEX messages until EOF */
     for (;;) {
       syxlen = syx_fetchnext(&syxfh, sysexbuff, 8192);
+#ifdef DBGFILE
+      if (params->logfd != NULL) fprintf(params->logfd, "sys_fetchnext() returned %d\n", syxlen);
+#endif
       if (syxlen == 0) break; /* EOF */
       if (syxlen < 0) { /* error condition */
         fio_close(&syxfh); /* close the syx file */
