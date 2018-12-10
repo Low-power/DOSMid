@@ -16,6 +16,9 @@ int main(void) {
   long pos;
   static unsigned char buff[1024];
 
+  /* delete the test file, just in case it would exist from a previous test */
+  unlink(FNAME);
+
   /* try opening a non-existing file - should fail */
   if (fio_open(FNAME, FIO_OPEN_RD, &f) == 0) {
     printf("ERR: opening " FNAME " should have failed (supposed not to exist)\n");
@@ -39,7 +42,19 @@ int main(void) {
     printf("ERR: opening " FNAME " should have failed (supposed not to exist)\n");
     return(1);
   }
-  /* read 1024 bytes and verify them */
+
+  /* read 200 bytes 1 byte a time, and verify them */
+  for (i = 0; i < 200; i++) {
+    fio_read(&f, buff, 1);
+    if (*buff != (i & 0xff)) {
+      fio_close(&f);
+      printf("ERR: unexpected data at offset %d (1 by 1 test, %d != %d)\n", i, *buff, i);
+      return(1);
+    }
+  }
+
+  /* read 1024 bytes again and verify them (this time in one go) */
+  fio_seek(&f, FIO_SEEK_START, 0);
   i = fio_read(&f, buff, 1024);
   if (i != 1024) {
     printf("ERR: tried to read 1024 bytes but got something else (%d)\n", i);
