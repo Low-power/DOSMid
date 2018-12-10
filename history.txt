@@ -2,6 +2,9 @@
 * DOSMid history file *
 
 
+DOSMid v0.9.5 [10 Dec 2018]
+ - Fixed file-reading module (buff corruption on first cache boundary read).
+
 DOSMid v0.9.4 [09 Dec 2018]
  - UI displays channels as 'piano' if no instrument is explicitely loaded,
  - reduced libc dependencies (smaller footprint),

@@ -137,7 +137,7 @@ int fio_open(char far *fname, int mode, struct fiofile_t *f) {
   regs.x.dx = 0;
   int86(0x21, &regs, &regs);
   /* */
-  f->flags = 0;
+  f->flags = FIO_FLAG_SEEKSYNC;
   return(0);
 }
 
