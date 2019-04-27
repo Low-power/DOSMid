@@ -1,7 +1,7 @@
 /*
  * This file is part of the DOSMid project.
- * Copyright (C) 2018 Mateusz Viste
+ * Copyright (C) 2019 Mateusz Viste
  */
 
-#define PVER "0.9.5"
-#define PDATE "2014-2018"
+#define PVER "0.9.6"
+#define PDATE "2014-2019"

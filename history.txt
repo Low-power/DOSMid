@@ -2,6 +2,9 @@
 * DOSMid history file *
 
 
+DOSMid v0.9.6 [xx xxx 2019]
+ - Fixed OPL support when combined with /noxms.
+
 DOSMid v0.9.5 [10 Dec 2018]
  - Fixed file-reading module (buff corruption on first cache boundary read).
 

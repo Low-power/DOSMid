@@ -1,7 +1,7 @@
 /*
  * DOSMID - a low-requirement MIDI and MUS player for DOS
  *
- * Copyright (C) 2014-2018, Mateusz Viste
+ * Copyright (C) 2014-2019, Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1373,16 +1373,6 @@ int main(int argc, char **argv) {
 
   params.devname = devtoname(params.device, params.devicesubtype);
 
-  /* allocate the work memory */
-  if (mem_init(params.memmode) == 0) {
-    if (params.memmode == MEM_XMS) {
-      dos_puts("ERROR: Memory init failed! No XMS maybe? Try /noxms.$");
-    } else {
-      dos_puts("ERROR: Memory init failed!$");
-    }
-    return(1);
-  }
-
   /* populate trackinfo with initial data */
   init_trackinfo(&trackinfo, &params);
 
@@ -1411,6 +1401,17 @@ int main(int argc, char **argv) {
   /* refresh outdev and its name (might have been changed due to OPL autodetection) */
   params.device = dev_getcurdev();
   params.devname = devtoname(params.device, params.devicesubtype);
+
+  /* allocate the work memory */
+  if (mem_init(params.memmode) == 0) {
+    if (params.memmode == MEM_XMS) {
+      ui_puterrmsg("ERROR: Memory init failed! No XMS maybe? Try /noxms.", NULL);
+    } else {
+      ui_puterrmsg("ERROR: Memory init failed!", NULL);
+    }
+    getkey();
+    goto memallocfail;
+  }
 
   /* playlist loop */
   if (params.random != 0) {
@@ -1470,6 +1471,11 @@ int main(int argc, char **argv) {
     }
   }
 
+  /* unload XMS memory */
+  mem_close();
+
+  memallocfail: /* jump here if mem_init() fails */
+
   /* close sound hardware */
   dev_close();
 
@@ -1477,9 +1483,6 @@ int main(int argc, char **argv) {
 
   /* reset screen (clears the screen and makes the cursor visible again) */
   ui_close();
-
-  /* unload XMS memory */
-  mem_close();
 
   /* free the allocated strings, if any */
   if (params.sbnk != NULL) free(params.sbnk);
