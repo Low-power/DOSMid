@@ -11,7 +11,8 @@ files (both format 0 and format 1), as well as MIDI in RIFF (ie. RMID), and
 even MUS tunes (as used by Id Software in numerous games like Doom, Heretic,
 Hexen, etc).
 DOSMid requires MIDI-capable hardware of some sort. Note, that some sound
-cards have an MPU-401 interface, although many need an additional 'wavetable' daughterboard to produce actual MIDI sound.
+cards have an MPU-401 interface, although many need an additional 'wavetable'
+daughterboard to produce actual MIDI sound.
 DOSMid can also emulate MIDI through FM synthesis using an OPL chip (that is
 one of the Yamaha YM3812 or YMF262 chips, found on most sound cards from the
 nineties) - be warned however that, most of the time, such MIDI-over-OPL
