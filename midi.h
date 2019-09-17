@@ -27,10 +27,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>
-
 #ifndef midi_h_sentinel
 #define midi_h_sentinel
+
+#ifdef DBGFILE
+/* only needed with DBGFILE so midi_track2events() can use FILE for its log */
+#include <stdio.h>
+#endif
 
 #define MIDI_OUTOFMEM -10
 #define MIDI_EMPTYTRACK -1

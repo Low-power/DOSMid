@@ -4,6 +4,7 @@
  */
 
 #ifndef SYX_H_SENTINEL
+#define SYX_H_SENTINEL
 
 #define SYXERR_INVALIDPARAM  -1
 #define SYXERR_UNEXPECTEDEOF -2

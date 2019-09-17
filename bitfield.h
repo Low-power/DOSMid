@@ -8,6 +8,7 @@
  */
 
 #ifndef bitfield_h
+#define bitfield_h
 
 /* set bit 'b' in bit array 'map' */
 #define BIT_SET(map, b) ((unsigned char *)map)[(b) >> 3] |= (1 << ((b) & 7))
