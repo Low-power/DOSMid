@@ -1,7 +1,7 @@
 /*
  * Wrapper for outputing MIDI commands to different devices.
  *
- * Copyright (C) 2014-2018, Mateusz Viste
+ * Copyright (C) 2014-2020, Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

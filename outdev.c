@@ -1,7 +1,7 @@
 /*
  * Wrapper for outputing MIDI commands to different devices.
  *
- * Copyright (C) 2014-2018, Mateusz Viste
+ * Copyright (C) 2014-2020, Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -289,6 +289,11 @@ void dev_clear(void) {
     dev_controller(i, 123, 0);   /* "all notes off" */
     dev_controller(i, 120, 0);   /* "all sounds off" */
     dev_controller(i, 121, 0);   /* "all controllers off" */
+    /* set pitch bend to a default preset */
+    dev_controller(i, 100, 0);  /* RPN MSB 0 */
+    dev_controller(i, 101, 0);  /* RPN LSB 0 -> RPN 0x0000 = "pitch bend" */
+    dev_controller(i, 6, 2);    /* Pitch Bend Sensitivity MSB */
+    dev_controller(i, 38, 0);   /* Pitch Bend Sensitivity LSB */
   }
   /* execute hardware-specific actions */
   switch (outdev) {
