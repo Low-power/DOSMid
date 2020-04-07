@@ -97,6 +97,8 @@ DOSMID [options] file.mid (or m3u playlist)
            IBK files (eg. /sbnk=file1.ibk,file2.ibk). If two are provided,
            then the first one will be used for the standard 128-instruments GM
            set, and the second one for defining percussion instruments.
+ /preset=X preset the MIDI device into a specific mode before playing, this
+           can be one of the following: GM, GS, XG or NONE (default is GM).
  /log=FILE Logs all DOSMid activity to FILE. This is a debugging feature that
            you shouldn't be interested in. Beware, the log file can get pretty
            big (MUCH bigger than the MIDI file you are playing).
@@ -180,7 +182,7 @@ my home page: http://mateusz.viste.fr
 
 *** LICENSE ***
 
-Copyright (C) 2014-2019 Mateusz Viste
+Copyright (C) 2014-2020 Mateusz Viste
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without

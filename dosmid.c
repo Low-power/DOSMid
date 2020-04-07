@@ -1,7 +1,7 @@
 /*
  * DOSMID - a low-requirement MIDI and MUS player for DOS
  *
- * Copyright (C) 2014-2019, Mateusz Viste
+ * Copyright (C) 2014-2020, Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -50,6 +50,11 @@
 #define EVENTSCACHESIZE 64 /* *must* be a power of 2 !!! */
 #define EVENTSCACHEMASK 63 /* used by the circular events buffer */
 
+#define PRESET_GM   0 /* default */
+#define PRESET_GS   1
+#define PRESET_XG   2
+#define PRESET_NONE 3
+
 /* define a work buffer that will be used instead of malloc() calls whenever a temporary buffer is required */
 unsigned char wbuff[8192];
 
@@ -86,6 +91,7 @@ struct clioptions {
   unsigned char nopowersave;
   unsigned char dontstop;
   unsigned char random;       /* randomize playlist order */
+  unsigned char gmgspreset;   /* PRESET_GM, PRESET_GS, PRESET_XG, PRESET_NONE */
 };
 
 
@@ -372,6 +378,14 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
     params->devport = params->port_mpu;
     /* if MPU port not found in BLASTER, use the default 0x330 */
     if (params->devport == 0) params->devport = 0x330;
+  } else if (strucmp(arg, "/preset=gm") == 0) {
+    params->gmgspreset = PRESET_GM;
+  } else if (strucmp(arg, "/preset=gs") == 0) {
+    params->gmgspreset = PRESET_GS;
+  } else if (strucmp(arg, "/preset=xg") == 0) {
+    params->gmgspreset = PRESET_XG;
+  } else if (strucmp(arg, "/preset=none") == 0) {
+    params->gmgspreset = PRESET_NONE;
   } else if (strucmp(arg, "/gus") == 0) {
     params->device = DEV_GUS;
     params->devport = gus_find();
@@ -1060,7 +1074,31 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
    * there are users that happen to use DOSMid to init their MPU hardware,
    * and resetting patches *after* the midi file played would break that
    * usage for them */
-  for (i = 0; i < 16; i++) if (i != 9) dev_setprog(i, 0); /* skip percussions */
+  for (i = 0; i < 16; i++) {
+    if (i != 9) dev_setprog(i, 0); /* do not set program on percussion */
+    /* set pitch bend to a default preset */
+    dev_controller(i, 100, 0);  /* RPN MSB 0 */
+    dev_controller(i, 101, 0);  /* RPN LSB 0 -> RPN 0x0000 = "pitch bend" */
+    dev_controller(i, 6, 2);    /* Pitch Bend Sensitivity MSB */
+    dev_controller(i, 38, 0);   /* Pitch Bend Sensitivity LSB */
+  }
+
+  /* reset the device's master volume via sysex */
+  dev_sysex(0x7F, "\xF0\x7F\x7F\x04\x01\x7F\x7F\xF7", 8);
+
+  /* preset the midi device to GM/GS/XG mode (or nothing) */
+  switch (params->gmgspreset) {
+    case PRESET_GM: /* GM RESET */
+      dev_sysex(0, "\xF0\x7E\x7F\x09\x01\xF7", 6);
+      break;
+    case PRESET_GS: /* ROLAND GS RESET */
+      dev_sysex(0, "\xF0\x41\x10\x42\x12\x40\x00\x7F\x00\x41\xF7", 11);
+      break;
+    case PRESET_XG: /* YAMAHA XG RESET */
+      dev_sysex(0, "\xF0\x7E\x7F\x09\x01\xF7", 6); /* prefixed with GM reset */
+      dev_sysex(0, "\xF0\x43\x10\x4C\x00\x00\x7E\x00\xF7", 9);
+      break;
+  }
 
   /* if a SYX init file is provided, feed it to the MIDI synth now */
   if (params->syxrst != NULL) {
@@ -1362,11 +1400,12 @@ int main(int argc, char **argv) {
 #ifdef DBGFILE
                " /log=FILE  write highly verbose logs about DOSMid's activity to FILE\r\n"
 #endif
+               " /preset=XX preset midi device to one of modes: GM, GS, XG or NONE (default=GM)\r\n"
                " /fullcpu   do not let DOSMid try to be CPU-friendly\r\n"
                " /dontstop  never wait for a keypress on error and continue the playlist\r\n"
                " /random    randomize playlist order\r\n"
                " /nosound   disable sound output\r\n"
-               "$");
+               "$"); /* DOS string terminator */
     }
     return(1);
   }

@@ -280,8 +280,8 @@ void dev_close(void) {
 }
 
 
-/* clears/reinits the out device (turns all sounds off...). this can be used
- * often (typically: between each song) */
+/* clears the out device (turns all sounds off...). this can be used
+ * often (typically: after each song) */
 void dev_clear(void) {
   int i;
   /* iterate on MIDI channels and send 'off' messages */
@@ -289,11 +289,6 @@ void dev_clear(void) {
     dev_controller(i, 123, 0);   /* "all notes off" */
     dev_controller(i, 120, 0);   /* "all sounds off" */
     dev_controller(i, 121, 0);   /* "all controllers off" */
-    /* set pitch bend to a default preset */
-    dev_controller(i, 100, 0);  /* RPN MSB 0 */
-    dev_controller(i, 101, 0);  /* RPN LSB 0 -> RPN 0x0000 = "pitch bend" */
-    dev_controller(i, 6, 2);    /* Pitch Bend Sensitivity MSB */
-    dev_controller(i, 38, 0);   /* Pitch Bend Sensitivity LSB */
   }
   /* execute hardware-specific actions */
   switch (outdev) {
@@ -316,8 +311,6 @@ void dev_clear(void) {
     case DEV_NONE:
       break;
   }
-  /* reset the device's master volume via sysex */
-  dev_sysex(0x7F, "\xF0\x7F\x7F\x04\x01\x7F\x7F\xF7", 8);
 }
 
 
