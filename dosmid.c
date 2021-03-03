@@ -287,6 +287,7 @@ static char *devtoname(enum outdev_types device, int devicesubtype) {
       return("COM");
     case DEV_SBMIDI: return("SB");
     case DEV_GUS:    return("GUS");
+    case DEV_CMS:    return("CMS");
     default:         return("UNK");
   }
 }
@@ -384,6 +385,15 @@ static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
     params->device = DEV_OPL;
     params->devport = hexstr2uint(arg + 5);
     if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388$");
+#endif
+#ifdef CMS
+  } else if (strucmp(arg, "/cms") == 0) {
+    params->device = DEV_CMS;
+    params->devport = 0x220;
+  } else if (stringstartswith(arg, "/cms=") == 0) {
+    params->device = DEV_CMS;
+    params->devport = hexstr2uint(arg + 5);
+    if (params->devport < 1) return("Invalid CMS port provided. Example: /cms=220$");
 #endif
   } else if (stringstartswith(arg, "/sbnk=") == 0) {
     if (params->sbnk != NULL) free(params->sbnk); /* drop last sbnk if already present, so a CLI sbnk would take precedence over a config-file sbnk */
@@ -1352,6 +1362,9 @@ int main(int argc, char **argv) {
 #endif
 #ifdef OPL
                " /opl[=XXX] use an FM synthesis OPL2/OPL3 chip for sound output\r\n"
+#endif
+#ifdef CMS
+               " /cms[=XXX] use Creative Music System / Game Blaster for sound output\r\n"
 #endif
                " /sbmidi[=XXX] outputs MIDI to the SoundBlaster MIDI port at I/O addr XXX$");
       dos_puts(" /com[=XXX] output MIDI messages to the RS-232 port at I/O address XXX\r\n"

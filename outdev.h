@@ -39,7 +39,8 @@ enum outdev_types {
   DEV_OPL3,
   DEV_RS232,
   DEV_SBMIDI,
-  DEV_GUS
+  DEV_GUS,
+  DEV_CMS
 };
 
 

@@ -7,7 +7,8 @@
 #  -DSBAWE    enables SoundBlaster AWE drivers (+36K)
 #  -DOPL      enables MIDI emulation over OPL output (+7K)
 #  -DDBGFILE   enables debug output to file (+10K)
-FEATURES = -DSBAWE -DOPL
+#  -DCMS      enables Creative Music System / Game Blaster output
+FEATURES = -DCMS -DDBGFILE
 
 # memory segmentation mode (s = small ; c = compact ; m = medium ; l = large)
 #             code | data
@@ -19,7 +20,7 @@ MODE = s
 
 all: dosmid.exe
 
-dosmid.exe: dosmid.c fio.c gus.c mem.c midi.c mpu401.c mus.c opl.c outdev.c rs232.c sbdsp.c syx.c timer.c ui.c xms.c
+dosmid.exe: dosmid.c fio.c gus.c mem.c midi.c mpu401.c mus.c opl.c outdev.c rs232.c sbdsp.c syx.c timer.c ui.c xms.c cms.c
 	wcl -zp2 -lr -we -d0 -y -0 -s -m$(MODE) $(FEATURES) -wx -fe=dosmid.exe -fm=dosmid.map *.c awe32\rawe32$(MODE).lib
 	upx --8086 -9 dosmid.exe
 

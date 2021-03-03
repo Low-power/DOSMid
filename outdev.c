@@ -35,6 +35,10 @@
 #include "opl.h"
 #endif
 
+#ifdef CMS
+#include "cms.h"
+#endif
+
 #include "fio.h"
 #include "gus.h"
 #include "mpu401.h"
@@ -162,6 +166,11 @@ char *dev_init(enum outdev_types dev, unsigned short port, char *sbank) {
       }
 #endif
       break;
+    case DEV_CMS:
+#ifdef CMS
+      cmsReset(outport);
+#endif
+      break;
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
@@ -217,6 +226,7 @@ void dev_preloadpatch(enum outdev_types dev, int p) {
     case DEV_OPL3:
     case DEV_RS232:
     case DEV_SBMIDI:
+    case DEV_CMS:
       break;
     case DEV_GUS:
       gus_loadpatch(p);
@@ -257,6 +267,11 @@ void dev_close(void) {
     case DEV_OPL3:
 #ifdef OPL
       opl_close(outport);
+#endif
+      break;
+    case DEV_CMS:
+#ifdef CMS
+      cmsReset(outport);
 #endif
       break;
     case DEV_RS232:
@@ -304,6 +319,11 @@ void dev_clear(void) {
       opl_clear(outport);
 #endif
       break;
+    case DEV_CMS:
+#ifdef CMS
+      cmsReset(outport);
+#endif
+      break;
     case DEV_GUS:
       gus_allnotesoff();
       gus_unloadpatches();
@@ -337,6 +357,11 @@ void dev_noteon(int channel, int note, int velocity) {
     case DEV_AWE:
 #ifdef SBAWE
       awe32NoteOn(channel, note, velocity);
+#endif
+      break;
+    case DEV_CMS:
+#ifdef CMS
+      cmsNoteOn(channel, note, velocity);
 #endif
       break;
     case DEV_RS232:
@@ -386,6 +411,10 @@ void dev_noteoff(int channel, int note) {
       awe32NoteOff(channel, note, 64);
 #endif
       break;
+    case DEV_CMS:
+#ifdef CMS
+      cmsNoteOff(channel, note);
+#endif
     case DEV_RS232:
       rs232_write(outport, 0x80 | channel); /* 'note off' + channel selector */
       rs232_write(outport, note);           /* note number */
@@ -473,6 +502,11 @@ void dev_controller(int channel, int id, int val) {
     case DEV_OPL3:
 #ifdef OPL
       opl_midi_controller(outport, channel, id, val);
+#endif
+      break;
+    case DEV_CMS:
+#ifdef CMS
+      cmsController(channel, id, val);
 #endif
       break;
     case DEV_AWE:
@@ -593,6 +627,11 @@ void dev_keypressure(int channel, int note, int pressure) {
 /* should be called by the application from time to time */
 void dev_tick(void) {
   switch (outdev) {
+    case DEV_CMS:
+#ifdef CMS
+      cmsTick();
+#endif
+      break;
     case DEV_MPU401:
       mpu401_flush(outport);
       break;
