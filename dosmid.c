@@ -1,7 +1,7 @@
 /*
  * DOSMID - a low-requirement MIDI and MUS player for DOS
  *
- * Copyright (C) 2014-2020, Mateusz Viste
+ * Copyright (C) 2014-2021, Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1406,6 +1406,19 @@ int main(int argc, char **argv) {
                " /random    randomize playlist order\r\n"
                " /nosound   disable sound output\r\n"
                "$"); /* DOS string terminator */
+      dos_puts("ENABLED FEATURES: [ OPL="
+#ifdef OPL
+               "YES"
+#else
+               "NO"
+#endif
+               " AWE="
+#ifdef SBAWE
+               "YES"
+#else
+               "NO"
+#endif
+               " ]$");
     }
     return(1);
   }

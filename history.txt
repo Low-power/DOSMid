@@ -2,9 +2,10 @@
 * DOSMid history file *
 
 
-DOSMid v0.9.6 [xx xxx 2020]
+DOSMid v0.9.6 [xx xxx 2021]
  - reset the RPN Pitch Bend between songs,
- - added /preset=GM|GS|XG|NONE (preset device into specific mode, default=GM)
+ - added /preset=GM|GS|XG|NONE (preset device into specific mode, default=GM),
+ - DOSMid comes with an extra DOSMIDLT.EXE binary ("lite"), w/o AWE support,
  - fixed OPL support when combined with /noxms.
 
 DOSMid v0.9.5 [10 Dec 2018]

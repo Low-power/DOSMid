@@ -31,6 +31,10 @@ Highly recommended:
  - VGA graphic with a color monitor
  - 512K of available XMS memory
 
+DOSMid comes in two versions: DOSMID.EXE and DOSMIDLT.EXE. The latter stands
+for "DOSMID LITE", it has all the same features as the full DOSMID with one
+exception: it does not support AWE32 boards, which saves about 36K of RAM.
+
 
 *** USAGE ***
 
@@ -175,14 +179,14 @@ you desperately need to lower DOSMid's memory footprint.
 
 *** CONTACT ***
 
-If you enjoy DOSMid, or noticed any bugs, I'd love to hear about it! You won't
-see my e-mail address here, but you will surely find some contact pointers on
-my home page: http://mateusz.viste.fr
+If you enjoy DOSMid, or noticed any bugs, I'd like to hear about it! You won't
+see my e-mail address here, but you will find some contact pointers on my home
+page: http://mateusz.viste.fr
 
 
 *** LICENSE ***
 
-Copyright (C) 2014-2020 Mateusz Viste
+Copyright (C) 2014-2021 Mateusz Viste
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
