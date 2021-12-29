@@ -1037,7 +1037,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   long trackpos;
   unsigned long midiplaybackstart;
   struct midi_event_t *curevent;
+#ifdef DBGFILE
   unsigned long elticks = 0; /* used only to count clock ticks in debug mode */
+#endif
   unsigned char *sysexbuff;
 
   /* flush all MIDI events from memory for new events to have where to load */
@@ -1187,7 +1189,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     /* printf("Action: %d / Note: %d / Vel: %d / t=%lu / next->%ld\n", curevent->type, curevent->data.note.note, curevent->data.note.velocity, curevent->deltatime, curevent->next); */
     if (curevent->deltatime > 0) { /* if I have some time ahead, I can do a few things */
       nexteventtime += (curevent->deltatime * trackinfo->tempo / trackinfo->miditimeunitdiv);
+#ifdef DBGFILE
       elticks += curevent->deltatime;
+#endif
       while (exitaction == ACTION_NONE) {
         unsigned long t;
         /* is time for next event yet? */
