@@ -1,7 +1,7 @@
 /*
  * A simple MIDI parsing library
  *
- * Copyright (C) 2014-2018 Mateusz Viste
+ * Copyright (C) 2014-2022 Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,6 +29,27 @@
 
 #ifndef midi_h_sentinel
 #define midi_h_sentinel
+
+/* Rule used to translate an amount of deltatime units into microseconds
+ *
+ * The MIDI file comes with a "divisor", it is a single 16-bit value in the
+ * MIDI header, it defines the number of delta-time units in a beat (quarter
+ * note). In other words: it is the "beat length" in delta-time units.
+ *
+ * Then, there is the tempo value. This is not fixed, can change many times
+ * during a song. If not explicitely defined, its defaults to 500'000.
+ * Tempo is the "beat length" in micro seconds.
+ *
+ * Keep in mind that a beat (also called a quarter note) isn't the shortest
+ * possible unit of time. The shortest unit is... one delta time unit.
+ *
+ * ...and for what's it's worth, a beat is divided into 24 MIDI clocks. Yes,
+ * the whole thing is insane indeed.
+ *
+ * The simple rule is (delta * tempo / unitdiv) but due to integer overflow
+ * on multiplication with large tempo values, some hacks must be applied.
+ */
+#define DELTATIME2US(delta, tempo, unitdiv) ((unsigned long)delta * ((((unsigned long)tempo << 3) / unitdiv) >> 3))
 
 #ifdef DBGFILE
 /* only needed with DBGFILE so midi_track2events() can use FILE for its log */

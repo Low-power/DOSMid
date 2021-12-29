@@ -1,7 +1,7 @@
 /*
  * DOSMID - a low-requirement MIDI and MUS player for DOS
  *
- * Copyright (C) 2014-2021, Mateusz Viste
+ * Copyright (C) 2014-2022, Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1188,7 +1188,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 
     /* printf("Action: %d / Note: %d / Vel: %d / t=%lu / next->%ld\n", curevent->type, curevent->data.note.note, curevent->data.note.velocity, curevent->deltatime, curevent->next); */
     if (curevent->deltatime > 0) { /* if I have some time ahead, I can do a few things */
-      nexteventtime += (curevent->deltatime * trackinfo->tempo / trackinfo->miditimeunitdiv);
+      nexteventtime += DELTATIME2US(curevent->deltatime, trackinfo->tempo, trackinfo->miditimeunitdiv);
 #ifdef DBGFILE
       elticks += curevent->deltatime;
 #endif
