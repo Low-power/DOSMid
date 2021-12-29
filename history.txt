@@ -5,7 +5,7 @@
 DOSMid v0.9.6 [xx xxx 2021]
  - reset the RPN Pitch Bend between songs
  - added /preset=GM|GS|XG|NONE (preset device into specific mode, default=GM)
- - DOSMid comes with an extra DOSMIDLT.EXE binary ("lite"), w/o AWE support
+ - new DOSMIDLT.EXE binary ("lite" for low-memory systems), w/o AWE support
  - fixed OPL support when combined with /noxms
  - OPL emulation plays files an octave lower (suggested by Campbell Kerr)
  - fixed timing computations on files with low BPM (reported by Campbell Kerr)
