@@ -1,6 +1,6 @@
 #
 # DOSMid Makefile for OpenWatcom
-# Copyright (C) 2014-2021 Mateusz Viste
+# Copyright (C) 2014-2022 Mateusz Viste
 #
 
 # you can control the availability of some features with the FEATURES string:
@@ -35,24 +35,18 @@ clean: .symbolic
 	del dosmidlt.exe
 
 pkg: dosmid.exe .symbolic
+	if exist dosmid.zip del dosmid.zip
+	if exist source.zip del source.zip
+	zip -q -D -k -9 dosmid.zip dosmid.exe dosmidlt.exe dosmid.txt dosmid.cfg history.txt
+	zip -q -D -k -9 -r source.zip awe32 *.txt *.cfg *.c *.h Makefile dosmid.lsm
 	mkdir progs
 	mkdir progs\dosmid
 	mkdir source
 	mkdir source\dosmid
-	mkdir source\dosmid\awe32
 	mkdir appinfo
-	if exist dosmid.zip del dosmid.zip
-	copy dosmid.exe progs\dosmid
-	copy dosmidlt.exe progs\dosmid
-	copy dosmid.txt progs\dosmid
-	copy dosmid.cfg progs\dosmid
-	copy history.txt progs\dosmid
-	copy *.txt source\dosmid
-	copy *.cfg source\dosmid
-	copy *.c source\dosmid
-	copy *.h source\dosmid
-	copy awe32\*.* source\dosmid\awe32
-	copy Makefile source\dosmid
-	copy dosmid.lsm source\dosmid
+	if exist dos_pkg.zip del dos_pkg.zip
+	cd progs\dosmid
+	unzip dosmid.zip -d progs\dosmid
+	unzip source.zip -d source\dosmid
 	copy dosmid.lsm appinfo
-	zip -m -q -k -r -9 dosmid.zip progs source appinfo
+	zip -m -q -k -r -9 dos_pkg.zip progs source appinfo
