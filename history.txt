@@ -2,13 +2,13 @@
 * DOSMid history file *
 
 
-DOSMid v0.9.6 [xx xxx 2021]
+DOSMid v0.9.6 [01 Jan 2022]
  - reset the RPN Pitch Bend between songs
  - added /preset=GM|GS|XG|NONE (preset device into specific mode, default=GM)
  - new DOSMIDLT.EXE binary ("lite" for low-memory systems), w/o AWE support
  - fixed OPL support when combined with /noxms
  - OPL emulation plays files an octave lower (suggested by Campbell Kerr)
- - fixed timing computations on files with low BPM (reported by Campbell Kerr)
+ - low-BPM files timing fix (reporter: Campbell Kerr, optimized by Tim Rentsch)
 
 DOSMid v0.9.5 [10 Dec 2018]
  - fixed file-reading module (buff corruption on first cache boundary read).

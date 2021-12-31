@@ -48,8 +48,11 @@
  *
  * The simple rule is (delta * tempo / unitdiv) but due to integer overflow
  * on multiplication with large tempo values, some hacks must be applied.
+ *
+ * Optimal solution kindly provided by Tim Rentsch on comp.lang.c :
+ * https://groups.google.com/g/comp.lang.c/c/1Nlc1zRXJqY
  */
-#define DELTATIME2US(delta, tempo, unitdiv) ((unsigned long)delta * ((((unsigned long)tempo << 3) / unitdiv) >> 3))
+#define DELTATIME2US(delta, tempo, unitdiv) ((delta * (tempo / unitdiv)) + (delta * (tempo % unitdiv)) / unitdiv)
 
 #ifdef DBGFILE
 /* only needed with DBGFILE so midi_track2events() can use FILE for its log */
