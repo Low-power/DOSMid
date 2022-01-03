@@ -2,7 +2,7 @@
 * DOSMid history file *
 
 
-DOSMid v0.9.6 [01 Jan 2022]
+DOSMid v0.9.6 [03 Jan 2022]
  - reset the RPN Pitch Bend between songs
  - added /preset=GM|GS|XG|NONE (preset device into specific mode, default=GM)
  - new DOSMIDLT.EXE binary ("lite" for low-memory systems), w/o AWE support
