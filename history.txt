@@ -8,7 +8,7 @@ DOSMid v0.9.6 [01 Jan 2022]
  - new DOSMIDLT.EXE binary ("lite" for low-memory systems), w/o AWE support
  - fixed OPL support when combined with /noxms
  - OPL emulation plays files an octave lower (suggested by Campbell Kerr)
- - low-BPM files timing fix (reporter: Campbell Kerr, optimized by Tim Rentsch)
+ - low-BPM files timing fix (reported by Campbell Kerr)
 
 DOSMid v0.9.5 [10 Dec 2018]
  - fixed file-reading module (buff corruption on first cache boundary read).
