@@ -2,6 +2,9 @@
 * DOSMid history file *
 
 
+DOSMid v0.9.x [xx xxx xxxx]
+ - optimized delta-time computation for performance (formula by Tim Rentsch)
+
 DOSMid v0.9.6 [03 Jan 2022]
  - reset the RPN Pitch Bend between songs
  - added /preset=GM|GS|XG|NONE (preset device into specific mode, default=GM)
