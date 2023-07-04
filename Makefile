@@ -50,3 +50,6 @@ pkg: dosmid.exe .symbolic
 	zip -k9rqD -j dosmid.zip progs\dosmid
 	zip -k9rqD -m dosmid.svp progs appinfo
 	zip -k9rqD source.zip awe32 *.txt *.cfg *.c *.h Makefile dosmid.lsm
+	rmdir appinfo
+	rmdir progs\dosmid
+	rmdir progs
