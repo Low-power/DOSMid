@@ -1042,6 +1042,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 #endif
   unsigned char *sysexbuff;
 
+  /* abort early if there is a pending ESC input (user wants out) */
+  if (getkey_ifany() == 0x1B) return(ACTION_EXIT);
+
   /* flush all MIDI events from memory for new events to have where to load */
   mem_clear();
 
@@ -1059,7 +1062,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     params->midifile = getnextm3uitem(params->playlist, playlistdir);
     if (params->midifile == NULL) {
       ui_puterrmsg("Playlist error", "Failed to fetch an entry from the playlist");
-      return(ACTION_ERR_HARD); /* this must be a hard error otherwise DOSMid might be trapped into a loop */
+      return(ACTION_ERR_HARD); /* this must be a hard error otherwise DOSMid might be trapped in a loop */
     }
   }
 
@@ -1086,7 +1089,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   }
 
   /* reset the device's master volume via sysex */
-  dev_sysex(0x7F, "\xF0\x7F\x7F\x04\x01\x7F\x7F\xF7", 8);
+  //dev_sysex(0x7F, "\xF0\x7F\x7F\x04\x01\x7F\x7F\xF7", 8);
 
   /* preset the midi device to GM/GS/XG mode (or nothing) */
   switch (params->gmgspreset) {
@@ -1360,7 +1363,6 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 int main(int argc, char **argv) {
   char *errstr;
   enum playactions action = ACTION_NONE;
-  int softerrcount = 0; /* counts soft errors - if too many occurs at once, dosmid quits */
   /* below objects are declared static so they land in the data segment and not in stack */
   static struct trackinfodata trackinfo;
   static struct midi_event_t eventscache[EVENTSCACHESIZE];
@@ -1483,8 +1485,6 @@ int main(int argc, char **argv) {
     } else {
       playlistdir = DIR_FWD;
     }
-    /* if I get three soft errors in a row, it's time to quit */
-    if (action != ACTION_ERR_SOFT) softerrcount = 0;
 
     switch (action) {
       case ACTION_EXIT:
@@ -1503,18 +1503,14 @@ int main(int argc, char **argv) {
         break;
       case ACTION_ERR_SOFT:         /* wait for a keypress so the user */
         if (params.dontstop == 0) { /* acknowledges the error message, */
-          getkey();                 /* then continue as usual          */
+          if (getkey() == 0x1B) {
+            action = ACTION_EXIT;  /* abort on ESC */
+            break;
+          }
         } else {
           udelay(2000000lu);
         }
-        /* if too many soft error occur in a row, quit */
-        if (++softerrcount > 2) {
-          ui_puterrmsg("", "Too many failures occured, will quit now!");
-          udelay(2000000lu);
-          getkey();
-          action = ACTION_EXIT;
-          break;
-        }
+        /* FALLTHRU */
       case ACTION_NONE: /* choose an action depending on the mode we are in */
         if (params.playlist == NULL) {
           /* wait 1s before quit, so it doesn't feel 'brutal', but don't if */

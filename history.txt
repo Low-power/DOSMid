@@ -2,8 +2,9 @@
 * DOSMid history file *
 
 
-DOSMid v0.9.x [xx xxx xxxx]
+DOSMid v0.9.7 [xx xxx xxxx]
  - optimized delta-time computation for performance (formula by Tim Rentsch)
+ - no auto-quit when 3 files fail in a row, now user can always abort with ESC
 
 DOSMid v0.9.6 [03 Jan 2022]
  - reset the RPN Pitch Bend between songs
@@ -14,7 +15,7 @@ DOSMid v0.9.6 [03 Jan 2022]
  - low-BPM files timing fix (reported by Campbell Kerr)
 
 DOSMid v0.9.5 [10 Dec 2018]
- - fixed file-reading module (buff corruption on first cache boundary read).
+ - fixed file-reading module (buff corruption on first cache boundary read)
 
 DOSMid v0.9.4 [09 Dec 2018]
  - UI displays channels as 'piano' if no instrument is explicitely loaded,
