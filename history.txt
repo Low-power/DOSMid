@@ -2,9 +2,9 @@
 * DOSMid history file *
 
 
-DOSMid v0.9.7 [xx xxx xxxx]
+DOSMid v0.9.7 [18 Aug 2023]
  - optimized delta-time computation for performance (formula by Tim Rentsch)
- - no auto-quit when 3 files fail in a row, now user can always abort with ESC
+ - no auto-quit when 3 files fail in a row + user can abort with ESC any time
 
 DOSMid v0.9.6 [03 Jan 2022]
  - reset the RPN Pitch Bend between songs

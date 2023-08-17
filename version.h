@@ -3,5 +3,5 @@
  * Copyright (C) 2014-2023 Mateusz Viste
  */
 
-#define PVER "0.9.7 alpha"
+#define PVER "0.9.7"
 #define PDATE "2014-2023"

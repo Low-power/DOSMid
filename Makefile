@@ -34,7 +34,7 @@ clean: .symbolic
 	del dosmid.exe
 	del dosmidlt.exe
 
-pkg: dosmid.exe .symbolic
+release: dosmid.exe .symbolic
 	if exist dosmid.svp del dosmid.svp
 	if exist dosmid.zip del dosmid.zip
 	if exist source.zip del source.zip
@@ -47,9 +47,9 @@ pkg: dosmid.exe .symbolic
 	copy dosmid.txt progs\dosmid\
 	copy dosmid.cfg progs\dosmid\
 	copy history.txt progs\dosmid\
-	zip -k9rqD -j dosmid.zip progs\dosmid
-	zip -k9rqD -m dosmid.svp progs appinfo
-	zip -k9rqD source.zip awe32 *.txt *.cfg *.c *.h Makefile dosmid.lsm
+	zip -k9rqDX -j dosmid.zip progs\dosmid
+	zip -k9rqDX -m dosmid.svp progs appinfo
+	zip -k9rqDX source.zip awe32 *.txt *.cfg *.c *.h Makefile dosmid.lsm
 	rmdir appinfo
 	rmdir progs\dosmid
 	rmdir progs
