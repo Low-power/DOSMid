@@ -11,7 +11,7 @@
 #  -DDBGFILE  enables debug output to file (+10K)
 #  -DCMS      enables Creative Music System / Game Blaster output
 FEATURES   = -DSBAWE -DOPL -DCMS
-FEATURESLT = -DCMS
+FEATURESLT = -DOPL -DCMS
 
 # memory segmentation mode (s = small ; c = compact ; m = medium ; l = large)
 #             code | data
