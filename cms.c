@@ -3,12 +3,12 @@
 //#define CMS_DEBUG		// verbose to CMSLOG.TXT debug file
 //#define DRUMS_ONLY		// for percussion debug purpouses
 
+#include "cms.h"
+#include <conio.h>
 #ifdef CMS_DEBUG
 #include <stdio.h>
 #include <stdarg.h>
 #endif
-
-#include "cms.h"
 
 #ifdef CMS_DEBUG
 void debug_log(const char *fmt, ...)
