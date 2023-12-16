@@ -27,7 +27,8 @@ files (both format 0 and format 1), as well as MIDI in RIFF (ie. RMID), and
 even MUS tunes (as used by Id Software in numerous games like Doom, Heretic,
 Hexen, etc).
 DOSMid requires MIDI-capable hardware of some sort. Note, that some sound
-cards have an MPU-401 interface, although many need an additional 'wavetable' daughterboard to produce actual MIDI sound.
+cards have an MPU-401 interface, although many need an additional 'wavetable'
+daughterboard to produce actual MIDI sound.
 DOSMid can also emulate MIDI through FM synthesis using an OPL chip (that is
 one of the Yamaha YM3812 or YMF262 chips, found on most sound cards from the
 nineties) - be warned however that, most of the time, such MIDI-over-OPL
@@ -45,6 +46,10 @@ Highly recommended:
  - 80286 CPU for a guaranteed lag-free experience even on complex MIDI files
  - VGA graphic with a color monitor
  - 512K of available XMS memory
+
+DOSMid comes in two versions: DOSMID.EXE and DOSMIDLT.EXE. The latter stands
+for "DOSMID LITE", it has all the same features as the full DOSMID with one
+exception: it does not support AWE32 boards, which saves about 36K of RAM.
 
 
 *** USAGE ***
@@ -112,6 +117,8 @@ DOSMID [options] file.mid (or m3u playlist)
            IBK files (eg. /sbnk=file1.ibk,file2.ibk). If two are provided,
            then the first one will be used for the standard 128-instruments GM
            set, and the second one for defining percussion instruments.
+ /preset=X preset the MIDI device into a specific mode before playing, this
+           can be one of the following: GM, GS, XG or NONE (default is GM).
  /log=FILE Logs all DOSMid activity to FILE. This is a debugging feature that
            you shouldn't be interested in. Beware, the log file can get pretty
            big (MUCH bigger than the MIDI file you are playing).
@@ -188,14 +195,14 @@ you desperately need to lower DOSMid's memory footprint.
 
 *** CONTACT ***
 
-If you enjoy DOSMid, or noticed any bugs, I'd love to hear about it! You won't
-see my e-mail address here, but you will surely find some contact pointers on
-my home page: http://mateusz.viste.fr
+If you enjoy DOSMid, or noticed any bugs, I'd like to hear about it! You won't
+see my e-mail address here, but you will find some contact pointers on my home
+page: http://mateusz.viste.fr
 
 
 *** LICENSE ***
 
-Copyright (C) 2014-2018 Mateusz Viste
+Copyright (C) 2014-2022 Mateusz Viste
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without

@@ -1,7 +1,7 @@
 /*
  * Wrapper for outputing MIDI commands to different devices.
  *
- * Copyright (C) 2014-2018, Mateusz Viste
+ * Copyright (C) 2014-2020, Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -295,8 +295,8 @@ void dev_close(void) {
 }
 
 
-/* clears/reinits the out device (turns all sounds off...). this can be used
- * often (typically: between each song) */
+/* clears the out device (turns all sounds off...). this can be used
+ * often (typically: after each song) */
 void dev_clear(void) {
   int i;
   /* iterate on MIDI channels and send 'off' messages */
@@ -331,8 +331,6 @@ void dev_clear(void) {
     case DEV_NONE:
       break;
   }
-  /* reset the device's master volume via sysex */
-  dev_sysex(0x7F, "\xF0\x7F\x7F\x04\x01\x7F\x7F\xF7", 8);
 }
 
 
