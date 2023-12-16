@@ -1,7 +1,7 @@
 /*
  * A simple MIDI parsing library
  *
- * Copyright (C) 2014-2018 Mateusz Viste
+ * Copyright (C) 2014-2022 Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -541,7 +541,7 @@ long midi_mergetrack(long t0, long t1, unsigned long *totlen, unsigned short tim
     memcpy(&lastevent, &(event[selected]), sizeof(struct midi_event_t));
     /* increment timer */
     if ((totlen != NULL) && (event[selected].deltatime != 0)) {
-      utotlen += event[selected].deltatime * curtempo / timeunitdiv;
+      utotlen += DELTATIME2US(event[selected].deltatime, curtempo, timeunitdiv);
       while (utotlen >= 1000000lu) {
         utotlen -= 1000000lu;
         *totlen += 1;

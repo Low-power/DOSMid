@@ -1,7 +1,7 @@
 /*
  * A simple MIDI parsing library
  *
- * Copyright (C) 2014-2018 Mateusz Viste
+ * Copyright (C) 2014-2022 Mateusz Viste
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,10 +27,45 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>
-
 #ifndef midi_h_sentinel
 #define midi_h_sentinel
+
+/* Rule used to translate an amount of deltatime units into microseconds
+ *
+ * The MIDI file comes with a "divisor", it is a single 16-bit value in the
+ * MIDI header, it defines the number of delta-time units in a beat (quarter
+ * note). In other words: it is the "beat length" in delta-time units.
+ *
+ * Then, there is the tempo value. This is not fixed, can change many times
+ * during a song. If not explicitely defined, its defaults to 500'000.
+ * Tempo is the "beat length" in micro seconds.
+ *
+ * Keep in mind that a beat (also called a quarter note) isn't the shortest
+ * possible unit of time. The shortest unit is... one delta time unit.
+ *
+ * ...and for what's it's worth, a beat is divided into 24 MIDI clocks. Yes,
+ * the whole thing is insane indeed.
+ *
+ * The simple rule is (delta * tempo / unitdiv) but due to integer overflow
+ * on multiplication with large tempo values, some hacks must be applied.
+ *
+ * An interesting discussion on the subject can be found here:
+ * https://groups.google.com/g/comp.lang.c/c/1Nlc1zRXJqY
+ *
+ * This solution has been provided by Tim Rentsch:
+ * #define DELTATIME2US(delta, tempo, unitdiv) ((delta * (tempo / unitdiv)) + (delta * (tempo % unitdiv)) / unitdiv)
+ *
+ * but ultimately my benchmarks did not show any performance gain of this over
+ * using a wider computation width (64-bit, through long long), hence I use
+ * the latter as it is simpler.
+ */
+#define DELTATIME2US(delta, tempo, unitdiv) (((unsigned long long)delta * tempo) / unitdiv)
+
+
+#ifdef DBGFILE
+/* only needed with DBGFILE so midi_track2events() can use FILE for its log */
+#include <stdio.h>
+#endif
 
 #define MIDI_OUTOFMEM -10
 #define MIDI_EMPTYTRACK -1
