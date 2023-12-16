@@ -1431,6 +1431,12 @@ int main(int argc, char **argv) {
 #else
                "NO"
 #endif
+               " CMS="
+#ifdef CMS
+               "YES"
+#else
+               "NO"
+#endif
                " AWE="
 #ifdef SBAWE
                "YES"
