@@ -19,30 +19,36 @@ New DOSMid options:
                     http://dosmid.sourceforge.net
 
 
-*** INTRO ***
+### INTRO ####################################################################
 
 DOSMid is a MIDI, MUS and RMID player for DOS. It's a real mode application
 designed to run on very modest hardware configurations. It plays standard MIDI
 files (both format 0 and format 1), as well as MIDI in RIFF (ie. RMID), and
 even MUS tunes (as used by Id Software in numerous games like Doom, Heretic,
 Hexen, etc).
+
 DOSMid requires MIDI-capable hardware of some sort. Note, that some sound
 cards have an MPU-401 interface, although many need an additional 'wavetable'
 daughterboard to produce actual MIDI sound.
+
 DOSMid can also emulate MIDI through FM synthesis using an OPL chip (that is
 one of the Yamaha YM3812 or YMF262 chips, found on most sound cards from the
 nineties) - be warned however that, most of the time, such MIDI-over-OPL
-emulation will yeld less than desirable results, unless the MIDI file was
+emulation will yield less than desirable results, unless the MIDI file was
 specifically crafted for OPL.
 
-Minimum requirements:
+
+### REQUIREMENTS #############################################################
+
+Minimum:
+
  - a compatible synthesizer (wavetable, OPL or external - see the compat list)
  - an 8086-compatible CPU
  - 100K of available conventional memory and some XMS
- - 250K or so available conventional memory if you do not have XMS
- - a video card able to display an 80x25 monochrome text mode
+ - 250K of available conventional memory if you do not have XMS
 
-Highly recommended:
+Recommended:
+
  - 80286 CPU for a guaranteed lag-free experience even on complex MIDI files
  - VGA graphic with a color monitor
  - 512K of available XMS memory
@@ -52,9 +58,10 @@ for "DOSMID LITE", it has all the same features as the full DOSMID with one
 exception: it does not support AWE32 boards, which saves about 36K of RAM.
 
 
-*** USAGE ***
+### USAGE ####################################################################
 
-During runtime, DOSMid can be controlled with the keyboard:
+At runtime, DOSMid can be controlled with the keyboard:
+
  ESC       Quits to DOS
  +/-       Volume up/down
  SPACE     Pause the song (press any key to resume)
@@ -137,7 +144,7 @@ file is loaded by DOSMID and used as default parameters that can still be
 overloaded by command-line options.
 
 
-*** THE BLASTER VARIABLE ***
+### THE BLASTER VARIABLE #####################################################
 
 When not forced into a specific configuration via command-line switches,
 DOSMid scans the BLASTER environment variable to find out the most desirable
@@ -158,7 +165,7 @@ environment variable is present, in which case it will try to detect a GUS
 through the ULTRAMID TSR API.
 
 
-*** COMPATIBLE SOUND HARDWARE ***
+### SOUND HARDWARE ###########################################################
 
 DOSMid supports a variety of MIDI hardware. Here below I list the types of
 hardware that DOSMid is able to talk to:
@@ -182,27 +189,27 @@ Internal MIDI synthesizers:
    nineties: Adlib, all SoundBlaster ISA models, Opti, AzTech...).
 
 
-*** BUILDING ***
+### BUILDING #################################################################
 
 DOSMid is compiled with OpenWatcom 1.9. The entire build process is automated
-through a Makefile file, so if you wish to rebuild DOSMid, all you have to do
-is type "wmake". A few compile-time options are available to disable features
-you might not want: edit the Makefile and adapt FEATURES to your likeness. The
+through a Makefile, so if you wish to rebuild DOSMid, all you have to do is
+type "wmake". A few compile-time options are available to disable features you
+might not want: edit the Makefile and adapt FEATURES to your likeness. The
 FEATURES list is documented in the Makefile. The default build comes with all
 features compiled in, so you really should fiddle with FEATURES only in case
 you desperately need to lower DOSMid's memory footprint.
 
 
-*** CONTACT ***
+### CONTACT ##################################################################
 
 If you enjoy DOSMid, or noticed any bugs, I'd like to hear about it! You won't
 see my e-mail address here, but you will find some contact pointers on my home
 page: http://mateusz.viste.fr
 
 
-*** LICENSE ***
+### LICENSE (2-CLAUSE BSD) ###################################################
 
-Copyright (C) 2014-2022 Mateusz Viste
+Copyright (C) 2014-2023 Mateusz Viste
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without

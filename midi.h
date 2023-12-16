@@ -52,15 +52,11 @@
  * An interesting discussion on the subject can be found here:
  * https://groups.google.com/g/comp.lang.c/c/1Nlc1zRXJqY
  *
- * This solution has been provided by Tim Rentsch:
- * #define DELTATIME2US(delta, tempo, unitdiv) ((delta * (tempo / unitdiv)) + (delta * (tempo % unitdiv)) / unitdiv)
- *
- * but ultimately my benchmarks did not show any performance gain of this over
- * using a wider computation width (64-bit, through long long), hence I use
- * the latter as it is simpler.
+ * The optimal solution has been provided by Tim Rentsch the 4th January 2022.
+ * Tim's solution is 8x faster than casting the delta * tempo product into an
+ * unsigned long long (see tim_mul.c in tests)
  */
-#define DELTATIME2US(delta, tempo, unitdiv) (((unsigned long long)delta * tempo) / unitdiv)
-
+#define DELTATIME2US(delta, tempo, unitdiv) ((delta / unitdiv) * tempo + (delta % unitdiv) * (tempo / unitdiv) + (delta % unitdiv) * (tempo % unitdiv) / unitdiv)
 
 #ifdef DBGFILE
 /* only needed with DBGFILE so midi_track2events() can use FILE for its log */
