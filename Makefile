@@ -1,5 +1,5 @@
 #
-# DOSMid Makefile for OpenWatcom
+# DOSMid Makefile for Open Watcom Make
 # Copyright (C) 2014-2022 Mateusz Viste
 #
 
