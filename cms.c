@@ -95,9 +95,10 @@ unsigned char	CMSFreqMap[128] = {
 // CMS IO port address
 unsigned short cmsPort;
 
-
+#if 0
 // The 12 note-within-an-octave values for the SAA1099, starting at B
 static unsigned char noteAdr[] = {5, 32, 60, 85, 110, 132, 153, 173, 192, 210, 227, 243};
+#endif
 
 // Volume
 static unsigned char atten[128] = {
@@ -404,8 +405,6 @@ void cms_pitchwheel(unsigned short oplport, int channel, int pitchwheel)
 {
   unsigned char i;
   unsigned short notefreq;
-  unsigned short period;
-  unsigned char mixer;
   unsigned char note;
   int pitch;
   unsigned char octave;
@@ -507,11 +506,8 @@ void cmsNoteOff(unsigned char channel, unsigned char note)
 
 void cmsNoteOn(unsigned char channel, unsigned char note, unsigned char velocity)
 {
-  unsigned char octave;
-  unsigned char noteVal;
   unsigned char i;
   unsigned char voice;
-  unsigned char note_cms;
   unsigned notefreq;
   int pitch;
 
@@ -583,10 +579,9 @@ void cmsNoteOn(unsigned char channel, unsigned char note, unsigned char velocity
   if (velocity != 0)
   {
 /*
-	note_cms = note+1;
-
-	octave = (note_cms / 12) - 1; //Some fancy math to get the correct octave
-  	noteVal = note_cms - ((octave + 1) * 12); //More fancy math to get the correct note
+	unsigned char note_cms = note+1;
+	unsigned char octave = (note_cms / 12) - 1; //Some fancy math to get the correct octave
+	unsigned char noteVal = note_cms - ((octave + 1) * 12); //More fancy math to get the correct note
 */
 	NotePriority++;
 
@@ -650,7 +645,7 @@ void cmsNoteOn(unsigned char channel, unsigned char note, unsigned char velocity
 
 	if ((notefreq > 31) && (notefreq < 7824))
 	{
-		octave=4;
+		unsigned char octave = 4;
 		while (notefreq<489)
 	 		{
 				notefreq=notefreq*2;
