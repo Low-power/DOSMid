@@ -559,16 +559,16 @@ static int opl_loadbank_internal(char *file, int offset) {
 
 /*
 static void dump2file(void) {
-  FILE *fd;
+  FILE *f;
   int i;
-  fd = fopen("dump.txt", "wb");
-  if (fd == NULL) return;
+  f = fopen("dump.txt", "wb");
+  if (f == NULL) return;
   for (i = 0; i < 256; i++) {
     char *comma = "";
     if (i < 255) comma = ",";
-    fprintf(fd, "{0x%07lX,0x%07lX,0x%02X,0x%02X,0x%02X,%d}%s\r\n", gmtimbres[i].modulator_E862, gmtimbres[i].carrier_E862, gmtimbres[i].modulator_40, gmtimbres[i].carrier_40, gmtimbres[i].feedconn, gmtimbres[i].finetune, comma);
+    fprintf(f, "{0x%07lX,0x%07lX,0x%02X,0x%02X,0x%02X,%d}%s\r\n", gmtimbres[i].modulator_E862, gmtimbres[i].carrier_E862, gmtimbres[i].modulator_40, gmtimbres[i].carrier_40, gmtimbres[i].feedconn, gmtimbres[i].finetune, comma);
   }
-  fclose(fd);
+  fclose(f);
 }*/
 
 int opl_loadbank(char *file) {

@@ -87,7 +87,7 @@ struct clioptions {
   char *playlist;   /* the playlist to read files from */
   char *sbnk;       /* optional sound bank to use (IBK file or so) */
 #ifdef DBGFILE
-  FILE *logfd;      /* an open file descriptor to the debug log file */
+  FILE *logfile;      /* an open debug log file */
 #endif
   /* 'flags' */
   unsigned char xmsdelay;
@@ -442,12 +442,9 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       if (params->devport < 1) return("Invalid SBMIDI port provided. Example: /sbmidi=220$");
 #ifdef DBGFILE
     } else if (stringstartswith(o, "log=")) {
-      if (params->logfd == NULL) {
-        params->logfd = fopen(o + 4, "wb");
-        if (params->logfd == NULL) {
-          return("Failed to open the debug log file.$");
-        }
-      }
+      if (params->logfile) fclose(params->logfile);
+      params->logfile = fopen(o + 4, "wb");
+      if (params->logfile == NULL) return("Failed to open the debug log file.$");
 #endif
     } else if (stringstartswith(o, "syx=")) {
       params->syxrst = strdup(o + 4);
@@ -795,7 +792,7 @@ static char *getnextm3uitem(char *playlist, enum direction_t dir) {
     }
   }
 
-  /* close the file descriptor */
+  /* close the file */
   fio_close(&f);
   /* trim any leading spaces, if any */
   rtrim(fnamebuf);
@@ -860,7 +857,9 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
   trackinfo->trackscount = miditracks;
 
 #ifdef DBGFILE
-  if (params->logfd != NULL) fprintf(params->logfd, "LOADED FILE '%s': format=%d tracks=%d timeunitdiv=%u\n", params->midifile, trackinfo->midiformat, miditracks, trackinfo->miditimeunitdiv);
+  if (params->logfile) {
+    fprintf(params->logfile, "LOADED FILE '%s': format=%d tracks=%d timeunitdiv=%u\n", params->midifile, trackinfo->midiformat, miditracks, trackinfo->miditimeunitdiv);
+  }
 #endif
 
   if ((trackinfo->midiformat != 0) && (trackinfo->midiformat != 1)) {
@@ -882,7 +881,7 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
     unsigned long tracklen;
 
 #ifdef DBGFILE
-    if (params->logfd != NULL) fprintf(params->logfd, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, trackmap[i]);
+    if (params->logfile) fprintf(params->logfile, "LOADING TRACK %d FROM OFFSET 0x%04X\n", i, trackmap[i]);
 #endif
     fio_seek(f, FIO_SEEK_START, trackmap[i]);
     if (i == 0) { /* copyright and text events are fetched from track 0 only */
@@ -890,14 +889,14 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
                                    UI_TITLEMAXLEN, text, sizeof(text),
                                    &(trackinfo->channelsusage),
 #ifdef DBGFILE
-                                   params->logfd,
+                                   params->logfile,
 #endif
                                    &tracklen, trackinfo->reqpatches);
     } else {
       newtrack = midi_track2events(f, tracktitle, UI_TITLEMAXLEN, NULL, 0,
                                    NULL, 0, &(trackinfo->channelsusage),
 #ifdef DBGFILE
-                                   params->logfd,
+                                   params->logfile,
 #endif
                                    &tracklen, trackinfo->reqpatches);
     }
@@ -922,7 +921,7 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
     if (newtrack >= 0) {
       *trackpos = midi_mergetrack(*trackpos, newtrack, &(trackinfo->totlen), trackinfo->miditimeunitdiv);
 #ifdef DBGFILE
-      if (params->logfd != NULL) fprintf(params->logfd, "TRACK %d MERGED (start id=%ld) -> TOTAL TIME: %ld\n", i, *trackpos, trackinfo->totlen);
+      if (params->logfile) fprintf(params->logfile, "TRACK %d MERGED (start id=%ld) -> TOTAL TIME: %ld\n", i, *trackpos, trackinfo->totlen);
 #endif
     }
   }
@@ -1092,7 +1091,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   timer_read(&nexteventtime); /* save current time, to schedule when the song shall start */
 
 #ifdef DBGFILE
-  if (params->logfd != NULL) fprintf(params->logfd, "Reset MPU\n");
+  if (params->logfile) fprintf(params->logfile, "Reset MPU\n");
 #endif
 
   /* load piano to all channels (even real MIDI synths do not always reset
@@ -1131,7 +1130,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     int syxlen;
     struct fiofile_t syxfh;
 #ifdef DBGFILE
-  if (params->logfd != NULL) fprintf(params->logfd, "loading SYSEX file %s\n", params->syxrst);
+  if (params->logfile) fprintf(params->logfile, "loading SYSEX file %s\n", params->syxrst);
 #endif
     /* open the syx file */
     if (fio_open(params->syxrst, FIO_OPEN_RD, &syxfh) != 0) {
@@ -1144,7 +1143,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     for (;;) {
       syxlen = syx_fetchnext(&syxfh, sysexbuff, 8192);
 #ifdef DBGFILE
-      if (params->logfd != NULL) fprintf(params->logfd, "sys_fetchnext() returned %d\n", syxlen);
+      if (params->logfile) fprintf(params->logfile, "sys_fetchnext() returned %d\n", syxlen);
 #endif
       if (syxlen == 0) break; /* EOF */
       if (syxlen < 0) { /* error condition */
@@ -1184,7 +1183,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
       if (BIT_GET(trackinfo->reqpatches, i) != 0) {
         dev_preloadpatch(params->device, i);
 #ifdef DBGFILE
-        if (params->logfd != NULL) fprintf(params->logfd, "preloading patch %d\n", i);
+        if (params->logfile) fprintf(params->logfile, "preloading patch %d\n", i);
 #endif
       }
     }
@@ -1266,7 +1265,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
     switch (curevent->type) {
       case EVENT_NOTEON:
 #ifdef DBGFILE
-        if (params->logfd != NULL) fprintf(params->logfd, "%lu: NOTE ON chan: %d / note: %d / vel: %d\n", trackinfo->elapsedsec, curevent->data.note.chan, curevent->data.note.note, curevent->data.note.velocity);
+        if (params->logfile) {
+          fprintf(params->logfile, "%lu: NOTE ON chan: %d / note: %d / vel: %d\n", trackinfo->elapsedsec, curevent->data.note.chan, curevent->data.note.note, curevent->data.note.velocity);
+        }
 #endif
         dev_noteon(curevent->data.note.chan, curevent->data.note.note, (volume * curevent->data.note.velocity) / 100);
         trackinfo->notestates[curevent->data.note.note] |= (1 << curevent->data.note.chan);
@@ -1275,7 +1276,9 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         break;
       case EVENT_NOTEOFF:
 #ifdef DBGFILE
-        if (params->logfd != NULL) fprintf(params->logfd, "%lu: NOTE OFF chan: %d / note: %d\n", trackinfo->elapsedsec, curevent->data.note.chan, curevent->data.note.note);
+        if (params->logfile) {
+          fprintf(params->logfile, "%lu: NOTE OFF chan: %d / note: %d\n", trackinfo->elapsedsec, curevent->data.note.chan, curevent->data.note.note);
+        }
 #endif
         dev_noteoff(curevent->data.note.chan, curevent->data.note.note);
         trackinfo->notestates[curevent->data.note.note] &= (0xFFFF ^ (1 << curevent->data.note.chan));
@@ -1284,14 +1287,18 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         break;
       case EVENT_TEMPO:
 #ifdef DBGFILE
-        if (params->logfd != NULL) fprintf(params->logfd, "%lu (%lu): TEMPO change from %lu to %lu\n", trackinfo->elapsedsec, elticks, trackinfo->tempo, curevent->data.tempoval);
+        if (params->logfile) {
+          fprintf(params->logfile, "%lu (%lu): TEMPO change from %lu to %lu\n", trackinfo->elapsedsec, elticks, trackinfo->tempo, curevent->data.tempoval);
+        }
 #endif
         trackinfo->tempo = curevent->data.tempoval;
         refreshflags |= UI_REFRESH_TEMPO;
         break;
       case EVENT_PROGCHAN:
 #ifdef DBGFILE
-        if (params->logfd != NULL) fprintf(params->logfd, "%lu: CHANNEL #%d PROG: %d\n", trackinfo->elapsedsec, curevent->data.prog.chan, curevent->data.prog.prog);
+        if (params->logfile) {
+          fprintf(params->logfile, "%lu: CHANNEL #%d PROG: %d\n", trackinfo->elapsedsec, curevent->data.prog.chan, curevent->data.prog.prog);
+        }
 #endif
         trackinfo->chanprogs[curevent->data.prog.chan] = curevent->data.prog.prog;
         dev_setprog(curevent->data.prog.chan, curevent->data.prog.prog);
@@ -1299,25 +1306,33 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         break;
       case EVENT_PITCH:
 #ifdef DBGFILE
-        if (params->logfd != NULL) fprintf(params->logfd, "%lu: PITCH WHEEL ON CHAN #%d: %d\n", trackinfo->elapsedsec, curevent->data.pitch.chan, curevent->data.pitch.wheel);
+        if (params->logfile) {
+          fprintf(params->logfile, "%lu: PITCH WHEEL ON CHAN #%d: %d\n", trackinfo->elapsedsec, curevent->data.pitch.chan, curevent->data.pitch.wheel);
+        }
 #endif
         dev_pitchwheel(curevent->data.pitch.chan, curevent->data.pitch.wheel);
         break;
       case EVENT_CONTROL:
 #ifdef DBGFILE
-        if (params->logfd != NULL) fprintf(params->logfd, "%lu: CONTROLLER %d ON CHAN #%d -> val %d\n", trackinfo->elapsedsec, curevent->data.control.id, curevent->data.control.chan, curevent->data.control.val);
+        if (params->logfile) {
+          fprintf(params->logfile, "%lu: CONTROLLER %d ON CHAN #%d -> val %d\n", trackinfo->elapsedsec, curevent->data.control.id, curevent->data.control.chan, curevent->data.control.val);
+        }
 #endif
         dev_controller(curevent->data.control.chan, curevent->data.control.id, curevent->data.control.val);
         break;
       case EVENT_CHANPRESSURE:
 #ifdef DBGFILE
-        if (params->logfd != NULL) fprintf(params->logfd, "%lu: CHANNEL PRESSURE %d ON CHAN #%d\n", trackinfo->elapsedsec, curevent->data.chanpressure.pressure, curevent->data.chanpressure.chan);
+        if (params->logfile) {
+          fprintf(params->logfile, "%lu: CHANNEL PRESSURE %d ON CHAN #%d\n", trackinfo->elapsedsec, curevent->data.chanpressure.pressure, curevent->data.chanpressure.chan);
+        }
 #endif
         dev_chanpressure(curevent->data.chanpressure.chan, curevent->data.chanpressure.pressure);
         break;
       case EVENT_KEYPRESSURE:
 #ifdef DBGFILE
-        if (params->logfd != NULL) fprintf(params->logfd, "%lu: KEY PRESSURE %d ON CHAN #%d, KEY %d\n", trackinfo->elapsedsec, curevent->data.keypressure.pressure, curevent->data.keypressure.chan, curevent->data.keypressure.note);
+        if (params->logfile) {
+          fprintf(params->logfile, "%lu: KEY PRESSURE %d ON CHAN #%d, KEY %d\n", trackinfo->elapsedsec, curevent->data.keypressure.pressure, curevent->data.keypressure.chan, curevent->data.keypressure.note);
+        }
 #endif
         dev_keypressure(curevent->data.keypressure.chan, curevent->data.keypressure.note, curevent->data.keypressure.pressure);
         break;
@@ -1327,7 +1342,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         /* read two bytes from sysexptr so I know how long the thing is */
         mem_pull(curevent->data.sysex.sysexptr, &sysexlen, 2);
 #ifdef DBGFILE
-        if (params->logfd != NULL) fprintf(params->logfd, "%lu: SYSEX is %d bytes long", trackinfo->elapsedsec, sysexlen);
+        if (params->logfile) fprintf(params->logfile, "%lu: SYSEX is %d bytes long", trackinfo->elapsedsec, sysexlen);
 #endif
         /* */
         i = sysexlen;
@@ -1336,18 +1351,18 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
         mem_pull(curevent->data.sysex.sysexptr, sysexbuff, i + 2);
         dev_sysex(sysexbuff[2] & 0x0F, sysexbuff + 2, sysexlen);
 #ifdef DBGFILE
-        if (params->logfd != NULL) {
+        if (params->logfile) {
           for (i = 0; i < sysexlen; i++) {
-            fprintf(params->logfd, " %02Xh", sysexbuff[i + 2]);
+            fprintf(params->logfile, " %02Xh", sysexbuff[i + 2]);
           }
-          fprintf(params->logfd, "\n");
+          fputc('\n', params->logfile);
         }
 #endif
         break;
       }
       default:
 #ifdef DBGFILE
-        if (params->logfd != NULL) fprintf(params->logfd, "%lu: ILLEGAL COMMAND: 0x%02X\n", trackinfo->elapsedsec, curevent->type);
+        if (params->logfile) fprintf(params->logfile, "%lu: ILLEGAL COMMAND: 0x%02X\n", trackinfo->elapsedsec, curevent->type);
 #endif
         break;
     }
@@ -1358,7 +1373,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
   }
 
 #ifdef DBGFILE
-  if (params->logfd != NULL) fprintf(params->logfd, "Clear notes\n");
+  if (params->logfile) fprintf(params->logfile, "Clear notes\n");
 #endif
 
   /* Look for notes that are still ON and turn them OFF */
@@ -1479,7 +1494,7 @@ int main(int argc, char **argv) {
     ui_draw(&trackinfo, &rflags, &rchans, params.devname, params.devport, 100);
   }
 #ifdef DBGFILE
-  if (params.logfd != NULL) fprintf(params.logfd, "INIT SOUND HARDWARE\n");
+  if (params.logfile) fprintf(params.logfile, "INIT SOUND HARDWARE\n");
 #endif
   errstr = dev_init(params.device, params.devport, params.sbnk);
   if (errstr != NULL) {
@@ -1573,9 +1588,9 @@ int main(int argc, char **argv) {
 
   /* if a verbose log file was used, close it now */
 #ifdef DBGFILE
-  if (params.logfd != NULL) {
-    fprintf(params.logfd, "Closing the log file\n");
-    fclose(params.logfd);
+  if (params.logfile) {
+    fprintf(params.logfile, "Closing the log file\n");
+    fclose(params.logfile);
   }
 #endif
 

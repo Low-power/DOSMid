@@ -142,7 +142,7 @@ long midi_track2events(struct fiofile_t *f, char *title, int titlemaxlen,
                        char *copyright, int copyrightmaxlen, char *text,
                        int textmaxlen, unsigned short *channelsusage,
 #ifdef DBGFILE
-                       FILE *logfd,
+                       FILE *logf,
 #endif
                        unsigned long *tracklen, void *reqpatches);
 

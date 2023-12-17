@@ -5,12 +5,12 @@
 #include <io.h>
 #include <stdio.h>
 
-#include "..\fio.h"
+#include "../fio.h"
 
 #define FNAME "fiotest.dat"
 
 int main(void) {
-  FILE *fd;
+  FILE *f;
   int i;
   struct fiofile_t f;
   long pos;
@@ -27,15 +27,15 @@ int main(void) {
   }
 
   /* create a test file of 2000 bytes */
-  fd = fopen(FNAME, "wb");
-  if (fd == NULL) {
+  f = fopen(FNAME, "wb");
+  if (f == NULL) {
     printf("ERR: fopen()\n");
     return(1);
   }
   for (i = 0; i < 2000; i++) {
-    fprintf(fd, "%c", i & 0xff);
+    fprintf(f, "%c", i & 0xff);
   }
-  fclose(fd);
+  fclose(f);
 
   /* open the file */
   if (fio_open(FNAME, FIO_OPEN_RD, &f) != 0) {

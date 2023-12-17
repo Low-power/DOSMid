@@ -7,7 +7,7 @@
 #include "syx.h" /* include self for control */
 
 
-/* fetch the next sysex event from file *fd, and copies it into *buff, up to
+/* fetch the next sysex event from file *fh, and copies it into *buff, up to
  * bufflen bytes. returns the length of the sysex string on success, 0 on
  * end of file, and a negative value on error. */
 int syx_fetchnext(struct fiofile_t *fh, unsigned char *buff, int bufflen) {

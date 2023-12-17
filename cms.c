@@ -13,14 +13,15 @@
 #ifdef CMS_DEBUG
 void debug_log(const char *fmt, ...)
 {
-   FILE *f_log;
+   FILE *log_f;
    va_list ap;
 
-	f_log = fopen("cmslog.log", "a");
+	log_f = fopen("cmslog.log", "a");
+	if(!log_f) return;
 	va_start(ap, fmt);
-        vfprintf(f_log, fmt, ap);
+	vfprintf(log_f, fmt, ap);
 	va_end(ap);
-        fclose(f_log);
+	fclose(log_f);
 }
 #endif
 

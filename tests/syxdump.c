@@ -6,13 +6,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "..\syx.h"
+#include "../syx.h"
 
 
 int main(int argc, char **argv) {
   unsigned char *buff;
   int syxlen;
-  FILE *fd;
+  FILE *f;
   int i;
 
   if (argc != 2) {
@@ -26,15 +26,15 @@ int main(int argc, char **argv) {
     return(1);
   }
 
-  fd = fopen(argv[1], "rb");
-  if (fd == NULL) {
+  f = fopen(argv[1], "rb");
+  if (f == NULL) {
     free(buff);
     puts("Failed to open file");
     return(1);
   }
 
   for (;;) {
-    syxlen = syx_fetchnext(fd, buff, 8192);
+    syxlen = syx_fetchnext(f, buff, 8192);
     if (syxlen < 0) {
       printf("Error: syx_fetchnext() returned %d\n", syxlen);
       break;
@@ -46,10 +46,10 @@ int main(int argc, char **argv) {
     for (i = 0; i < syxlen; i++) {
       printf("%02X ", buff[i]);
     }
-    puts("");
+    putchar('\n');
   }
 
-  fclose(fd);
+  fclose(f);
   free(buff);
 
   return(0);
