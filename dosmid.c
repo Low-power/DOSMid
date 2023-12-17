@@ -32,7 +32,10 @@
 #include <limits.h> /* ULONG_MAX */
 #include <stdlib.h> /* rand() */
 #include <string.h> /* memset(), strcpy(), strncat(), memcpy() */
-
+#if defined __WATCOMC__ && __WATCOMC__ >= 1240
+#define HAVE_STRCASECMP
+#include <strings.h>
+#endif
 #include "bitfield.h"
 #include "fio.h"
 #include "gus.h"
@@ -229,8 +232,9 @@ static int lcase(char c) {
 }
 
 
+#ifndef HAVE_STRCASECMP
 /* a case-insensitive version of strcmp() */
-static int strucmp(char *s1, char *s2) {
+static int strcasecmp(const char *s1, const char *s2) {
   for (;;) {
     if (lcase(*s1) != lcase(*s2)) return(1);
     if (*s1 == 0) return(0);
@@ -238,18 +242,17 @@ static int strucmp(char *s1, char *s2) {
     s2++;
   }
 }
+#endif
 
 
-/* checks whether str starts with start or not. returns 0 if so, non-zero
- * otherwise - this function is case insensitive */
-static int stringstartswith(char *str, char *start) {
-  if ((str == NULL) || (start == NULL)) return(-1);
+/* case-insensitively check whether 'str' starts with 'start' */
+static int stringstartswith(const char *str, const char *start) {
   while (*start != 0) {
-    if (lcase(*start) != lcase(*str)) return(-1);
+    if (lcase(*start) != lcase(*str)) return(0);
     str++;
     start++;
   }
-  return(0);
+  return(1);
 }
 
 
@@ -263,9 +266,9 @@ static int hexchar2int(char c) {
 
 /* converts a hex string to unsigned int. stops at first null terminator or
  * space. returns zero on error. */
-static unsigned int hexstr2uint(char *hexstr) {
+static unsigned int hexstr2uint(const char *hexstr) {
   unsigned int v = 0;
-  while ((*hexstr != 0) && (*hexstr != ' ')) {
+  while (*hexstr && *hexstr != ' ') {
     int c;
     c = hexchar2int(*hexstr);
     if (c < 0) return(0);
@@ -349,120 +352,123 @@ static void getfileext(char *ext, char *filename, int limit) {
 
 /* interpret a single config argument, returns NULL on succes, or a pointer to
  * an error string otherwise */
-static char *feedarg(char *arg, struct clioptions *params, int fileallowed) {
-  if (strucmp(arg, "/noxms") == 0) {
-    params->memmode = MEM_MALLOC;
-  } else if (strucmp(arg, "/xmsdelay") == 0) {
-    params->xmsdelay = 1;
-  } else if (strucmp(arg, "/fullcpu") == 0) {
-    params->nopowersave = 1;
-  } else if (strucmp(arg, "/dontstop") == 0) {
-    params->dontstop = 1;
-  } else if (strucmp(arg, "/random") == 0) {
-    params->random = 1;
-  } else if (strucmp(arg, "/nosound") == 0) {
-    params->device = DEV_NONE;
-    params->devport = 0;
+static char *feedarg(char *arg, struct clioptions *params, int option_allowed, int file_allowed) {
+  if(option_allowed && (arg[0] == '/' || arg[0] == '-')) {
+    const char *o = arg + 1;
+    if (strcasecmp(o, "noxms") == 0) {
+      params->memmode = MEM_MALLOC;
+    } else if (strcasecmp(o, "xmsdelay") == 0) {
+      params->xmsdelay = 1;
+    } else if (strcasecmp(o, "fullcpu") == 0) {
+      params->nopowersave = 1;
+    } else if (strcasecmp(o, "dontstop") == 0) {
+      params->dontstop = 1;
+    } else if (strcasecmp(o, "random") == 0) {
+      params->random = 1;
+    } else if (strcasecmp(o, "nosound") == 0) {
+      params->device = DEV_NONE;
+      params->devport = 0;
 #ifdef SBAWE
-  } else if (strucmp(arg, "/awe") == 0) {
-    params->device = DEV_AWE;
-    params->devport = params->port_awe;
-    /* if AWE port not found in BLASTER, use the default 0x620 */
-    if (params->devport == 0) params->devport = 0x620;
-  } else if (stringstartswith(arg, "/awe=") == 0) {
-    params->device = DEV_AWE;
-    params->devport = hexstr2uint(arg + 5);
+    } else if (strcasecmp(o, "awe") == 0) {
+      params->device = DEV_AWE;
+      params->devport = params->port_awe;
+      /* if AWE port not found in BLASTER, use the default 0x620 */
+      if (params->devport == 0) params->devport = 0x620;
+    } else if (stringstartswith(o, "awe=")) {
+      params->device = DEV_AWE;
+      params->devport = hexstr2uint(o + 4);
     if (params->devport < 1) return("Invalid AWE port provided. Example: /awe=620$");
 #endif
-  } else if (strucmp(arg, "/mpu") == 0) {
-    params->device = DEV_MPU401;
-    params->devport = params->port_mpu;
-    /* if MPU port not found in BLASTER, use the default 0x330 */
-    if (params->devport == 0) params->devport = 0x330;
-  } else if (strucmp(arg, "/preset=gm") == 0) {
-    params->gmgspreset = PRESET_GM;
-  } else if (strucmp(arg, "/preset=gs") == 0) {
-    params->gmgspreset = PRESET_GS;
-  } else if (strucmp(arg, "/preset=xg") == 0) {
-    params->gmgspreset = PRESET_XG;
-  } else if (strucmp(arg, "/preset=none") == 0) {
-    params->gmgspreset = PRESET_NONE;
-  } else if (strucmp(arg, "/gus") == 0) {
-    params->device = DEV_GUS;
-    params->devport = gus_find();
-    if (params->devport < 1) return("GUS error: No ULTRAMID driver found$");
+    } else if (strcasecmp(o, "mpu") == 0) {
+      params->device = DEV_MPU401;
+      params->devport = params->port_mpu;
+      /* if MPU port not found in BLASTER, use the default 0x330 */
+      if (params->devport == 0) params->devport = 0x330;
+    } else if (strcasecmp(o, "preset=gm") == 0) {
+      params->gmgspreset = PRESET_GM;
+    } else if (strcasecmp(o, "preset=gs") == 0) {
+      params->gmgspreset = PRESET_GS;
+    } else if (strcasecmp(o, "preset=xg") == 0) {
+      params->gmgspreset = PRESET_XG;
+    } else if (strcasecmp(o, "preset=none") == 0) {
+      params->gmgspreset = PRESET_NONE;
+    } else if (strcasecmp(o, "gus") == 0) {
+      params->device = DEV_GUS;
+      params->devport = gus_find();
+      if (params->devport < 1) return("GUS error: No ULTRAMID driver found$");
 #ifdef OPL
-  } else if (strucmp(arg, "/opl") == 0) {
-    params->device = DEV_OPL;
-    params->devport = 0x388;
-  } else if (stringstartswith(arg, "/opl=") == 0) {
-    params->device = DEV_OPL;
-    params->devport = hexstr2uint(arg + 5);
-    if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388$");
+    } else if (strcasecmp(o, "opl") == 0) {
+      params->device = DEV_OPL;
+      params->devport = 0x388;
+    } else if (stringstartswith(o, "opl=")) {
+      params->device = DEV_OPL;
+      params->devport = hexstr2uint(o + 4);
+      if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388$");
 #endif
 #ifdef CMS
-  } else if (strucmp(arg, "/cms") == 0) {
-    params->device = DEV_CMS;
-    params->devport = 0x220;
-  } else if (stringstartswith(arg, "/cms=") == 0) {
-    params->device = DEV_CMS;
-    params->devport = hexstr2uint(arg + 5);
-    if (params->devport < 1) return("Invalid CMS port provided. Example: /cms=220$");
+    } else if (strcasecmp(o, "cms") == 0) {
+      params->device = DEV_CMS;
+      params->devport = 0x220;
+    } else if (stringstartswith(o, "cms=")) {
+      params->device = DEV_CMS;
+      params->devport = hexstr2uint(o + 4);
+      if (params->devport < 1) return("Invalid CMS port provided. Example: /cms=220$");
 #endif
-  } else if (stringstartswith(arg, "/sbnk=") == 0) {
-    if (params->sbnk != NULL) free(params->sbnk); /* drop last sbnk if already present, so a CLI sbnk would take precedence over a config-file sbnk */
-    params->sbnk = strdup(arg + 6);
-  } else if (stringstartswith(arg, "/mpu=") == 0) {
-    params->device = DEV_MPU401;
-    params->devport = hexstr2uint(arg + 5);
-    if (params->devport < 1) return("Invalid MPU port provided. Example: /mpu=330$");
-  } else if (stringstartswith(arg, "/com=") == 0) {
-    params->device = DEV_RS232;
-    params->devport = hexstr2uint(arg + 5);
-    if (params->devport < 10) return("Invalid COM port provided. Example: /com=3f8$");
-  } else if (stringstartswith(arg, "/com") == 0) { /* must be compared AFTER "/com=" */
-    params->device = DEV_RS232;
-    params->devicesubtype = arg[4] - '0';
-    if ((params->devicesubtype < 1) || (params->devicesubtype > 4)) return("Invalid COM port provided. Example: /com1$");
-    params->devport = rs232_getport(params->devicesubtype);
-    if (params->devport < 1) return("Failed to autodetect the I/O address of this COM port. Try using the /com=XXX option.$");
-  } else if (strucmp(arg, "/sbmidi") == 0) {
-    params->device = DEV_SBMIDI;
-    params->devport = params->port_sb;
-    /* if SB port not found in BLASTER, use the default 0x220 */
-    if (params->devport == 0) params->devport = 0x220;
-  } else if (stringstartswith(arg, "/sbmidi=") == 0) {
-    params->device = DEV_SBMIDI;
-    params->devport = hexstr2uint(arg + 8);
-    if (params->devport < 1) return("Invalid SBMIDI port provided. Example: /sbmidi=220$");
+    } else if (stringstartswith(o, "sbnk=")) {
+      if (params->sbnk != NULL) free(params->sbnk); /* drop last sbnk if already present, so a CLI sbnk would take precedence over a config-file sbnk */
+      params->sbnk = strdup(o + 5);
+    } else if (stringstartswith(o, "mpu=")) {
+      params->device = DEV_MPU401;
+      params->devport = hexstr2uint(o + 4);
+      if (params->devport < 1) return("Invalid MPU port provided. Example: /mpu=330$");
+    } else if (stringstartswith(o, "com=")) {
+      params->device = DEV_RS232;
+      params->devport = hexstr2uint(o + 4);
+      if (params->devport < 10) return("Invalid COM port provided. Example: /com=3f8$");
+    } else if (stringstartswith(o, "com")) { /* must be compared AFTER "com=" */
+      params->device = DEV_RS232;
+      params->devicesubtype = o[3] - '0';
+      if ((params->devicesubtype < 1) || (params->devicesubtype > 4)) return("Invalid COM port provided. Example: /com1$");
+      params->devport = rs232_getport(params->devicesubtype);
+      if (params->devport < 1) return("Failed to autodetect the I/O address of this COM port. Try using the /com=XXX option.$");
+    } else if (strcasecmp(o, "sbmidi") == 0) {
+      params->device = DEV_SBMIDI;
+      params->devport = params->port_sb;
+      /* if SB port not found in BLASTER, use the default 0x220 */
+      if (params->devport == 0) params->devport = 0x220;
+    } else if (stringstartswith(o, "sbmidi=")) {
+      params->device = DEV_SBMIDI;
+      params->devport = hexstr2uint(o + 7);
+      if (params->devport < 1) return("Invalid SBMIDI port provided. Example: /sbmidi=220$");
 #ifdef DBGFILE
-  } else if (stringstartswith(arg, "/log=") == 0) {
-    if (params->logfd == NULL) {
-      params->logfd = fopen(arg + 5, "wb");
+    } else if (stringstartswith(o, "log=")) {
       if (params->logfd == NULL) {
-        return("Failed to open the debug log file.$");
+        params->logfd = fopen(o + 4, "wb");
+        if (params->logfd == NULL) {
+          return("Failed to open the debug log file.$");
+        }
       }
-    }
 #endif
-  } else if (stringstartswith(arg, "/syx=") == 0) {
-    params->syxrst = strdup(arg + 5);
-  } else if (stringstartswith(arg, "/delay=") == 0) {
-    params->delay = atoi(arg + 7);
-    if ((params->delay < 1) || (params->delay > 9000)) {
-      return("Invalid delay value: must be in the range 1..9000$");
+    } else if (stringstartswith(o, "syx=")) {
+      params->syxrst = strdup(o + 4);
+    } else if (stringstartswith(o, "delay=")) {
+      params->delay = atoi(o + 6);
+      if ((params->delay < 1) || (params->delay > 9000)) {
+        return("Invalid delay value: must be in the range 1..9000$");
+      }
+    } else if (strcasecmp(o, "?") == 0 || strcasecmp(o, "h") == 0 || strcasecmp(o, "help") == 0) {
+      return("");
+    } else {
+      return("Unknown option.$");
     }
-  } else if ((strucmp(arg, "/?") == 0) || (strucmp(arg, "/h") == 0) || (strucmp(arg, "/help") == 0)) {
-    return("");
-  } else if ((fileallowed != 0) && (arg[0] != '/') && (params->midifile == NULL) && (params->playlist == NULL)) {
+  } else if (file_allowed && !params->midifile && !params->playlist) {
     char ext[4];
     getfileext(ext, arg, 4);
-    if (strucmp(ext, "m3u") == 0) {
+    if (strcasecmp(ext, "m3u") == 0) {
       params->playlist = arg;
     } else {
       params->midifile = arg;
     }
-  } else {
-    return("Unknown option.$");
   }
   return(NULL);
 }
@@ -507,7 +513,7 @@ static char *loadconfigfile(struct clioptions *params) {
     rtrim(buff);
     if (*buff == 0) continue; /* skip empty lines */
     /* push arg to feedarg() (files not allowed because filename not allocated in persistent memory) */
-    res = feedarg(buff, params, 0);
+    res = feedarg(buff, params, 1, 0);
     if (res != NULL) break;
   }
   /* close file */
@@ -519,13 +525,18 @@ static char *loadconfigfile(struct clioptions *params) {
 /* parse command line params and fills the params struct accordingly. returns
    NULL on sucess, or a pointer to an error string otherwise. */
 static char *parseargv(int argc, char **argv, struct clioptions *params) {
+  int end_of_options = 0;
   int i;
   /* if no params at all, don't waste time */
   if (argc == 0) return("");
   /* now read params */
   for (i = 1; i < argc; i++) {
     char *r;
-    r = feedarg(argv[i], params, 1);
+    if(!end_of_options && strcmp(argv[i], "--") == 0) {
+      end_of_options = 1;
+      continue;
+    }
+    r = feedarg(argv[i], params, !end_of_options, 1);
     if (r != NULL) return(r);
   }
   /* check if at least a MIDI filename have been provided */
@@ -1393,11 +1404,11 @@ int main(int argc, char **argv) {
       dos_puts("Run DOSMID /? for additional help$");
     } else {
       dos_puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste\r\n"
-               "a MIDI player that plays MID, RMI and MUS files.\r\n"
+               "A MIDI player that plays MID, RMI and MUS files.\r\n"
                "\r\n"
-               "usage: dosmid [options] file.mid (or m3u playlist)\r\n"
-               "\r\n"
-               "options:\r\n"
+               "Usage: dosmid [<options>] <file> ...\r\n"
+               "File can be m3u playlist.\r\n"
+               "Options:\r\n"
                " /noxms     use conventional memory instead of XMS (loads small files only)$");
       dos_puts(" /xmsdelay  wait 2ms before accessing XMS memory (AWEUTIL compatibility)\r\n"
                " /mpu[=XXX] use MPU-401 on I/O port XXX. /mpu reads port address from BLASTER\r\n"
@@ -1414,16 +1425,17 @@ int main(int argc, char **argv) {
       dos_puts(" /com[=XXX] output MIDI messages to the RS-232 port at I/O address XXX\r\n"
                " /comX      same as /com=XXX, but takes a COM port instead (example: /com1)\r\n"
                " /gus       use the Gravis UltraSound card (requires ULTRAMID)\r\n"
-               " /syx=FILE  use SYSEX instructions from FILE for MIDI initialization$");
-      dos_puts(" /sbnk=FILE load a custom sound bank file(s) (IBK on OPL, SBK on AWE)\r\n"
+               " /syx=<FILE> use SYSEX instructions from FILE for MIDI initialization$");
+      dos_puts(" /sbnk=<FILE> load a custom sound bank file(s) (IBK on OPL, SBK on AWE)\r\n"
 #ifdef DBGFILE
-               " /log=FILE  write highly verbose logs about DOSMid's activity to FILE\r\n"
+               " /log=<FILE> write highly verbose logs about DOSMid's activity to FILE\r\n"
 #endif
-               " /preset=XX preset midi device to one of modes: GM, GS, XG or NONE (default=GM)\r\n"
+               " /preset={GM|GS|XG|NONE} preset midi device to specified mode (default GM)\r\n"
                " /fullcpu   do not let DOSMid try to be CPU-friendly\r\n"
                " /dontstop  never wait for a keypress on error and continue the playlist\r\n"
                " /random    randomize playlist order\r\n"
                " /nosound   disable sound output\r\n"
+               "Options can begin with either '-' or '/'.\r\n"
                "$"); /* DOS string terminator */
       dos_puts("ENABLED FEATURES: [ OPL="
 #ifdef OPL
