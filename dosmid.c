@@ -1418,8 +1418,8 @@ int main(int argc, char **argv) {
       dos_puts(errstr);
       dos_puts("Run DOSMID /? for additional help$");
     } else {
-      dos_puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste\r\n"
-               "A MIDI player that plays MID, RMI and MUS files.\r\n"
+      dos_puts("DOSMid " PVER "\r\n"
+               "Copyright (C) " PDATE " Mateusz Viste\r\n"
                "\r\n"
                "Usage: dosmid [<options>] <file> ...\r\n"
                "File can be m3u playlist.\r\n"
@@ -1594,7 +1594,7 @@ int main(int argc, char **argv) {
   }
 #endif
 
-  dos_puts("DOSMid v" PVER " Copyright (C) " PDATE " Mateusz Viste$");
+  dos_puts("DOSMid " PVER "\r\nCopyright (C) " PDATE " Mateusz Viste$");
 
   return(0);
 }

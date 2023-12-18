@@ -3,5 +3,5 @@
  * Copyright (C) 2014-2023 Mateusz Viste
  */
 
-#define PVER "0.9.7/CMS"
+#define PVER "0.9.7-rivoreo"
 #define PDATE "2014-2023"
