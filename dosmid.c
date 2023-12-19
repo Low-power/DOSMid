@@ -61,7 +61,7 @@
 /* define a work buffer that will be used instead of malloc() calls whenever a temporary buffer is required */
 unsigned char wbuff[8192];
 
-enum playactions {
+enum playaction {
   ACTION_NONE = 0,
   ACTION_NEXT = 1,
   ACTION_PREV = 2,
@@ -78,7 +78,7 @@ struct clioptions {
   unsigned short port_awe;
   unsigned short port_opl;
   unsigned short port_sb;
-  enum outdev_types device;
+  enum outdev_type device;
   int devicesubtype;
   char *devname;    /* the human name of the out device (MPU, AWE..) */
   char *midifile;   /* MIDI filename to play */
@@ -280,7 +280,7 @@ static unsigned int hexstr2uint(const char *hexstr) {
 }
 
 
-static char *devtoname(enum outdev_types device, int devicesubtype) {
+static char *devtoname(enum outdev_type device, int devicesubtype) {
   switch (device) {
     case DEV_NONE:   return("NONE");
     case DEV_MPU401: return("MPU");
@@ -303,7 +303,7 @@ static char *devtoname(enum outdev_types device, int devicesubtype) {
 
 
 /* analyzes a 16 bytes file header and guess the file format */
-static enum fileformats header2fileformat(unsigned char *hdr) {
+static enum fileformat header2fileformat(unsigned char *hdr) {
   /* Classic MIDI */
   if ((hdr[0] == 'M') && (hdr[1] == 'T') && (hdr[2] == 'h') && (hdr[3] == 'd')) {
     return(FORMAT_MIDI);
@@ -717,13 +717,11 @@ static void preload_outdev(struct clioptions *params) {
 #endif
 }
 
-enum direction_t {
-  DIR_FWD,
-  DIR_REV,
-  DIR_RND
+enum order {
+  FORWARD_ORDER, REVERSE_ORDER, RANDOM_ORDER
 };
 /* reads a position from an M3U file and returns a ptr from static mem */
-static char *getnextm3uitem(char *playlist, enum direction_t dir) {
+static char *getnextm3uitem(char *playlist, enum order order) {
   static char fnamebuf[256];
   char tempstr[256];
   long fsize;
@@ -737,11 +735,10 @@ static char *getnextm3uitem(char *playlist, enum direction_t dir) {
     fio_close(&f);
     return(NULL);
   }
-  if (dir == DIR_RND) {
+  if (order == RANDOM_ORDER) {
     /* go to a random position (avoid last bytes, could be an empty \r\n record) */
     pos = (rnd() << 1) % (fsize - 2); /* mul rnd by 2 to speed up 'randomness' at the cost of getting only even offsets */
-  }
-  if (dir == DIR_REV) pos -= 3;
+  } else if (order == REVERSE_ORDER) pos -= 3;
   GOHEREFORPREV:
   if (pos < 0) pos = 0;
   fio_seek(&f, FIO_SEEK_START, pos);
@@ -756,9 +753,9 @@ static char *getnextm3uitem(char *playlist, enum direction_t dir) {
       break;
     }
   }
-  if (dir == DIR_REV) {
+  if (order == REVERSE_ORDER) {
     pos -= 3;
-    dir = DIR_FWD;
+    order = FORWARD_ORDER;
     goto GOHEREFORPREV;
   }
 
@@ -778,7 +775,7 @@ static char *getnextm3uitem(char *playlist, enum direction_t dir) {
   }
 
   /* if sequential reading of the playlist, then jump to next entry */
-  if (dir == DIR_FWD) {
+  if (order == FORWARD_ORDER) {
     for (;;) {
       char c;
       if (fio_read(&f, &c, 1) != 1) {
@@ -837,7 +834,7 @@ static void copyline(char *d, int l, char *s) {
 }
 
 
-static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
+static enum playaction loadfile_midi(struct fiofile_t *f, struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
   static unsigned long trackmap[MAXTRACKS];
   int miditracks;
   int i;
@@ -940,10 +937,10 @@ static enum playactions loadfile_midi(struct fiofile_t *f, struct clioptions *pa
 }
 
 
-static enum playactions loadfile(struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
+static enum playaction loadfile(struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
   struct fiofile_t f;
   unsigned char hdr[16];
-  enum playactions res;
+  enum playaction res;
 
   /* (try to) open the music file */
   if (fio_open(params->midifile, FIO_OPEN_RD, &f) != 0) {
@@ -1047,10 +1044,10 @@ static void init_trackinfo(struct trackinfodata *trackinfo, struct clioptions *p
 
 
 /* plays a file. returns 0 on success, non-zero if the program must exit */
-static enum playactions playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event_t *eventscache, int playlistdir) {
+static enum playaction playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event_t *eventscache, enum order playlist_order) {
   static int volume = 100; /* volume is static because it needs to be retained between songs */
   int i;
-  enum playactions exitaction;
+  enum playaction exitaction;
   unsigned long nexteventtime;
   unsigned short refreshflags = UI_REFRESH_ALL;
   unsigned short refreshchans = 0xffffu;
@@ -1079,7 +1076,7 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 
   /* if running on a playlist, load next song */
   if (params->playlist != NULL) {
-    params->midifile = getnextm3uitem(params->playlist, playlistdir);
+    params->midifile = getnextm3uitem(params->playlist, playlist_order);
     if (params->midifile == NULL) {
       ui_puterrmsg("Playlist error", "Failed to fetch an entry from the playlist");
       return(ACTION_ERR_HARD); /* this must be a hard error otherwise DOSMid might be trapped in a loop */
@@ -1398,12 +1395,12 @@ static enum playactions playfile(struct clioptions *params, struct trackinfodata
 
 int main(int argc, char **argv) {
   char *errstr;
-  enum playactions action = ACTION_NONE;
+  enum playaction action = ACTION_NONE;
   /* below objects are declared static so they land in the data segment and not in stack */
   static struct trackinfodata trackinfo;
   static struct midi_event_t eventscache[EVENTSCACHESIZE];
   static struct clioptions params;
-  enum direction_t playlistdir;
+  enum order playlistdir;
 
   /* make sure to init all CLI params to empty values */
   /* memset(&params, 0, sizeof(params)); */ /* no need to (static storage) */
@@ -1518,26 +1515,15 @@ int main(int argc, char **argv) {
   }
 
   /* playlist loop */
-  if (params.random != 0) {
-    playlistdir = DIR_RND;
-  } else {
-    playlistdir = DIR_FWD;
-  }
   while (action != ACTION_EXIT) {
-
+    playlistdir = params.random ? RANDOM_ORDER : FORWARD_ORDER;
     action = playfile(&params, &trackinfo, eventscache, playlistdir);
-    if (params.random != 0) {
-      playlistdir = DIR_RND;
-    } else {
-      playlistdir = DIR_FWD;
-    }
-
     switch (action) {
       case ACTION_EXIT:
         /* do nothing, we will exit at the end of the loop anyway */
         break;
       case ACTION_PREV:
-        playlistdir = DIR_REV;
+        playlistdir = REVERSE_ORDER;
         break;
       case ACTION_NEXT:
         /* no explicit action - we will do a 'next' action by default */

@@ -30,7 +30,7 @@
 #ifndef outdev_h_sentinel
 #define outdev_h_sentinel
 
-enum outdev_types {
+enum outdev_type {
   DEV_NONE,
   DEV_MPU401,
   DEV_AWE,
@@ -55,13 +55,13 @@ enum outdev_types {
  * This should be called only ONCE, when program starts.
  * Returns NULL on success, or a pointer to an error message otherwise.
  */
-char *dev_init(enum outdev_types dev, unsigned short port, char *sbank);
+char *dev_init(enum outdev_type dev, unsigned short port, char *sbank);
 
 /* pre-load a patch (so far needed only for GUS) */
-void dev_preloadpatch(enum outdev_types dev, int p);
+void dev_preloadpatch(enum outdev_type dev, int p);
 
 /* returns the device that has been inited/selected */
-enum outdev_types dev_getcurdev(void);
+enum outdev_type dev_getcurdev(void);
 
 /* close/deinitializes the out device */
 void dev_close(void);

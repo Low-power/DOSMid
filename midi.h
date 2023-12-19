@@ -67,7 +67,7 @@
 #define MIDI_EMPTYTRACK -1
 #define MIDI_TRACKERROR -2
 
-enum midi_midievents {
+enum midi_midievent {
   EVENT_NOTEOFF = 0,
   EVENT_NOTEON = 1,
   EVENT_TEMPO = 2,
@@ -131,7 +131,7 @@ struct midi_event_t {
     struct midi_event_sysex_t sysex;
     unsigned long tempoval;
   } data;
-  enum midi_midievents type;
+  enum midi_midievent type;
 };
 
 /* returns number of tracks in midi file on success, neg val otherwise */

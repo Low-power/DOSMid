@@ -20,7 +20,7 @@
 #define UI_TITLENODES 12
 #define UI_FILENAMEMAXLEN 16
 
-enum fileformats {
+enum fileformat {
   FORMAT_UNKNOWN,
   FORMAT_MIDI,
   FORMAT_RMID,
@@ -37,7 +37,7 @@ struct trackinfodata {
   unsigned short miditimeunitdiv;
   unsigned char chanprogs[16];
   int titlescount;
-  enum fileformats fileformat;
+  enum fileformat fileformat;
   int midiformat;
   unsigned short trackscount; /* number of tracks that were found in the file */
   char title[UI_TITLENODES][UI_TITLEMAXLEN];

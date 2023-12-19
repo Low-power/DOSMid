@@ -59,7 +59,7 @@ static char far *presetbuf = NULL; /* used to allocate presets for custom sound 
                          modify [ax bx cx dx es];
 
 
-static enum outdev_types outdev = DEV_NONE;
+static enum outdev_type outdev = DEV_NONE;
 static unsigned short outport = 0;
 
 
@@ -131,7 +131,7 @@ static int awe_loadfont(char *filename) {
  *
  * This should be called only ONCE, when program starts.
  * Returns NULL on success, or a pointer to an error string otherwise. */
-char *dev_init(enum outdev_types dev, unsigned short port, char *sbank) {
+char *dev_init(enum outdev_type dev, unsigned short port, char *sbank) {
   outdev = dev;
   outport = port;
   switch (outdev) {
@@ -217,7 +217,7 @@ char *dev_init(enum outdev_types dev, unsigned short port, char *sbank) {
 
 
 /* pre-load a patch (so far needed only for GUS) */
-void dev_preloadpatch(enum outdev_types dev, int p) {
+void dev_preloadpatch(enum outdev_type dev, int p) {
   switch (dev) {
     case DEV_MPU401:
     case DEV_AWE:
@@ -238,7 +238,7 @@ void dev_preloadpatch(enum outdev_types dev, int p) {
 
 
 /* returns the device that has been inited/selected */
-enum outdev_types dev_getcurdev(void) {
+enum outdev_type dev_getcurdev(void) {
   return(outdev);
 }
 
