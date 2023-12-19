@@ -76,7 +76,6 @@ struct clioptions {
   unsigned short devport;
   unsigned short port_mpu;
   unsigned short port_awe;
-  unsigned short port_opl;
   unsigned short port_sb;
   enum outdev_type device;
   int devicesubtype;
@@ -635,7 +634,6 @@ static void preload_outdev(struct clioptions *params) {
 
   params->port_mpu = 0;
   params->port_awe = 0;
-  params->port_opl = 0;
   params->port_sb  = 0;
 
   /* check if a blaster variable is present */
