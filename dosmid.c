@@ -1580,6 +1580,7 @@ int main(int argc, char **argv) {
   }
 #endif
 
+  dos_puts("Exiting...\r\n$");
   dos_puts("DOSMid " PVER "\r\nCopyright (C) " PDATE " Mateusz Viste$");
 
   return(0);
