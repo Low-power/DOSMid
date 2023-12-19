@@ -147,18 +147,14 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
       ui_printstr(y, 1, "", 78, COLOR_TEXT[colorflag]);
     }
     /* print static strings */
-    len = sprintf(tempstr, "%s port: %03Xh", devname, mpuport);
+    len = sprintf(tempstr, "%s port %03Xh", devname, mpuport);
     ui_printstr(18, 79 - len, tempstr, -1, COLOR_TEMPO[colorflag]);
-    ui_printstr(19, 67, "Volume:", 7, COLOR_TEMPO[colorflag]);
-    ui_printstr(20, 67, "Format:", 7, COLOR_TEMPO[colorflag]);
-    ui_printstr(21, 67, "Tracks:", 7, COLOR_TEMPO[colorflag]);
-    ui_printstr(22, 68, "Tempo:", 6, COLOR_TEMPO[colorflag]);
-    if (MEM_MODE == MEM_XMS) {
-      ui_printstr(22, 50, "XMS", 4, COLOR_TEMPO[colorflag]);
-    } else {
-      ui_printstr(22, 50, "MEM", 4, COLOR_TEMPO[colorflag]);
-    }
-    ui_printstr(22, 54, "used:", 9, COLOR_TEMPO[colorflag]);
+    ui_printstr(19, 68, "Volume", 6, COLOR_TEMPO[colorflag]);
+    ui_printstr(20, 68, "Format", 6, COLOR_TEMPO[colorflag]);
+    ui_printstr(21, 68, "Tracks", 6, COLOR_TEMPO[colorflag]);
+    ui_printstr(22, 69, "Tempo", 5, COLOR_TEMPO[colorflag]);
+    ui_printstr(22, 50, MEM_MODE == MEM_XMS ? "XMS" : "MEM", 4, COLOR_TEMPO[colorflag]);
+    ui_printstr(22, 54, "used", 9, COLOR_TEMPO[colorflag]);
   }
   /* print notes states on every channel */
   if (*refreshflags & UI_REFRESH_NOTES) {
@@ -197,7 +193,7 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
     }
     /* total allocated memory */
     sprintf(tempstr, "%luK", MEM_TOTALLOC >> 10);
-    ui_printstr(22, 60, tempstr, 7, COLOR_TEMPO[colorflag]);
+    ui_printstr(22, 59, tempstr, 7, COLOR_TEMPO[colorflag]);
 
     /* print format */
     switch ((trackinfo->fileformat << 1) | trackinfo->midiformat) {
