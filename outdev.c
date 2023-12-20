@@ -169,7 +169,7 @@ char *dev_init(enum outdev_type dev, unsigned short port, int skip_checking, cha
       break;
     case DEV_CMS:
 #ifdef CMS
-      cmsReset(outport);
+      cms_reset(outport);
 #endif
       break;
     case DEV_OPL:
@@ -279,7 +279,7 @@ void dev_close(void) {
       break;
     case DEV_CMS:
 #ifdef CMS
-      cmsReset(outport);
+      cms_reset(outport);
 #endif
       break;
     case DEV_RS232:
@@ -329,7 +329,7 @@ void dev_clear(void) {
       break;
     case DEV_CMS:
 #ifdef CMS
-      cmsReset(outport);
+      cms_reset(outport);
 #endif
       break;
     case DEV_GUS:
@@ -367,7 +367,7 @@ void dev_noteon(int channel, int note, int velocity) {
       break;
     case DEV_CMS:
 #ifdef CMS
-      cmsNoteOn(channel, note, velocity);
+      cms_noteon(channel, note, velocity);
 #endif
       break;
     case DEV_RS232:
@@ -419,7 +419,7 @@ void dev_noteoff(int channel, int note) {
       break;
     case DEV_CMS:
 #ifdef CMS
-      cmsNoteOff(channel, note);
+      cms_noteoff(channel, note);
 #endif
       break;
     case DEV_RS232:
@@ -518,7 +518,7 @@ void dev_controller(int channel, int id, int val) {
       break;
     case DEV_CMS:
 #ifdef CMS
-      cmsController(channel, id, val);
+      cms_controller(channel, id, val);
 #endif
       break;
     case DEV_AWE:
@@ -641,7 +641,7 @@ void dev_tick(void) {
   switch (outdev) {
     case DEV_CMS:
 #ifdef CMS
-      cmsTick();
+      cms_tick();
 #endif
       break;
     case DEV_MPU401:

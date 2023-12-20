@@ -11,16 +11,16 @@ typedef struct {
 	unsigned char velocity;
 } mid_channel;
 
-void cmsReset(unsigned short port);
+void cms_reset(unsigned short int port);
 
 void cms_pitchwheel(unsigned short oplport, int channel, int pitchwheel);
 
-void cmsNoteOn(unsigned char channel, unsigned char note, unsigned char velocity);
+void cms_noteon(unsigned char channel, unsigned char note, unsigned char velocity);
 
-void cmsNoteOff(unsigned char channel, unsigned char note);
+void cms_noteoff(unsigned char channel, unsigned char note);
 
-void cmsTick(void);
+void cms_tick(void);
 
-void cmsController(unsigned char channel, unsigned char id, unsigned char val);
+void cms_controller(unsigned char channel, unsigned char id, unsigned char val);
 
 #endif

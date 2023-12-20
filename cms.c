@@ -1,6 +1,6 @@
 #ifdef CMS
 
-//#define CMS_DEBUG		// verbose to CMSLOG.TXT debug file
+//#define CMS_DEBUG		// verbose to CMSLOG debug file
 //#define DRUMS_ONLY		// for percussion debug purpouses
 
 #include "cms.h"
@@ -16,7 +16,7 @@ void debug_log(const char *fmt, ...)
    FILE *log_f;
    va_list ap;
 
-	log_f = fopen("cmslog.log", "a");
+	log_f = fopen("cmslog", "a");
 	if(!log_f) return;
 	va_start(ap, fmt);
 	vfprintf(log_f, fmt, ap);
@@ -174,9 +174,9 @@ loop_nul:           // null all 20 registers
     }
 }
 
-void cmsReset(unsigned short port)
+void cms_reset(unsigned short int port)
 {
-   unsigned char i;
+   int i;
    cmsPort = port;
    _asm
     {
@@ -185,19 +185,17 @@ void cmsReset(unsigned short port)
 	mov  dx,2
 	call cmsNull
     }
-	for (i=0;i<11;i++)CmsOctaveStore[i]=0;
+	for (i=0; i<11; i++) CmsOctaveStore[i] = 0;
 	ChanEnableReg[0]=0;
 	ChanEnableReg[1]=0;
-        for (i=0;i<MAX_CMS_CHANNELS;i++)
-        {
+        for (i=0; i<MAX_CMS_CHANNELS; i++) {
                 cms_synth[i].note=0;
                 cms_synth[i].priority=0;
     		cms_synth[i].ch = 0;
     		cms_synth[i].voice = 0;
     		cms_synth[i].velocity = 0;
         }
-        for (i=0;i<16;i++)
-        {
+        for (i=0; i<16; i++) {
             channelpitch[i] = 8192;
         }
 	NotePriority = 0;
@@ -290,7 +288,7 @@ skip_inc:
 }
 
 
-void cmsSetVolume(unsigned char voice,unsigned char amplitudeLeft,unsigned char amplitudeRight)
+void cmsSetVolume(unsigned char voice, unsigned char amplitudeLeft, unsigned char amplitudeRight)
 {
 _asm
    {
@@ -313,7 +311,7 @@ setVol:
    }
 }
 
-void cmsSound(unsigned char voice,unsigned char freq,unsigned char octave,unsigned char amplitudeLeft,unsigned char amplitudeRight)
+void cmsSound(unsigned char voice, unsigned char freq, unsigned char octave, unsigned char amplitudeLeft, unsigned char amplitudeRight)
 {
 _asm
    {
@@ -404,7 +402,7 @@ skip_inc2:
 
 void cms_pitchwheel(unsigned short oplport, int channel, int pitchwheel)
 {
-  unsigned char i;
+  int i;
   unsigned short notefreq;
   unsigned char note;
   int pitch;
@@ -426,24 +424,21 @@ void cms_pitchwheel(unsigned short oplport, int channel, int pitchwheel)
            }
          }
 
-        notefreq = ((unsigned long)freqtable[note] * pitchtable[pitch + 128]) >> 15;
+        notefreq = ((unsigned long int)freqtable[note] * pitchtable[pitch + 128]) >> 15;
 
-	if ((notefreq > 31) && (notefreq < 7824))
-	{
-		octave=4;
-		while (notefreq<489)
-	 		{
-				notefreq=notefreq*2;
-				octave--;
-			}
-		while (notefreq>977)
-			{
-				notefreq=notefreq / 2;
-				octave++;
-			}
+	if (notefreq > 31 && notefreq < 7824) {
+		octave = 4;
+		while (notefreq < 489) {
+			notefreq=notefreq * 2;
+			octave--;
+		}
+		while (notefreq > 977) {
+			notefreq=notefreq / 2;
+			octave++;
+		}
 
 #ifndef DRUMS_ONLY
-		cmsSound(cms_synth[i].voice,CMSFreqMap[((notefreq-489)*128) / 489],octave,atten[cms_synth[i].velocity],atten[cms_synth[i].velocity]); 
+		cmsSound(cms_synth[i].voice, CMSFreqMap[((notefreq-489)*128) / 489], octave, atten[cms_synth[i].velocity], atten[cms_synth[i].velocity]); 
 #endif
 
         }
@@ -451,63 +446,58 @@ void cms_pitchwheel(unsigned short oplport, int channel, int pitchwheel)
    }
 }
 
-void cmsNoteOff(unsigned char channel, unsigned char note)
+void cms_noteoff(unsigned char channel, unsigned char note)
 {
-  unsigned char i;
-  unsigned char voice;
+	int i;
+	unsigned char voice;
 
-    if (channel == 9)
-    {
+	if (channel == 9) {
 #ifdef CMS_DEBUG
-       debug_log("DRUM OFF note= %u\n",note);
+		debug_log("DRUM OFF note= %u\n",note);
 #endif
-	CMS_SetRegister(cmsPort+2, 0x19, 0x0);
-	CMS_SetRegister(cmsPort+2, 0x15, 0x0); // noise ch 11
-	cmsDisableVoice(11);
-    }
-    else
-    {
+		CMS_SetRegister(cmsPort+2, 0x19, 0x0);
+		CMS_SetRegister(cmsPort+2, 0x15, 0x0); // noise ch 11
+		cmsDisableVoice(11);
+	} else {
 
-    voice = MAX_CMS_CHANNELS;
-    for(i=0; i<MAX_CMS_CHANNELS; i++)
-    {
-      	if(cms_synth[i].note==note)
-      	{
-        	voice = i;
-        	break;
-      	}
-    }
+		voice = MAX_CMS_CHANNELS;
+		for(i=0; i<MAX_CMS_CHANNELS; i++) {
+			if(cms_synth[i].note == note) {
+				voice = i;
+				break;
+			}
+		}
 
 
-    // Note not found, ignore note off command
-    if(voice==MAX_CMS_CHANNELS)
-    {
+		// Note not found, ignore note off command
+		if(voice == MAX_CMS_CHANNELS) {
 #ifdef CMS_DEBUG
-	debug_log("not found Ch=%u,note=%u\n",channel & 0xFF,note & 0xFF);
+			debug_log("not found Ch=%u,note=%u\n",channel & 0xFF,note & 0xFF);
 #endif
-    	return;
-    }
+			return;
+		}
 
-    // decrease priority for all notes greater than current
-    for (i=0; i<MAX_CMS_CHANNELS; i++)
-	if (cms_synth[i].priority > cms_synth[voice].priority )
-		cms_synth[i].priority = cms_synth[i].priority - 1;
+		// decrease priority for all notes greater than current
+		for (i=0; i<MAX_CMS_CHANNELS; i++) {
+			if (cms_synth[i].priority > cms_synth[voice].priority) {
+				cms_synth[i].priority = cms_synth[i].priority - 1;
+			}
+		}
 
-    
-    if (NotePriority != 0) NotePriority--;
+		if (NotePriority != 0) NotePriority--;
 
-    cmsDisableVoice(voice);
-    cms_synth[voice].note = 0;
-    cms_synth[voice].priority = 0;
-    cms_synth[voice].ch = 0;
-    cms_synth[voice].voice = 0;
-    cms_synth[voice].velocity = 0;
-   }
+		cmsDisableVoice(voice);
+		cms_synth[voice].note = 0;
+		cms_synth[voice].priority = 0;
+		cms_synth[voice].ch = 0;
+		cms_synth[voice].voice = 0;
+		cms_synth[voice].velocity = 0;
+	}
 }
 
-void cmsNoteOn(unsigned char channel, unsigned char note, unsigned char velocity)
+void cms_noteon(unsigned char channel, unsigned char note, unsigned char velocity)
 {
-  unsigned char i;
+  int i;
   unsigned char voice;
   unsigned notefreq;
   int pitch;
@@ -575,10 +565,7 @@ void cmsNoteOn(unsigned char channel, unsigned char note, unsigned char velocity
 	CMS_SetRegister(cmsPort+2, 0x15, 0x0); // noise ch 11
 	cmsDisableVoice(11);
        }
-  }
-  else
-  if (velocity != 0)
-  {
+  } else if (velocity != 0) {
 /*
 	unsigned char note_cms = note+1;
 	unsigned char octave = (note_cms / 12) - 1; //Some fancy math to get the correct octave
@@ -589,8 +576,7 @@ void cmsNoteOn(unsigned char channel, unsigned char note, unsigned char velocity
         voice = MAX_CMS_CHANNELS;
     	for(i=0; i<MAX_CMS_CHANNELS; i++)
     	{
-      		if(cms_synth[i].note==0)
-      		{
+      		if(cms_synth[i].note == 0) {
         		voice = i;
         		break;
       		}
@@ -610,26 +596,27 @@ void cmsNoteOn(unsigned char channel, unsigned char note, unsigned char velocity
 #endif
 		// find note with min prioryty
 		voice = 0;
-    		for (i=1; i<MAX_CMS_CHANNELS; i++)
-		  if (cms_synth[i].priority < min_prior) 
-		  {
+    		for (i=1; i<MAX_CMS_CHANNELS; i++) {
+		  if (cms_synth[i].priority < min_prior) {
 			voice = i;
                         min_prior = cms_synth[i].priority;
                   }
+                }
 
 		// decrease all notes priority by one
-    		for (i=0; i<MAX_CMS_CHANNELS; i++)
-		  if (cms_synth[i].priority != 0)
-			cms_synth[i].priority = cms_synth[i].priority - 1;
+    		for (i=0; i<MAX_CMS_CHANNELS; i++) {
+		  if (cms_synth[i].priority != 0) {
+                    cms_synth[i].priority = cms_synth[i].priority - 1;
+                  }
+                }
 
 		// decrease current priority
 		if (NotePriority != 0) NotePriority--;
 
 #ifdef CMS_DEBUG
 	debug_log("find low priority voice %u, NotePriority=%u\n",voice,NotePriority);
-    		for (i=0; i<MAX_CMS_CHANNELS; i++)
-		  debug_log("%u ",cms_synth[i].priority);
-	debug_log("\n");	
+    	for (i=0; i<MAX_CMS_CHANNELS; i++) debug_log("%u ",cms_synth[i].priority);
+	debug_log("\n");
 #endif
   	}
 
@@ -642,24 +629,21 @@ void cmsNoteOn(unsigned char channel, unsigned char note, unsigned char velocity
            }
         }
 
-        notefreq = ((unsigned long)freqtable[note] * pitchtable[pitch + 128]) >> 15;
+        notefreq = ((unsigned long int)freqtable[note] * pitchtable[pitch + 128]) >> 15;
 
-	if ((notefreq > 31) && (notefreq < 7824))
-	{
+	if (notefreq > 31 && notefreq < 7824) {
 		unsigned char octave = 4;
-		while (notefreq<489)
-	 		{
-				notefreq=notefreq*2;
-				octave--;
-			}
-		while (notefreq>977)
-			{
-				notefreq=notefreq / 2;
-				octave++;
-			}
+		while (notefreq < 489) {
+			notefreq = notefreq * 2;
+			octave--;
+		}
+		while (notefreq > 977) {
+			notefreq = notefreq / 2;
+			octave++;
+		}
 
 #ifndef DRUMS_ONLY
-		cmsSound(voice,CMSFreqMap[((notefreq-489)*128) / 489],octave,atten[velocity],atten[velocity]); 
+		cmsSound(voice, CMSFreqMap[((notefreq-489)*128) / 489], octave, atten[velocity], atten[velocity]); 
 #endif
 
 		cms_synth[voice].note = note;
@@ -669,58 +653,51 @@ void cmsNoteOn(unsigned char channel, unsigned char note, unsigned char velocity
         	cms_synth[voice].voice = voice;
 	}
 
-  } 
-  else
-        cmsNoteOff(channel,note);
+  } else {
+        cms_noteoff(channel,note);
+  }
 }
 
 
-void cmsTick(void)
+void cms_tick(void)
 {
 #if 0
-  unsigned char i;
-  unsigned char noteVal;
-
-  for (i=0;i<MAX_CMS_CHANNELS;i++) 
-    if (cms_synth[i].note != 0)
-	{
-		noteVal = cms_synth[i].volume-1;
-		if (noteVal != 0)
-			{
-				cmsSetVolume(i,atten[noteVal],atten[noteVal]);
+	int i;
+	unsigned char noteVal;
+	for (i=0; i<MAX_CMS_CHANNELS; i++) {
+		if (cms_synth[i].note != 0) {
+			noteVal = cms_synth[i].volume - 1;
+			if (noteVal != 0) {
+				cmsSetVolume(i, atten[noteVal], atten[noteVal]);
 				cms_synth[i].volume = noteVal;
-			}
-		else
-			{
-    				cmsDisableVoice(i);
+			} else {
+				cmsDisableVoice(i);
 				cms_synth[i].volume = 0;
 				cms_synth[i].note = 0;
 			}
+		}
 	}
 #endif
 }
 
-void cmsController(unsigned char channel, unsigned char id, unsigned char val)
+void cms_controller(unsigned char channel, unsigned char id, unsigned char val)
 {
-  unsigned char i;
-    if ((id==121) || (id==123)) // All Sound/Notes Off
-    {
-  		for (i=0;i<MAX_CMS_CHANNELS;i++) 
-    		  if (cms_synth[i].note != 0)
-		 	{
-    				cmsDisableVoice(i);
-				cms_synth[i].note = 0;
-				cms_synth[i].priority = 0;
-    				cms_synth[i].ch = 0;
-    				cms_synth[i].voice = 0;
-    				cms_synth[i].velocity = 0;
-		 	}
-		if (id==121)
-		{
-        		for (i=0;i<16;i++)
-            			channelpitch[i] = 8192;
+	int i;
+	if(id != 121 && id != 123) return;
+	// All Sound/Notes Off
+	for (i=0; i<MAX_CMS_CHANNELS; i++) {
+		if (cms_synth[i].note != 0) {
+			cmsDisableVoice(i);
+			cms_synth[i].note = 0;
+			cms_synth[i].priority = 0;
+			cms_synth[i].ch = 0;
+			cms_synth[i].voice = 0;
+			cms_synth[i].velocity = 0;
 		}
-    }
+	}
+	if (id == 121) {
+		for (i=0;i<16;i++) channelpitch[i] = 8192;
+	}
 }
 
 #endif
