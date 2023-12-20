@@ -55,7 +55,7 @@ enum outdev_type {
  * This should be called only ONCE, when program starts.
  * Returns NULL on success, or a pointer to an error message otherwise.
  */
-char *dev_init(enum outdev_type dev, unsigned short port, char *sbank);
+char *dev_init(enum outdev_type dev, unsigned short port, int skip_checking, char *sbank);
 
 /* pre-load a patch (so far needed only for GUS) */
 void dev_preloadpatch(enum outdev_type dev, int p);

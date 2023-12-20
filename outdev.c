@@ -131,10 +131,11 @@ static int awe_loadfont(char *filename) {
  *
  * This should be called only ONCE, when program starts.
  * Returns NULL on success, or a pointer to an error string otherwise. */
-char *dev_init(enum outdev_type dev, unsigned short port, char *sbank) {
+char *dev_init(enum outdev_type dev, unsigned short port, int skip_checking, char *sbank) {
   outdev = dev;
   outport = port;
   switch (outdev) {
+      int gen;
     case DEV_MPU401:
       /* reset the MPU401 */
       if (mpu401_rst(outport) != 0) return("MPU doesn't answer");
@@ -172,27 +173,34 @@ char *dev_init(enum outdev_type dev, unsigned short port, char *sbank) {
 #endif
       break;
     case DEV_OPL:
+      gen = -1;
+      goto init_opl;
     case DEV_OPL2:
+      gen = 2;
+      goto init_opl;
     case DEV_OPL3:
+      gen = 3;
+init_opl:
 #ifdef OPL
-    {
-      int res;
-      res = opl_init(outport);
-      if (res < 0) return("No OPL2/OPL3 device detected");
+      switch(opl_init(outport, &gen, skip_checking)) {
+        case 0:
+          break;
+        case -1:
+          return("No OPL2/OPL3 device detected");
+        case -2:
+          return("No OPL3 device detected");
+        case -3:
+          return "Out of memory";
+        default:
+          return "Failed to initialize OPL device due to an internal error";
+      }
       /* change the outdev device depending on OPL autodetection */
-      if (res == 0) {
-        outdev = DEV_OPL2;
-      } else {
-        outdev = DEV_OPL3;
-      }
+      if(outdev == DEV_OPL) outdev = gen == 2 ? DEV_OPL2 : DEV_OPL3;
       /* load a custom sound bank, if any provided */
-      if (sbank != NULL) {
-        if (opl_loadbank(sbank) != 0) {
-          dev_close();
-          return("OPL sound bank could not be loaded");
-        }
+      if (sbank && opl_loadbank(sbank) < 0) {
+        dev_close();
+        return("OPL sound bank could not be loaded");
       }
-    }
 #endif
       break;
     case DEV_RS232:

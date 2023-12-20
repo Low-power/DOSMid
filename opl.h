@@ -37,9 +37,20 @@ struct timbre_t {
   signed char finetune;
 };
 
-/* Initialize hardware upon startup - positive on success, negative otherwise
- * Returns 0 for OPL2 initialization, or 1 if OPL3 has been detected */
-int opl_init(unsigned short port);
+/* Initialize hardware upon startup
+ * Possible values for '*gen':
+ * -1	Auto-detect OPL2 and OPL3, detection result will be stored back
+ * 2	Use the device as OPL2, even if it is OPL3-compatible
+ * 3	Use the device as OPL3, fail if it isn't OPL3-compatible
+ * Possible return values:
+ * 0	Success
+ * -1	Device presence check failed (possible only if 'skip_checking' is 0)
+ * -2	Request OPL3 but device is OPL2
+ * -3	Out of memory
+ * -4	Invalid value in '*gen'
+ * -5	Already initialized
+ */
+int opl_init(unsigned short int port, int *gen, int skip_checking);
 
 /* close OPL device */
 void opl_close(unsigned short port);

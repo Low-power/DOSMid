@@ -90,6 +90,7 @@ struct clioptions {
 #endif
   /* 'flags' */
   unsigned char xmsdelay;
+  char nockdev;
   unsigned char nopowersave;
   unsigned char dontstop;
   unsigned char random;       /* randomize playlist order */
@@ -403,6 +404,7 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       params->device = DEV_OPL;
       params->devport = hexstr2uint(o + 4);
       if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388$");
+      params->nockdev = 1;
 #endif
 #ifdef CMS
     } else if (strcasecmp(o, "cms") == 0) {
@@ -1491,7 +1493,7 @@ int main(int argc, char **argv) {
 #ifdef DBGFILE
   if (params.logfile) fprintf(params.logfile, "INIT SOUND HARDWARE\n");
 #endif
-  errstr = dev_init(params.device, params.devport, params.sbnk);
+  errstr = dev_init(params.device, params.devport, params.nockdev, params.sbnk);
   if (errstr != NULL) {
     ui_puterrmsg("Hardware initialization failure", errstr);
     getkey();

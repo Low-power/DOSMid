@@ -180,37 +180,68 @@ static void calc_vol(unsigned char *regbyte, int volume) {
 }
 
 
-/* Initialize hardware upon startup - positive on success, negative otherwise
- * Returns 0 for OPL2 initialization, or 1 if OPL3 has been detected */
-int opl_init(unsigned short port) {
-  int x, y;
+/* Initialize hardware upon startup
+ * Possible values for '*gen':
+ * -1	Auto-detect OPL2 and OPL3, detection result will be stored back
+ * 2	Use the device as OPL2, even if it is OPL3-compatible
+ * 3	Use the device as OPL3, fail if it isn't OPL3-compatible
+ * Possible return values:
+ * 0	Success
+ * -1	Device presence check failed (possible only if 'skip_checking' is 0)
+ * -2	Request OPL3 but device is OPL2
+ * -3	Out of memory
+ * -4	Invalid value in '*gen'
+ * -5	Already initialized
+ */
+int opl_init(unsigned short int port, int *gen, int skip_checking) {
+  int x;
 
   /* make sure we're not inited yet */
-  if (oplmem != NULL) return(-1);
+  if (oplmem != NULL) return(-5);
 
-  /* detect the hardware and return error if not found */
-  oplregwr(port, 0x04, 0x60); /* reset both timers by writing 60h to register 4 */
-  oplregwr(port, 0x04, 0x80); /* enable interrupts by writing 80h to register 4 (must be a separate write from the 1st one) */
-  x = inp(port) & 0xE0; /* read the status register (port 388h) and store the result */
-  oplregwr(port, 0x02, 0xff); /* write FFh to register 2 (Timer 1) */
-  oplregwr(port, 0x04, 0x21); /* start timer 1 by writing 21h to register 4 */
-  udelay(500); /* Creative Labs recommends a delay of at least 80 microseconds
-                  I delay for 500us just to be sure. DO NOT perform inp()
-                  calls for delay here, some cards do not initialize well then
-                  (reported for CT2760) */
-  y = inp(port) & 0xE0;  /* read the upper bits of the status register */
-  oplregwr(port, 0x04, 0x60); /* reset both timers and interrupts (see steps 1 and 2) */
-  oplregwr(port, 0x04, 0x80); /* reset both timers and interrupts (see steps 1 and 2) */
-  /* test the stored results of steps 3 and 7 by ANDing them with E0h. The result of step 3 should be */
-  if (x != 0) return(-1);    /* 00h, and the result of step 7 should be C0h. If both are     */
-  if (y != 0xC0) return(-2); /* ok, an AdLib-compatible board is installed in the computer   */
+  if(!skip_checking) {
+    int y;
+    /* detect the hardware and return error if not found */
+    oplregwr(port, 0x04, 0x60); /* reset both timers by writing 60h to register 4 */
+    oplregwr(port, 0x04, 0x80); /* enable interrupts by writing 80h to register 4 (must be a separate write from the 1st one) */
+    x = inp(port) & 0xE0; /* read the status register (port 388h) and store the result */
+    oplregwr(port, 0x02, 0xff); /* write FFh to register 2 (Timer 1) */
+    oplregwr(port, 0x04, 0x21); /* start timer 1 by writing 21h to register 4 */
+    udelay(500); /* Creative Labs recommends a delay of at least 80 microseconds
+                    I delay for 500us just to be sure. DO NOT perform inp()
+                    calls for delay here, some cards do not initialize well then
+                    (reported for CT2760) */
+    y = inp(port) & 0xE0;  /* read the upper bits of the status register */
+    oplregwr(port, 0x04, 0x60); /* reset both timers and interrupts (see steps 1 and 2) */
+    oplregwr(port, 0x04, 0x80); /* reset both timers and interrupts (see steps 1 and 2) */
+    /* test the stored results of steps 3 and 7 by ANDing them with E0h. The result of step 3 should be */
+    if (x != 0) return(-1);    /* 00h, and the result of step 7 should be C0h. If both are     */
+    if (y != 0xC0) return(-1); /* ok, an AdLib-compatible board is installed in the computer   */
+  }
 
   /* init memory */
   oplmem = calloc(1, sizeof(struct oplstate_t));
   if (oplmem == NULL) return(-3);
 
   /* is it an OPL3 or just an OPL2? */
-  if ((inp(port) & 0x06) == 0) oplmem->opl3 = 1;
+  switch(*gen) {
+    case -1:
+      if (inp(port) & 0x06 == 0) {
+        oplmem->opl3 = 1;
+        *gen = 3;
+      } else {
+        *gen = 2;
+      }
+      break;
+    case 2:
+      break;
+    case 3:
+      if(inp(port) & 0x06) return -2;
+      oplmem->opl3 = 1;
+      break;
+    default:
+      return -4;
+  }
 
   /* init the hardware */
   voicescount = 9; /* OPL2 provides 9 melodic voices */
@@ -243,7 +274,7 @@ int opl_init(unsigned short port) {
   opl_clear(port);
 
   /* all done */
-  return(oplmem->opl3);
+  return 0;
 }
 
 
