@@ -33,16 +33,21 @@
 enum outdev_type {
   DEV_NONE,
   DEV_MPU401,
+#ifdef SBAWE
   DEV_AWE,
+#endif
+#ifdef OPL
   DEV_OPL,
   DEV_OPL2,
   DEV_OPL3,
+#endif
   DEV_RS232,
   DEV_SBMIDI,
   DEV_GUS,
-  DEV_CMS
+#ifdef CMS
+  DEV_CMS,
+#endif
 };
-
 
 /* inits the out device, also selects the out device, from one of these:
  *  DEV_MPU401

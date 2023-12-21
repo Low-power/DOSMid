@@ -285,10 +285,14 @@ static char *devtoname(enum outdev_type device, int devicesubtype) {
   switch (device) {
     case DEV_NONE:   return("NONE");
     case DEV_MPU401: return("MPU");
+#ifdef SBAWE
     case DEV_AWE:    return("AWE");
+#endif
+#ifdef OPL
     case DEV_OPL:    return("OPL");
     case DEV_OPL2:   return("OPL2");
     case DEV_OPL3:   return("OPL3");
+#endif
     case DEV_RS232:
       if (devicesubtype == 1) return("COM1");
       if (devicesubtype == 2) return("COM2");
@@ -297,7 +301,9 @@ static char *devtoname(enum outdev_type device, int devicesubtype) {
       return("COM");
     case DEV_SBMIDI: return("SB");
     case DEV_GUS:    return("GUS");
+#ifdef CMS
     case DEV_CMS:    return("CMS");
+#endif
     default:         return("UNK");
   }
 }

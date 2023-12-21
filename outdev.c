@@ -136,15 +136,17 @@ char *dev_init(enum outdev_type dev, unsigned short int port, int is_on_lpt, int
   outport = port;
   outport_is_lpt = is_on_lpt;
   switch (outdev) {
+#ifdef OPL
       int gen;
+#endif
     case DEV_MPU401:
       /* reset the MPU401 */
       if (mpu401_rst(outport) != 0) return("MPU doesn't answer");
       /* put it into UART mode */
       mpu401_uart(outport);
       break;
-    case DEV_AWE:
 #ifdef SBAWE
+    case DEV_AWE:
       awe32NumG = 30; /* global var used by the AWE lib, must be set to 30 for
                          DRAM sound fonts to work properly */
       if (awe32Detect(outport) != 0) return("No EMU8000 chip detected");
@@ -166,13 +168,14 @@ char *dev_init(enum outdev_type dev, unsigned short int port, int is_on_lpt, int
         dev_close();
         return("EMU8000 MIDI processor initialization failed");
       }
-#endif
       break;
-    case DEV_CMS:
+#endif
 #ifdef CMS
+    case DEV_CMS:
       cms_reset(outport, is_on_lpt);
-#endif
       break;
+#endif
+#ifdef OPL
     case DEV_OPL:
       gen = -1;
       goto init_opl;
@@ -182,7 +185,6 @@ char *dev_init(enum outdev_type dev, unsigned short int port, int is_on_lpt, int
     case DEV_OPL3:
       gen = 3;
 init_opl:
-#ifdef OPL
       switch(opl_init(outport, &gen, skip_checking)) {
         case 0:
           break;
@@ -202,8 +204,8 @@ init_opl:
         dev_close();
         return("OPL sound bank could not be loaded");
       }
-#endif
       break;
+#endif
     case DEV_RS232:
       if (rs232_check(outport) != 0) return("RS232 failure");
       break;
@@ -229,13 +231,19 @@ init_opl:
 void dev_preloadpatch(enum outdev_type dev, int p) {
   switch (dev) {
     case DEV_MPU401:
+#ifdef SBAWE
     case DEV_AWE:
+#endif
+#ifdef OPL
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
+#endif
     case DEV_RS232:
     case DEV_SBMIDI:
+#ifdef CMS
     case DEV_CMS:
+#endif
       break;
     case DEV_GUS:
       gus_loadpatch(p);
@@ -258,8 +266,8 @@ void dev_close(void) {
     case DEV_MPU401:
       mpu401_rst(outport); /* resets it to intelligent mode */
       break;
-    case DEV_AWE:
 #ifdef SBAWE
+    case DEV_AWE:
       /* Creative recommends to disable interrupts during AWE shutdown */
       _disable();
       awe32Terminate();
@@ -269,20 +277,20 @@ void dev_close(void) {
         _ffree(presetbuf);
         presetbuf = NULL;
       }
-#endif
       break;
+#endif
+#ifdef OPL
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
-#ifdef OPL
       opl_close(outport);
-#endif
       break;
-    case DEV_CMS:
+#endif
 #ifdef CMS
+    case DEV_CMS:
       cms_reset(outport, outport_is_lpt);
-#endif
       break;
+#endif
     case DEV_RS232:
       break;
     case DEV_SBMIDI:
@@ -317,22 +325,24 @@ void dev_clear(void) {
   /* execute hardware-specific actions */
   switch (outdev) {
     case DEV_MPU401:
+#ifdef SBAWE
     case DEV_AWE:
+#endif
     case DEV_RS232:
     case DEV_SBMIDI:
       break;
+#ifdef OPL
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
-#ifdef OPL
       opl_clear(outport);
-#endif
       break;
-    case DEV_CMS:
+#endif
 #ifdef CMS
+    case DEV_CMS:
       cms_reset(outport, outport_is_lpt);
-#endif
       break;
+#endif
     case DEV_GUS:
       gus_allnotesoff();
       gus_unloadpatches();
@@ -354,23 +364,23 @@ void dev_noteon(int channel, int note, int velocity) {
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, velocity);        /* Send velocity */
       break;
+#ifdef OPL
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
-#ifdef OPL
       opl_midi_noteon(outport, channel, note, velocity);
-#endif
       break;
-    case DEV_AWE:
+#endif
 #ifdef SBAWE
+    case DEV_AWE:
       awe32NoteOn(channel, note, velocity);
-#endif
       break;
-    case DEV_CMS:
+#endif
 #ifdef CMS
+    case DEV_CMS:
       cms_noteon(channel, note, velocity);
-#endif
       break;
+#endif
     case DEV_RS232:
       rs232_write(outport, 0x90 | channel); /* Send note ON to selected channel */
       rs232_write(outport, note);           /* Send note number to turn ON */
@@ -406,23 +416,23 @@ void dev_noteoff(int channel, int note) {
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, 64);              /* Send velocity */
       break;
+#ifdef OPL
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
-#ifdef OPL
       opl_midi_noteoff(outport, channel, note);
-#endif
       break;
-    case DEV_AWE:
+#endif
 #ifdef SBAWE
+    case DEV_AWE:
       awe32NoteOff(channel, note, 64);
-#endif
       break;
-    case DEV_CMS:
+#endif
 #ifdef CMS
+    case DEV_CMS:
       cms_noteoff(channel, note);
-#endif
       break;
+#endif
     case DEV_RS232:
       rs232_write(outport, 0x80 | channel); /* 'note off' + channel selector */
       rs232_write(outport, note);           /* note number */
@@ -458,23 +468,23 @@ void dev_pitchwheel(int channel, int wheelvalue) {
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, wheelvalue >> 7); /* Send the highest (most significant) 7 bits of the wheel value */
       break;
+#ifdef OPL
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
-#ifdef OPL
       opl_midi_pitchwheel(outport, channel, wheelvalue);
-#endif
       break;
-    case DEV_CMS:
+#endif
 #ifdef CMS
+    case DEV_CMS:
       cms_pitchwheel(outport, channel, wheelvalue);
-#endif
       break;
-    case DEV_AWE:
+#endif
 #ifdef SBAWE
+    case DEV_AWE:
       awe32PitchBend(channel, wheelvalue & 127, wheelvalue >> 7);
-#endif
       break;
+#endif
     case DEV_RS232:
       rs232_write(outport, 0xE0 | channel);   /* Send selected channel */
       rs232_write(outport, wheelvalue & 127); /* Send the lowest (least significant) 7 bits of the wheel value */
@@ -510,23 +520,23 @@ void dev_controller(int channel, int id, int val) {
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, val);             /* Send controller's value */
       break;
+#ifdef OPL
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
-#ifdef OPL
       opl_midi_controller(outport, channel, id, val);
-#endif
       break;
-    case DEV_CMS:
+#endif
 #ifdef CMS
+    case DEV_CMS:
       cms_controller(channel, id, val);
-#endif
       break;
-    case DEV_AWE:
+#endif
 #ifdef SBAWE
+    case DEV_AWE:
       awe32Controller(channel, id, val);
-#endif
       break;
+#endif
     case DEV_RS232:
       rs232_write(outport, 0xB0 | channel);  /* Send selected channel */
       rs232_write(outport, id);              /* Send the controller's id */
@@ -559,18 +569,18 @@ void dev_chanpressure(int channel, int pressure) {
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, pressure);        /* Send the pressure value */
       break;
+#ifdef OPL
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
-#ifdef OPL
       /* nothing to do */
-#endif
       break;
-    case DEV_AWE:
+#endif
 #ifdef SBAWE
+    case DEV_AWE:
       awe32ChannelPressure(channel, pressure);
-#endif
       break;
+#endif
     case DEV_RS232:
       rs232_write(outport, 0xD0 | channel);  /* Send selected channel */
       rs232_write(outport, pressure);        /* Send the pressure value */
@@ -601,18 +611,18 @@ void dev_keypressure(int channel, int note, int pressure) {
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, pressure);        /* Send the pressure value */
       break;
+#ifdef OPL
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
-#ifdef OPL
       /* nothing to do */
-#endif
       break;
-    case DEV_AWE:
+#endif
 #ifdef SBAWE
+    case DEV_AWE:
       awe32PolyKeyPressure(channel, note, pressure);
-#endif
       break;
+#endif
     case DEV_RS232:
       rs232_write(outport, 0xA0 | channel);  /* Send selected channel */
       rs232_write(outport, note);            /* Send the note we target */
@@ -640,20 +650,24 @@ void dev_keypressure(int channel, int note, int pressure) {
 /* should be called by the application from time to time */
 void dev_tick(void) {
   switch (outdev) {
-    case DEV_CMS:
 #ifdef CMS
+    case DEV_CMS:
       cms_tick();
-#endif
       break;
+#endif
     case DEV_MPU401:
       mpu401_flush(outport);
       break;
+#ifdef OPL
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
       break;
+#endif
+#ifdef SBAWE
     case DEV_AWE:
       break;
+#endif
     case DEV_RS232:
       /* I do nothing here - although flushing any incoming bytes would seem
        * to be the 'sane thing to do', it can lead sometimes to freezes on
@@ -681,18 +695,18 @@ void dev_setprog(int channel, int program) {
       mpu401_waitwrite(outport);     /* Wait for port ready */
       outp(outport, program);        /* Send patch id */
       break;
+#ifdef OPL
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
-#ifdef OPL
       opl_midi_changeprog(channel, program);
-#endif
       break;
-    case DEV_AWE:
+#endif
 #ifdef SBAWE
+    case DEV_AWE:
       awe32ProgramChange(channel, program);
-#endif
       break;
+#endif
     case DEV_RS232:
       rs232_write(outport, 0xC0 | channel); /* Send channel */
       rs232_write(outport, program);        /* Send patch id */
@@ -726,18 +740,18 @@ void dev_sysex(int channel, unsigned char *buff, int bufflen) {
         outp(outport, buff[x]);        /* Send sysex data byte */
       }
       break;
+#ifdef OPL
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
-#ifdef OPL
       /* SYSEX is unsupported on OPL output */
-#endif
       break;
-    case DEV_AWE:
+#endif
 #ifdef SBAWE
+    case DEV_AWE:
       awe32Sysex(channel, (unsigned char far *)buff, bufflen);
-#endif
       break;
+#endif
     case DEV_RS232:
       for (x = 0; x < bufflen; x++) {
         rs232_write(outport, buff[x]);      /* Send sysex data byte */
