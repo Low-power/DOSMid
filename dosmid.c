@@ -1074,8 +1074,12 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
 #endif
   unsigned char *sysexbuff;
 
-  /* abort early if there is a pending ESC input (user wants out) */
-  if (getkey_ifany() == 0x1B) return(ACTION_EXIT);
+  /* abort early if there is a pending ESC or 'q' input (user wants out) */
+  switch(getkey_ifany()) {
+    case 0x1B:
+    case 'q':
+      return(ACTION_EXIT);
+  }
 
   /* flush all MIDI events from memory for new events to have where to load */
   mem_clear();
@@ -1239,6 +1243,7 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
         /* read keypresses */
         switch (getkey_ifany()) {
           case 0x1B: /* escape */
+          case 'q':
             exitaction = ACTION_EXIT;
             break;
           case 0x0D: /* return */
