@@ -30,7 +30,7 @@
 
 
 #include <dos.h>   /* _dos_getvect(), MK_FP, FP_SEG */
-
+#include <stdint.h>
 #include "gus.h"
 
 static void (far *ultramidfn)(void);
@@ -38,15 +38,14 @@ static void (far *ultramidfn)(void);
 /* detect whether or not a GUS is present in the system (relying on the
  * ultramid API), returns ULTRAMID's vector, or 0 on error */
 int gus_find(void) {
-  void far *vaddr;
-  char far *sig;
   int v;
   /* scan vectors 0x78 to 0x7f, offset 0x103 of the vector's segment is
    *  expected to contain the string 'ULTRAMID' */
   for (v = 0x78; v < 0x80; v++) {
-    vaddr = _dos_getvect(v);
-    sig = MK_FP(FP_SEG(vaddr), 0x103);
-    if ((sig[0] == 'U') && (sig[1] == 'L') && (sig[2] == 'T') && (sig[3] == 'R') && (sig[4] == 'A') && (sig[5] == 'M') && (sig[6] == 'I') && (sig[7] == 'D')) return(v);
+    void far *vaddr = _dos_getvect(v);
+    uint32_t far *sig = MK_FP(FP_SEG(vaddr), 0x103);
+    // Little endian only
+    if (sig[0] == 0x52544c55 && sig[1] == 0x44494d41) return(v);
   }
   return(0);
 }
@@ -56,7 +55,7 @@ void gus_open(int v) {
   ultramidfn = _dos_getvect(v);
   /* "open" ultramid, TSR_APP_START (26) */
   __asm mov ax, 26
-  (*ultramidfn)();
+  ultramidfn();
 }
 
 /* preload patch p into memory */
@@ -64,14 +63,14 @@ void gus_loadpatch(int p) {
   /* TSR_LOAD_PATCH (12) */
   __asm mov ax, 12
   __asm mov cx, p
-  (*ultramidfn)();
+  ultramidfn();
 }
 
 /* unload all patches from memory */
 void gus_unloadpatches(void) {
   /* TSR_UNLOAD_ALL_PATCHES (15) */
   __asm mov ax, 15
-  (*ultramidfn)();
+  ultramidfn();
 }
 
 /* sends a MIDI byte to ULTRAMID */
@@ -79,19 +78,19 @@ void gus_write(int b) {
   /* TSR_MIDI_OUT (16) */
   __asm mov ax, 16
   __asm mov cx, b
-  (*ultramidfn)();
+  ultramidfn();
 }
 
 /* release all notes */
 void gus_allnotesoff(void) {
   /* TSR_ALL_NOTES_OFF (18) */
   __asm mov ax, 18
-  (*ultramidfn)();
+  ultramidfn();
 }
 
 /* close the ULTRAMID API */
 void gus_close(void) {
   /* "close" ultramid, TSR_APP_END (27) */
   __asm mov ax, 27
-  (*ultramidfn)();
+  ultramidfn();
 }
