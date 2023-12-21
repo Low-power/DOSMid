@@ -30,14 +30,6 @@
 
 #define MAX_CMS_CHANNELS 10
 
-typedef struct {
-        unsigned char note;
-        unsigned char priority;
-        unsigned char ch;
-        unsigned char voice;
-	unsigned char velocity;
-} mid_channel;
-
 void cms_reset(unsigned short int port, int is_on_lpt);
 
 void cms_pitchwheel(unsigned short oplport, int channel, int pitchwheel);

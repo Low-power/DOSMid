@@ -54,7 +54,15 @@ static void debug_log(const char *fmt, ...)
 }
 #endif
 
-static mid_channel cms_synth[MAX_CMS_CHANNELS];
+struct mid_channel {
+        unsigned char note;
+        unsigned char priority;
+        unsigned char ch;
+        unsigned char voice;
+	unsigned char velocity;
+};
+
+static struct mid_channel cms_synth[MAX_CMS_CHANNELS];
 
 static const unsigned short freqtable[128] = {
     8,    9,    9,   10,   10,   11,   12,   12,   13,   14,   15,   15,
