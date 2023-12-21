@@ -1443,9 +1443,9 @@ int main(int argc, char **argv) {
                "Options:\r\n"
                " /noxms     use conventional memory instead of XMS (loads small files only)$");
       dos_puts(" /xmsdelay  wait 2ms before accessing XMS memory (AWEUTIL compatibility)\r\n"
-               " /mpu[=XXX] use MPU-401 on I/O port XXX. /mpu reads port address from BLASTER\r\n"
+               " /mpu[=XXX] use MPU-401 on I/O port XXX; will read BLASTER for port if omitted\r\n"
 #ifdef SBAWE
-               " /awe[=XXX] use the EMU8K on SB AWE cards, port is optional (read from BLASTER)\r\n"
+               " /awe[=XXX] use the EMU8K on SB AWE card; will read BLASTER for port if omitted\r\n"
 #endif
 #ifdef OPL
                " /opl[=XXX] use an FM synthesis OPL2/OPL3 chip for sound output\r\n"
