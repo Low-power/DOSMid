@@ -10,8 +10,9 @@
 #  OPL      enables MIDI emulation over OPL output (+9K)
 #  DBGFILE  enables debug output to file (+10K)
 #  CMS      enables Creative Music System / Game Blaster output
-FEATURES   := -D SBAWE=1 -D OPL=1 -D CMS=1
-FEATURESLT := -D OPL=1 -D CMS=1
+#  CMSLPT   enables CMSLPT output, requires CMS
+FEATURES   := -D SBAWE=1 -D OPL=1 -D CMS=1 -D CMSLPT=1
+FEATURESLT := -D OPL=1 -D CMS=1 -D CMSLPT=1
 
 # memory segmentation mode (s = small ; c = compact ; m = medium ; l = large)
 #             code | data

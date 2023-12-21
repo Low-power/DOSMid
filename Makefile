@@ -10,8 +10,9 @@
 #  -DOPL      enables MIDI emulation over OPL output (+9K)
 #  -DDBGFILE  enables debug output to file (+10K)
 #  -DCMS      enables Creative Music System / Game Blaster output
-FEATURES   = -DSBAWE -DOPL -DCMS
-FEATURESLT = -DOPL -DCMS
+#  -DCMSLPT   enables CMSLPT output, requires CMS
+FEATURES   = -DSBAWE -DOPL -DCMS -DCMSLPT
+FEATURESLT = -DOPL -DCMS -DCMSLPT
 
 # memory segmentation mode (s = small ; c = compact ; m = medium ; l = large)
 #             code | data

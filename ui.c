@@ -118,13 +118,13 @@ void ui_puterrmsg(char *title, char *errmsg) {
 }
 
 /* draws the UI screen */
-void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsigned short *refreshchans, char *devname, unsigned int mpuport, int volume) {
+void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsigned short *refreshchans, char *devname, unsigned int mpuport, int onlpt, int volume) {
   #include "gm.h"  /* GM instruments names */
   int x, y;
   /* draw ascii graphic frames, etc */
   if (*refreshflags & UI_REFRESH_TUI) {
     int len;
-    char tempstr[32];
+    char buffer[32];
     for (x = 0; x < 80; x++) {
       ui_printchar(0, x, 205 | COLOR_TUI[colorflag]);
       ui_printchar(17, x, 205 | COLOR_TUI[colorflag]);
@@ -147,9 +147,10 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
       ui_printstr(y, 1, "", 78, COLOR_TEXT[colorflag]);
     }
     /* print static strings */
-    len = sprintf(tempstr, "%s port %03Xh", devname, mpuport);
+    if(onlpt) len = sprintf(buffer, "%s port LPT%c", devname, onlpt + '0');
+    else len = sprintf(buffer, "%s port %03Xh", devname, mpuport);
     x = 79 - len;
-    ui_printstr(18, x, tempstr, -1, COLOR_TEMPO[colorflag]);
+    ui_printstr(18, x, buffer, -1, COLOR_TEMPO[colorflag]);
     ui_printstr(19, x, "Volume", 6, COLOR_TEMPO[colorflag]);
     ui_printstr(20, x, "Format", 6, COLOR_TEMPO[colorflag]);
     ui_printstr(21, x, "Tracks", 6, COLOR_TEMPO[colorflag]);

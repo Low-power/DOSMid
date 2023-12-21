@@ -88,6 +88,7 @@ struct clioptions {
 #ifdef DBGFILE
   FILE *logfile;      /* an open debug log file */
 #endif
+  unsigned char onlpt;
   /* 'flags' */
   unsigned char xmsdelay;
   char nockdev;
@@ -321,6 +322,11 @@ static enum fileformat header2fileformat(unsigned char *hdr) {
   return(FORMAT_UNKNOWN);
 }
 
+#ifdef CMSLPT
+static unsigned short int get_lpt_port(unsigned int i) {
+  return *(unsigned short int __far *)MK_FP(0x40, 6 + 2*i);
+}
+#endif
 
 /* loads the file's extension into ext (limited to limit characters) */
 static void getfileext(char *ext, char *filename, int limit) {
@@ -412,8 +418,17 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       params->devport = 0x220;
     } else if (stringstartswith(o, "cms=")) {
       params->device = DEV_CMS;
-      params->devport = hexstr2uint(o + 4);
-      if (params->devport < 1) return("Invalid CMS port provided. Example: /cms=220$");
+#ifdef CMSLPT
+      if(stringstartswith(o + 4, "lpt")) {
+        char i = o[7];
+        if(i < '1' || i > '4' || o[8]) return "Invalid LPT index provided. Example: /cms=lpt2$";
+        params->devicesubtype = params->onlpt = i - '0';
+      } else
+#endif
+      {
+        params->devport = hexstr2uint(o + 4);
+        if (params->devport < 1) return("Invalid CMS port provided. Example: /cms=220$");
+      }
 #endif
     } else if (stringstartswith(o, "sbnk=")) {
       if (params->sbnk != NULL) free(params->sbnk); /* drop last sbnk if already present, so a CLI sbnk would take precedence over a config-file sbnk */
@@ -1071,7 +1086,7 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
 
   /* update screen with the next operation */
   sprintf(trackinfo->title[0], "Loading file...");
-  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, volume);
+  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, params->onlpt, volume);
   refreshflags = UI_REFRESH_ALL;
 
   /* if running on a playlist, load next song */
@@ -1164,7 +1179,7 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
   sprintf(trackinfo->title[0], "Loading...");
   filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
   ucasestr(trackinfo->filename);
-  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, volume);
+  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, params->onlpt, volume);
   memset(trackinfo->title[0], 0, 16);
   refreshflags = UI_REFRESH_ALL;
 
@@ -1186,7 +1201,7 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
     }
   }
   /* draw the gui with track's data */
-  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, volume);
+  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, params->onlpt, volume);
   for (;;) {
     timer_read(&midiplaybackstart); /* save start time so we can compute elapsed time later */
     if (midiplaybackstart >= nexteventtime) break; /* wait until the scheduled start time is met */
@@ -1250,7 +1265,7 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
         }
         /* do I need to refresh the screen now? if not, just call INT28h */
         if (refreshflags != 0) {
-          ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, volume);
+          ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, params->onlpt, volume);
         } else if (params->nopowersave == 0) { /* if no screen refresh is     */
           union REGS regs;                     /* needed, and power saver not */
           int86(0x28, &regs, &regs);           /* disabled, then call INT 28h */
@@ -1449,29 +1464,27 @@ int main(int argc, char **argv) {
                " /nosound   disable sound output\r\n"
                "Options can begin with either '-' or '/'.\r\n"
                "$"); /* DOS string terminator */
-      dos_puts("ENABLED FEATURES: [ OPL="
+      dos_puts("ENABLED FEATURES: ["
 #ifdef OPL
-               "YES"
-#else
-               "NO"
+               " OPL"
 #endif
-               " CMS="
 #ifdef CMS
-               "YES"
-#else
-               "NO"
+               " CMS"
+#ifdef CMSLPT
+               " CMSLPT"
 #endif
-               " AWE="
+#endif
 #ifdef SBAWE
-               "YES"
-#else
-               "NO"
+               " AWE"
 #endif
                " ]$");
     }
     return(1);
   }
 
+#ifdef CMSLPT
+  if(params.onlpt) params.devport = get_lpt_port(params.onlpt);
+#endif
   params.devname = devtoname(params.device, params.devicesubtype);
 
   /* populate trackinfo with initial data */
@@ -1488,12 +1501,12 @@ int main(int argc, char **argv) {
   sprintf(trackinfo.title[0], "Sound hardware initialization...");
   {
     unsigned short rflags = 0xffffu, rchans = 0xffffu;
-    ui_draw(&trackinfo, &rflags, &rchans, params.devname, params.devport, 100);
+    ui_draw(&trackinfo, &rflags, &rchans, params.devname, params.devport, params.onlpt, 100);
   }
 #ifdef DBGFILE
   if (params.logfile) fprintf(params.logfile, "INIT SOUND HARDWARE\n");
 #endif
-  errstr = dev_init(params.device, params.devport, params.nockdev, params.sbnk);
+  errstr = dev_init(params.device, params.devport, params.onlpt, params.nockdev, params.sbnk);
   if (errstr != NULL) {
     ui_puterrmsg("Hardware initialization failure", errstr);
     getkey();

@@ -38,7 +38,7 @@ typedef struct {
 	unsigned char velocity;
 } mid_channel;
 
-void cms_reset(unsigned short int port);
+void cms_reset(unsigned short int port, int is_on_lpt);
 
 void cms_pitchwheel(unsigned short oplport, int channel, int pitchwheel);
 

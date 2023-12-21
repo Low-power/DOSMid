@@ -1,5 +1,13 @@
-DOSMid Copyright (C) 2014-2018 Mateusz Viste
+The Rivoreo customized version of DOSMid, based on upstream DOSMid 0.9.7 by
+Mateusz Viste, and the CMS-enabled fork made by Tronix.
+
+This fork adds native support for CMSLPT, a LPT sound card uses SAA1099P
+chips. So it is now possible for DOSMid to use this card without loading its
+TSR driver to emulate the CMS.
+
+DOSMid Copyright (C) 2014-2023 Mateusz Viste
 Creative Music System / Game Blaster output support version (C) Tronix 2021
+CMSLPT output support by WHR, Copyright 2023 Rivoreo
 
 Used piece of software codes from third-party peoples, eg:
 - DEATHSHADOW'S Paku-Paku game by Jason M. Knight
@@ -11,6 +19,8 @@ New DOSMid options:
  /cms=XXX  Force dosmid to use Creative Music System / Game Blaster
            on port XXX. The port part is optional, that means you can 
            use "/cms" to just force CMS usage on default 220h port.
+ /cms=lpt# Use CMSLPT card on LPT port #. The actual I/O port number is
+           retrieved from BIOS automatically.
 
 
 ============================= ORIGINAL DOSMID.TXT

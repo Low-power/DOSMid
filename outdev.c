@@ -60,8 +60,8 @@ static char far *presetbuf = NULL; /* used to allocate presets for custom sound 
 
 
 static enum outdev_type outdev = DEV_NONE;
-static unsigned short outport = 0;
-
+static unsigned short int outport = 0;
+static int outport_is_lpt = 0;
 
 /* loads a SBK sound font to AWE hardware */
 #ifdef SBAWE
@@ -131,9 +131,10 @@ static int awe_loadfont(char *filename) {
  *
  * This should be called only ONCE, when program starts.
  * Returns NULL on success, or a pointer to an error string otherwise. */
-char *dev_init(enum outdev_type dev, unsigned short port, int skip_checking, char *sbank) {
+char *dev_init(enum outdev_type dev, unsigned short int port, int is_on_lpt, int skip_checking, char *sbank) {
   outdev = dev;
   outport = port;
+  outport_is_lpt = is_on_lpt;
   switch (outdev) {
       int gen;
     case DEV_MPU401:
@@ -169,7 +170,7 @@ char *dev_init(enum outdev_type dev, unsigned short port, int skip_checking, cha
       break;
     case DEV_CMS:
 #ifdef CMS
-      cms_reset(outport);
+      cms_reset(outport, is_on_lpt);
 #endif
       break;
     case DEV_OPL:
@@ -279,7 +280,7 @@ void dev_close(void) {
       break;
     case DEV_CMS:
 #ifdef CMS
-      cms_reset(outport);
+      cms_reset(outport, outport_is_lpt);
 #endif
       break;
     case DEV_RS232:
@@ -329,7 +330,7 @@ void dev_clear(void) {
       break;
     case DEV_CMS:
 #ifdef CMS
-      cms_reset(outport);
+      cms_reset(outport, outport_is_lpt);
 #endif
       break;
     case DEV_GUS:

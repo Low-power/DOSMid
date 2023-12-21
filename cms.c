@@ -1,6 +1,7 @@
 /*
  * Creative Music System device output support for DOSMid
  * Copyright 2021 Tronix
+ * Copyright 2023 Rivoreo
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -32,13 +33,14 @@
 
 #include "cms.h"
 #include <conio.h>
+#include <assert.h>
 #ifdef CMS_DEBUG
 #include <stdio.h>
 #include <stdarg.h>
 #endif
 
 #ifdef CMS_DEBUG
-void debug_log(const char *fmt, ...)
+static void debug_log(const char *fmt, ...)
 {
    FILE *log_f;
    va_list ap;
@@ -52,9 +54,9 @@ void debug_log(const char *fmt, ...)
 }
 #endif
 
-mid_channel cms_synth[MAX_CMS_CHANNELS];	// CMS synth
+static mid_channel cms_synth[MAX_CMS_CHANNELS];
 
-static unsigned short freqtable[128] = {
+static const unsigned short freqtable[128] = {
     8,    9,    9,   10,   10,   11,   12,   12,   13,   14,   15,   15,
    16,   17,   18,   19,   21,   22,   23,   24,   26,   28,   29,   31,
    33,   35,   37,   39,   41,   44,   46,   49,   52,   55,   58,   62,
@@ -67,7 +69,7 @@ static unsigned short freqtable[128] = {
  4186, 4435, 4699, 4978, 5274, 5588, 5920, 6272, 6645, 7040, 7459, 7902,
  8372, 8870, 9397, 9956,10548,11175,11840,12544};
 
-static unsigned short pitchtable[256] = {                    /* pitch wheel */
+static const unsigned short pitchtable[256] = {                    /* pitch wheel */
          29193U,29219U,29246U,29272U,29299U,29325U,29351U,29378U,  /* -128 */
          29405U,29431U,29458U,29484U,29511U,29538U,29564U,29591U,  /* -120 */
          29618U,29644U,29671U,29698U,29725U,29752U,29778U,29805U,  /* -112 */
@@ -101,7 +103,7 @@ static unsigned short pitchtable[256] = {                    /* pitch wheel */
          36254U,36286U,36319U,36352U,36385U,36417U,36450U,36483U,  /*  112 */
          36516U,36549U,36582U,36615U,36648U,36681U,36715U,36748U}; /*  120 */
 
-unsigned char	CMSFreqMap[128] = {
+static const unsigned char CMSFreqMap[128] = {
 		0  ,  3,  7, 11, 15, 19, 23, 27,
 		31 , 34, 38, 41, 45, 48, 51, 55,
 		58 , 61, 64, 66, 69, 72, 75, 77,
@@ -120,8 +122,11 @@ unsigned char	CMSFreqMap[128] = {
 		247,249,250,251,252,253,254,255
 	};
 
-// CMS IO port address
-unsigned short cmsPort;
+// CMS I/O port address
+static unsigned short int cms_port;
+#ifdef CMSLPT
+static int is_cmslpt;
+#endif
 
 #if 0
 // The 12 note-within-an-octave values for the SAA1099, starting at B
@@ -129,7 +134,7 @@ static unsigned char noteAdr[] = {5, 32, 60, 85, 110, 132, 153, 173, 192, 210, 2
 #endif
 
 // Volume
-static unsigned char atten[128] = {
+static const unsigned char atten[128] = {
                  0,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,
                  3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,
                  5,5,5,5,5,5,5,5,6,6,6,6,6,6,6,6,
@@ -141,41 +146,82 @@ static unsigned char atten[128] = {
         };
 
 // Logic channel - first chip/second chip
-static unsigned char ChanReg[12] =  {000,001,002,003,004,005,000,001,002,003,004,005};
+static const unsigned char ChanReg[12] =  {000,001,002,003,004,005,000,001,002,003,004,005};
 
 // Set octave command
-static unsigned char OctavReg[12] = {0x10,0x10,0x11,0x11,0x12,0x12,0x10,0x10,0x11,0x11,0x12,0x12};
+static const unsigned char OctavReg[12] = {0x10,0x10,0x11,0x11,0x12,0x12,0x10,0x10,0x11,0x11,0x12,0x12};
 
-unsigned char CmsOctaveStore[12];
+static unsigned char CmsOctaveStore[12];
 
-unsigned char ChanEnableReg[2] = {0,0};
+static unsigned char ChanEnableReg[2] = {0,0};
 
 // Note priority
-unsigned char NotePriority;
+static unsigned char NotePriority;
 
-unsigned short channelpitch[16];
+static unsigned short channelpitch[16];
 
-void __declspec( naked ) cmsWrite(void)
+#ifdef CMSLPT
+// Copied from CMSLPT project
+static void write_cmslpt(unsigned int byte, unsigned int ctrl)
+{
+  unsigned int port = cms_port;
+  outp(port, byte);
+  port += 2;
+  outp(port, ctrl);
+  outp(port, ctrl ^ 4);         // toggle WR
+  inp(port);
+  if (ctrl & 1) {
+    inp(port);
+    inp(port);
+    inp(port);
+    inp(port);
+    inp(port);
+  }
+  outp(port, ctrl);
+}
+#endif
+
+#if 0
+static void __declspec( naked ) asm_write_cms(void)
 {
 /*
 	parameters
-	dx = port base+offset
+	dx = port offset (should be 0 or 2)
 	ah = register
 	al = data
 */
-_asm
-    {
-	inc  dx
-	xchg al,ah
-	out  dx,al
-	dec  dx
-	xchg al,ah
-	out  dx,al
+  _asm {
+#ifdef CMSLPT
+	cmp	is_cmslpt, 0
+	je	orig_cms
+	cmp	dx, 0
+	je	first
+	mov	dx, 6
+	jmp	sel_reg
+first:
+	mov	dx, 12
+sel_reg:
+	call	cmslpt_output
+	add	dx, 1
+	call	cmslpt_output
+	ret
+orig_cms:
+#endif
+	add	dx, cms_port
+	inc	dx
+	xchg	al,ah
+	out	dx,al
+	dec	dx
+	xchg	al,ah
+	out	dx,al
+	sub	dx, cms_port
         ret
-    }
+  }
 }
+#endif
 
-void __declspec( naked ) cmsNull(unsigned short port)
+#if 0
+static void __declspec( naked ) cmsNull(unsigned short port)
 {
 /*
 	parameters
@@ -183,28 +229,78 @@ void __declspec( naked ) cmsNull(unsigned short port)
 */
 _asm
     {
-	add   dx,cmsPort // FIXME! CMSPortAddr
+	mov	bx, dx
 	mov   cx,20h
 	xor   ax,ax
-loop_nul:           // null all 20 registers 
-	call  cmsWrite
+loop_nul:           // null all 0x20 registers 
+	call	asm_write_cms
+	mov	dx, bx
 	inc   ah
 	loop  loop_nul
 
 	mov   ax,1C02h // reset chip 
-	call  cmsWrite
+	call	asm_write_cms
+	mov	dx, bx
 
 	mov   ax,1C01h // enable this chip 
-	call  cmsWrite
+	call	asm_write_cms
 
 	ret
     }
 }
+#endif
 
-void cms_reset(unsigned short int port)
+static void write_cms(unsigned char chip_i, unsigned char reg, unsigned char value) {
+#ifdef CMS_DEBUG
+	debug_log("function: write_cms(%hhu, 0x%hhx, 0x%hhx)\n", chip_i, reg, value);
+#endif
+	assert(chip_i == 0 || chip_i == 1);
+#ifdef CMSLPT
+	if(is_cmslpt) {
+		unsigned int ctrl = chip_i ? 6 : 12;
+		write_cmslpt(reg, ctrl);
+		write_cmslpt(value, ctrl + 1);
+	} else
+#endif
+	{
+		unsigned int port = cms_port + (chip_i ? 2 : 0);
+		outp(port + 1, reg);	/* Select register */
+		outp(port, value);	/* Set value of the register */
+	}
+}
+
+#if 1
+static void __declspec(naked) asm_write_cms() {
+	__asm {
+		push	ax
+		push	dx
+		push	bx
+		xchg	ax, dx
+		xor	bx, bx
+		mov	bl, dl
+		mov	dl, dh
+		xor	dh, dh
+		cmp	ax, 0
+		je	first
+		dec	ax
+	first:
+		call	write_cms
+		pop	bx
+		pop	dx
+		pop	ax
+		ret
+	}
+}
+#endif
+
+void cms_reset(unsigned short int port, int is_on_lpt)
 {
    int i;
-   cmsPort = port;
+   cms_port = port;
+#ifdef CMSLPT
+   is_cmslpt = is_on_lpt;
+#endif
+#if 0
    _asm
     {
 	mov  dx,0
@@ -212,6 +308,14 @@ void cms_reset(unsigned short int port)
 	mov  dx,2
 	call cmsNull
     }
+#else
+	for(i = 0; i < 2; i++) {
+		int j;
+		for(j = 0; j < 32; j++) write_cms(i, j, 0);
+		write_cms(i, 0x1c, 0x2);
+		write_cms(i, 0x1c, 0x1);
+	}
+#endif
 	for (i=0; i<11; i++) CmsOctaveStore[i] = 0;
 	ChanEnableReg[0]=0;
 	ChanEnableReg[1]=0;
@@ -228,65 +332,57 @@ void cms_reset(unsigned short int port)
 	NotePriority = 0;
 }
 
-static void CMS_SetRegister(unsigned short regAddr, unsigned char reg, unsigned char val)
+#if 1
+static void cmsDisableVoice(unsigned char voice)
 {
-    outp(regAddr + 1, reg); /* Select the register */
-    outp(regAddr, val);     /* Set the value of the register */
-}
-
-#if 0
-void cmsDisableVoice(unsigned char voice)
-{
-	if (voice > 5)
-	    {
+	if (voice > 5) {
 		ChanEnableReg[1] &= ~(1 << ChanReg[voice]);
-		CMS_SetRegister(cmsPort + 2, 0x14, ChanEnableReg[1]);
-	    }
-	else
-	    {
+		write_cms(1, 0x14, ChanEnableReg[1]);
+	} else {
 		ChanEnableReg[0] &= ~(1 << ChanReg[voice]);
-		CMS_SetRegister(cmsPort, 0x14, ChanEnableReg[0]);
-	    }
+		write_cms(0, 0x14, ChanEnableReg[0]);
+	}
 }
-
-void cmsSound(unsigned char voice,unsigned char freq,unsigned char octave,unsigned char amplitudeLeft,unsigned char amplitudeRight)
-{
-	if (voice > 5)
-	    {
-		if (ChanReg[voice]&0x1 == 0)
-			CmsOctaveStore[OctavReg[voice]-0x10+3] = (CmsOctaveStore[OctavReg[voice]-0x10+3] & 0xF0) | octave;
-		else
-			CmsOctaveStore[OctavReg[voice]-0x10+3] = ((CmsOctaveStore[OctavReg[voice]-0x10+3] & 0xF) << 4) | octave;
-		CMS_SetRegister(cmsPort + 2, OctavReg[voice], CmsOctaveStore[OctavReg[voice]-0x10+3]);
-		CMS_SetRegister(cmsPort + 2, ChanReg[voice], (amplitudeLeft << 4) | amplitudeRight);
-		CMS_SetRegister(cmsPort + 2, ChanReg[voice] | 0x8, freq);
-		ChanEnableReg[1] |= 1 << ChanReg[voice];
-		CMS_SetRegister(cmsPort + 2, 0x14, ChanEnableReg[1]);
-	    }
-	else
-	    {
-		if (ChanReg[voice]&0x1 == 0)
-			CmsOctaveStore[OctavReg[voice]-0x10] = (CmsOctaveStore[OctavReg[voice]-0x10] & 0xF0) | octave;
-		else
-			CmsOctaveStore[OctavReg[voice]-0x10] = ((CmsOctaveStore[OctavReg[voice]-0x10] & 0xF) << 4) | octave;
-		CMS_SetRegister(cmsPort, OctavReg[voice], CmsOctaveStore[OctavReg[voice]-0x10]);
-		CMS_SetRegister(cmsPort, ChanReg[voice], (amplitudeLeft << 4) | amplitudeRight);
-		CMS_SetRegister(cmsPort, ChanReg[voice] | 0x8, freq);
-		ChanEnableReg[0] |= 1 << ChanReg[voice];
-		CMS_SetRegister(cmsPort, 0x14, ChanEnableReg[0]);
-	    }
-}
-
 #endif
 
-void cmsDisableVoice(unsigned char voice)
+#if 0
+static void cmsSound(unsigned char voice, unsigned char freq, unsigned char octave, unsigned char amplitudeLeft, unsigned char amplitudeRight)
+{
+	if (voice > 5) {
+		if (ChanReg[voice]&0x1 == 0) {
+			CmsOctaveStore[OctavReg[voice]-0x10+3] = (CmsOctaveStore[OctavReg[voice]-0x10+3] & 0xF0) | octave;
+		} else {
+			CmsOctaveStore[OctavReg[voice]-0x10+3] = ((CmsOctaveStore[OctavReg[voice]-0x10+3] & 0xF) << 4) | octave;
+		}
+		write_cms(1, OctavReg[voice], CmsOctaveStore[OctavReg[voice]-0x10+3]);
+		write_cms(1, ChanReg[voice], (amplitudeLeft << 4) | amplitudeRight);
+		write_cms(1, ChanReg[voice] | 0x8, freq);
+		ChanEnableReg[1] |= 1 << ChanReg[voice];
+		write_cms(1, 0x14, ChanEnableReg[1]);
+	} else {
+		if (ChanReg[voice]&0x1 == 0) {
+			CmsOctaveStore[OctavReg[voice]-0x10] = (CmsOctaveStore[OctavReg[voice]-0x10] & 0xF0) | octave;
+		} else {
+			CmsOctaveStore[OctavReg[voice]-0x10] = ((CmsOctaveStore[OctavReg[voice]-0x10] & 0xF) << 4) | octave;
+		}
+		write_cms(0, OctavReg[voice], CmsOctaveStore[OctavReg[voice]-0x10]);
+		write_cms(0, ChanReg[voice], (amplitudeLeft << 4) | amplitudeRight);
+		write_cms(0, ChanReg[voice] | 0x8, freq);
+		ChanEnableReg[0] |= 1 << ChanReg[voice];
+		write_cms(0, 0x14, ChanEnableReg[0]);
+	}
+}
+#endif
+
+#if 0
+static void cmsDisableVoice(unsigned char voice)
 {
 _asm
    {
 		xor   bh,bh
 		mov   bl,voice
 
-		mov   dx,cmsPort	// FIXME !!!
+		mov   dx,cms_port	// FIXME !!!
 
 		mov   bl,ChanReg[bx]	; bl = true channel (0 - 5)
 
@@ -313,16 +409,17 @@ skip_inc:
 		mov   ChanEnableReg[di],al
     }
 }
+#endif
 
-
-void cmsSetVolume(unsigned char voice, unsigned char amplitudeLeft, unsigned char amplitudeRight)
+#if 0
+static void cmsSetVolume(unsigned char voice, unsigned char amplitudeLeft, unsigned char amplitudeRight)
 {
 _asm
    {
 		xor   bh,bh
 		mov   bl,voice
 		
-		mov   dx,cmsPort	// FIXME !!!
+		xor	dx, dx
 		cmp   bl,06h		; check channel num > 5?
 		jl    setVol	; yes - set port = port + 2
 		add   dx,2
@@ -334,18 +431,20 @@ setVol:
 		shl   ah,cl
 		or    al,ah
 		mov   ah,bl
-		call cmsWrite
+		call	asm_write_cms
    }
 }
+#endif
 
-void cmsSound(unsigned char voice, unsigned char freq, unsigned char octave, unsigned char amplitudeLeft, unsigned char amplitudeRight)
+#if 1
+static void cmsSound(unsigned char voice, unsigned char freq, unsigned char octave, unsigned char amplitudeLeft, unsigned char amplitudeRight)
 {
 _asm
    {
 		xor   bh,bh
 		mov   bl,voice
-		
-		mov   dx,cmsPort	// FIXME !!!
+
+		xor	dx, dx
 		cmp   bl,06h		; check channel num > 5?
 		jl    setOctave	; yes - set port = port + 2
 		add   dx,2
@@ -385,7 +484,7 @@ shiftOctave:
 outOctave:
 		or    al,bh
 		mov   byte ptr CmsOctaveStore[di],al
-		call cmsWrite		; set octave to CMS
+		call	asm_write_cms	; set octave to CMS
 setAmp:
 		mov   al,byte ptr amplitudeLeft
 		mov   ah,byte ptr amplitudeRight
@@ -394,34 +493,36 @@ setAmp:
 		shl   ah,cl
 		or    al,ah
 		mov   ah,bl
-		call cmsWrite
+		call	asm_write_cms
 setFreq:
 		mov   al,byte ptr freq
 		or    ah,08h
 
 
-		call cmsWrite
+		call	asm_write_cms
 voiceEnable:
-		mov   al,14h
-		inc   dx
-		out   dx,al
-		dec   dx
-
 		xor   di,di
 		mov   cl,voice
 		cmp   cl,06h
                 jl    skip_inc2
 		inc   di
 skip_inc2:
-		mov   al,ChanEnableReg[di]
-		mov   ah,01h
 		mov   cl,bl
-		shl   ah,cl
-		or    al,ah
-		out   dx,al
-		mov   ChanEnableReg[di],al
+		mov   bl,ChanEnableReg[di]
+		mov   bh,01h
+		shl   bh,cl
+		or    bl,bh
+		mov   ChanEnableReg[di],bl
+		mov	ax, dx
+		mov	dx, 14h
+		cmp	ax, 0
+		je	first
+		dec	ax
+first:
+		call	write_cms
     }
 }
+#endif
 
 // ****
 // High-level CMS synth procedures
@@ -482,8 +583,8 @@ void cms_noteoff(unsigned char channel, unsigned char note)
 #ifdef CMS_DEBUG
 		debug_log("DRUM OFF note= %u\n",note);
 #endif
-		CMS_SetRegister(cmsPort+2, 0x19, 0x0);
-		CMS_SetRegister(cmsPort+2, 0x15, 0x0); // noise ch 11
+		write_cms(1, 0x19, 0x0);
+		write_cms(1, 0x15, 0x0); // noise ch 11
 		cmsDisableVoice(11);
 	} else {
 
@@ -536,46 +637,46 @@ void cms_noteon(unsigned char channel, unsigned char note, unsigned char velocit
 #ifdef CMS_DEBUG
        debug_log("DRUM ON note= %u\n",note);
 #endif
-	CMS_SetRegister(cmsPort+2, 0x19, 0x84); // single dacay
+	write_cms(1, 0x19, 0x84); // single dacay
 	switch (note) {
 		case 37: // Side Stick
-			CMS_SetRegister(cmsPort+2, 0x16, 0x00); // noise gen 1 31.3kHz
-			CMS_SetRegister(cmsPort+2, 0x15, 0x20); // noise ch 11
+			write_cms(1, 0x16, 0x00); // noise gen 1 31.3kHz
+			write_cms(1, 0x15, 0x20); // noise ch 11
 			cmsSound(11,0,2,atten[velocity],atten[velocity]);
 			break;
 		case 38: // Acoustic Snare
-			CMS_SetRegister(cmsPort+2, 0x16, 0x00); // noise gen 1 31.3kHz
-			CMS_SetRegister(cmsPort+2, 0x15, 0x20); // noise ch 11
+			write_cms(1, 0x16, 0x00); // noise gen 1 31.3kHz
+			write_cms(1, 0x15, 0x20); // noise ch 11
 			cmsSound(11,0,0,atten[velocity],atten[velocity]);
 			break;
 		case 39: // Hand Clap
-			CMS_SetRegister(cmsPort+2, 0x16, 0x10); // noise gen 1 15.6kHz
-			CMS_SetRegister(cmsPort+2, 0x15, 0x20); // noise ch 11
+			write_cms(1, 0x16, 0x10); // noise gen 1 15.6kHz
+			write_cms(1, 0x15, 0x20); // noise ch 11
 			cmsSound(11,0,3,atten[velocity],atten[velocity]);
 			break;
 		case 40: // Electric Snare
-			CMS_SetRegister(cmsPort+2, 0x16, 0x10); // noise gen 1 15.6kHz
-			CMS_SetRegister(cmsPort+2, 0x15, 0x20); // noise ch 11
+			write_cms(1, 0x16, 0x10); // noise gen 1 15.6kHz
+			write_cms(1, 0x15, 0x20); // noise ch 11
 			cmsSound(11,0,1,atten[velocity],atten[velocity]);
 			break;
 		case 42: // Closed Hi Hat
-			CMS_SetRegister(cmsPort+2, 0x16, 0x10); // noise gen 1 15.6kHz
-			CMS_SetRegister(cmsPort+2, 0x15, 0x20); // noise ch 11
+			write_cms(1, 0x16, 0x10); // noise gen 1 15.6kHz
+			write_cms(1, 0x15, 0x20); // noise ch 11
 			cmsSound(11,0,2,atten[velocity],atten[velocity]);
 			break;
 		case 44: // Pedal Hi-Hat
-			CMS_SetRegister(cmsPort+2, 0x16, 0x10); // noise gen 1 15.6kHz
-			CMS_SetRegister(cmsPort+2, 0x15, 0x20); // noise ch 11
+			write_cms(1, 0x16, 0x10); // noise gen 1 15.6kHz
+			write_cms(1, 0x15, 0x20); // noise ch 11
 			cmsSound(11,0,0,atten[velocity],atten[velocity]);
 			break;
 		case 52: // Chinese Cymbal
-			CMS_SetRegister(cmsPort+2, 0x16, 0x20); // noise gen 1 7.6kHz
-			CMS_SetRegister(cmsPort+2, 0x15, 0x20); // noise ch 11
+			write_cms(1, 0x16, 0x20); // noise gen 1 7.6kHz
+			write_cms(1, 0x15, 0x20); // noise ch 11
 			cmsSound(11,0,2,atten[velocity],atten[velocity]);
 			break;
 		case 55: // Splash Cymbal
-			CMS_SetRegister(cmsPort+2, 0x16, 0x20); // noise gen 1 7.6kHz
-			CMS_SetRegister(cmsPort+2, 0x15, 0x20); // noise ch 11
+			write_cms(1, 0x16, 0x20); // noise gen 1 7.6kHz
+			write_cms(1, 0x15, 0x20); // noise ch 11
 			cmsSound(11,0,0,atten[velocity],atten[velocity]);
 			break;
 		case 71: // Short Whistle
@@ -588,8 +689,8 @@ void cms_noteon(unsigned char channel, unsigned char note, unsigned char velocit
        }
     else
        {
-	CMS_SetRegister(cmsPort+2, 0x19, 0x0);
-	CMS_SetRegister(cmsPort+2, 0x15, 0x0); // noise ch 11
+	write_cms(1, 0x19, 0x0);
+	write_cms(1, 0x15, 0x0); // noise ch 11
 	cmsDisableVoice(11);
        }
   } else if (velocity != 0) {
