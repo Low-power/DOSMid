@@ -405,7 +405,7 @@ void opl_midi_changeprog(int channel, int program) {
 }
 
 
-void opl_loadinstrument(unsigned short oplport, unsigned short voice, struct timbre_t *timbre) {
+void opl_loadinstrument(unsigned short int oplport, unsigned short int voice, const struct timbre *timbre) {
   /* KSL (key level scaling) / attenuation */
   oplregwr(oplport, 0x40 + op1offsets[voice], timbre->modulator_40);
   oplregwr(oplport, 0x40 + op2offsets[voice], timbre->carrier_40 | 0x3f); /* force volume to 0, it will be reajusted during 'note on' */
@@ -539,7 +539,7 @@ void opl_midi_noteoff(unsigned short port, int channel, int note) {
 static int opl_loadbank_internal(char *file, int offset) {
   unsigned char buff[16];
   int i;
-  struct fiofile_t f;
+  struct fiofile f;
   /* open the IBK file */
   if (fio_open(file, FIO_OPEN_RD, &f) != 0) return(-1);
   /* file must be exactly 3204 bytes long */

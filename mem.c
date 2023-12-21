@@ -40,7 +40,7 @@
 
 static unsigned char far *mempool[LOWMEMBUFCOUNT];
 unsigned short MEM_MODE = 0;
-static struct xms_struct xms;
+static struct xms xms;
 static long nexteventid = 0;
 unsigned long MEM_TOTALLOC = 0; /* total allocated memory counter (bytes) */
 
@@ -90,16 +90,16 @@ int mem_push(void far *ptr, long addr, int sz) {
 /* pushes an event to memory, and link events as they come. take care to call
  * this with event == NULL to close the song. returns 0 on success, non-zero
  * otherwise */
-int pusheventqueue(struct midi_event_t *event, long *root) {
-  static struct midi_event_t lastevent;
+int pusheventqueue(const struct midi_event *event, long int *root) {
+  static struct midi_event lastevent;
   static long lasteventid;
-  struct midi_event_t far *lasteventfarptr;
+  struct midi_event far *lasteventfarptr;
 
   if (root != NULL) {
-    lasteventid = mem_alloc(sizeof(struct midi_event_t));
+    lasteventid = mem_alloc(sizeof(struct midi_event));
     if (lasteventid < 0) return(-1);
     *root = lasteventid;
-    memcpy(&lastevent, event, sizeof(struct midi_event_t));
+    memcpy(&lastevent, event, sizeof(struct midi_event));
     return(0);
   }
 
@@ -107,15 +107,15 @@ int pusheventqueue(struct midi_event_t *event, long *root) {
 
   if (event == NULL) {
     lastevent.next = -1;
-    mem_push(lasteventfarptr, lasteventid, sizeof(struct midi_event_t));
+    mem_push(lasteventfarptr, lasteventid, sizeof(struct midi_event));
     return(0);
   }
 
-  lastevent.next = mem_alloc(sizeof(struct midi_event_t));
+  lastevent.next = mem_alloc(sizeof(struct midi_event));
   if (lastevent.next < 0) return(-1);
-  mem_push(lasteventfarptr, lasteventid, sizeof(struct midi_event_t));
+  mem_push(lasteventfarptr, lasteventid, sizeof(struct midi_event));
   lasteventid = lastevent.next;
-  memcpy(&lastevent, event, sizeof(struct midi_event_t));
+  memcpy(&lastevent, event, sizeof(struct midi_event));
   return(0);
 }
 

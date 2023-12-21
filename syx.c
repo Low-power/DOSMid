@@ -10,7 +10,7 @@
 /* fetch the next sysex event from file *fh, and copies it into *buff, up to
  * bufflen bytes. returns the length of the sysex string on success, 0 on
  * end of file, and a negative value on error. */
-int syx_fetchnext(struct fiofile_t *fh, unsigned char *buff, int bufflen) {
+int syx_fetchnext(struct fiofile *fh, unsigned char *buff, int bufflen) {
   int reslen = 0;
   unsigned char bytebuff;
   /* quit immediately if any of the arguments is invalid */

@@ -510,7 +510,7 @@ static char *loadconfigfile(struct clioptions *params) {
   char buff[128 + 12]; /* 128 for exepath plus 8+3 for the config file */
   int r;
   char *res = NULL;
-  struct fiofile_t f;
+  struct fiofile f;
   /* prepare config file's full path */
   r = exepath(buff);
   if (r < 1) return(NULL);
@@ -580,10 +580,10 @@ static int compute_elapsed_time(unsigned long starttime, unsigned long *elapsed)
 
 /* check the event cache for a given event. to reset the cache, issue a single
  * call with trackpos < 0. */
-static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscache, long trackpos, int xmsdelay) {
+static struct midi_event *getnexteventfromcache(struct midi_event *eventscache, long int trackpos, int xmsdelay) {
   static unsigned int itemsincache = 0;
   static unsigned int curcachepos = 0;
-  struct midi_event_t *res = NULL;
+  struct midi_event *res = NULL;
   long nextevent;
   /* if trackpos < 0 then this is only about flushing cache */
   if (trackpos < 0) {
@@ -610,7 +610,7 @@ static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscac
         while ((itemsincache < EVENTSCACHESIZE - 1) && (nextevent >= 0)) {
           nextslot++;
           nextslot &= EVENTSCACHEMASK;
-          pullres = mem_pull(nextevent, &eventscache[nextslot], sizeof(struct midi_event_t));
+          pullres = mem_pull(nextevent, &eventscache[nextslot], sizeof(struct midi_event));
           if (pullres != 0) {
             /* printf("pullevent() ERROR: %u (eventid = %ld)\n", pullres, trackpos); */
             return(NULL);
@@ -628,7 +628,7 @@ static struct midi_event_t *getnexteventfromcache(struct midi_event_t *eventscac
       nextevent = trackpos;
       curcachepos = 0;
       for (refillcount = 0; refillcount < EVENTSCACHESIZE; refillcount++) {
-        pullres = mem_pull(nextevent, &eventscache[refillcount], sizeof(struct midi_event_t));
+        pullres = mem_pull(nextevent, &eventscache[refillcount], sizeof(struct midi_event));
         if (pullres != 0) {
           /* printf("pullevent() ERROR: %u (eventid = %ld)\n", pullres, trackpos); */
           return(NULL);
@@ -742,7 +742,7 @@ static char *getnextm3uitem(char *playlist, enum order order) {
   long fsize;
   static long pos = 0;
   int slen;
-  struct fiofile_t f;
+  struct fiofile f;
   /* open the playlist and read its size */
   if (fio_open(playlist, FIO_OPEN_RD, &f) != 0) return(NULL);
   fsize = fio_seek(&f, FIO_SEEK_END, 0);
@@ -849,7 +849,7 @@ static void copyline(char *d, int l, char *s) {
 }
 
 
-static enum playaction loadfile_midi(struct fiofile_t *f, struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
+static enum playaction loadfile_midi(struct fiofile *f, const struct clioptions *params, struct trackinfodata *trackinfo, long int *trackpos) {
   static unsigned long trackmap[MAXTRACKS];
   int miditracks;
   int i;
@@ -952,8 +952,8 @@ static enum playaction loadfile_midi(struct fiofile_t *f, struct clioptions *par
 }
 
 
-static enum playaction loadfile(struct clioptions *params, struct trackinfodata *trackinfo, long *trackpos) {
-  struct fiofile_t f;
+static enum playaction loadfile(const struct clioptions *params, struct trackinfodata *trackinfo, long int *trackpos) {
+  struct fiofile f;
   unsigned char hdr[16];
   enum playaction res;
 
@@ -1042,7 +1042,7 @@ static void pauseplay(unsigned long *starttime, unsigned long *nexteventtime, st
 }
 
 
-static void init_trackinfo(struct trackinfodata *trackinfo, struct clioptions *params) {
+static void init_trackinfo(struct trackinfodata *trackinfo, const struct clioptions *params) {
   /* zero out the entire structure */
   memset(trackinfo, 0, sizeof(struct trackinfodata));
   /* preload piano into channels and set initial tempo */
@@ -1059,7 +1059,7 @@ static void init_trackinfo(struct trackinfodata *trackinfo, struct clioptions *p
 
 
 /* plays a file. returns 0 on success, non-zero if the program must exit */
-static enum playaction playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event_t *eventscache, enum order playlist_order) {
+static enum playaction playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event *eventscache, enum order playlist_order) {
   static int volume = 100; /* volume is static because it needs to be retained between songs */
   int i;
   enum playaction exitaction;
@@ -1068,7 +1068,7 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
   unsigned short refreshchans = 0xffffu;
   long trackpos;
   unsigned long midiplaybackstart;
-  struct midi_event_t *curevent;
+  struct midi_event *curevent;
 #ifdef DBGFILE
   unsigned long elticks = 0; /* used only to count clock ticks in debug mode */
 #endif
@@ -1144,7 +1144,7 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
   /* if a SYX init file is provided, feed it to the MIDI synth now */
   if (params->syxrst != NULL) {
     int syxlen;
-    struct fiofile_t syxfh;
+    struct fiofile syxfh;
 #ifdef DBGFILE
   if (params->logfile) fprintf(params->logfile, "loading SYSEX file %s\n", params->syxrst);
 #endif
@@ -1418,7 +1418,7 @@ int main(int argc, char **argv) {
   enum playaction action = ACTION_NONE;
   /* below objects are declared static so they land in the data segment and not in stack */
   static struct trackinfodata trackinfo;
-  static struct midi_event_t eventscache[EVENTSCACHESIZE];
+  static struct midi_event eventscache[EVENTSCACHESIZE];
   static struct clioptions params;
   enum order playlistdir;
 

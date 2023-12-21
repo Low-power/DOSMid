@@ -35,6 +35,6 @@
 /* loads a MUS file into memory, returns the id of the first event on success,
  * or -1 on error. channelsusage contains 16 flags indicating what channels
  * are used. */
-long mus_load(struct fiofile_t *f, unsigned long *totlen, unsigned short *timeunitdiv, unsigned short *channelsusage, void *reqpatches);
+long int mus_load(struct fiofile *f, unsigned long int *totlen, unsigned short int *timeunitdiv, unsigned short int *channelsusage, void *reqpatches);
 
 #endif

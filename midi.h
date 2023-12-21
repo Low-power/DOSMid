@@ -81,70 +81,70 @@ enum midi_midievent {
   EVENT_NONE = 100
 };
 
-struct midi_event_note_t {
+struct midi_event_note {
   unsigned char note;
   unsigned char chan;
   unsigned char velocity;
 };
 
-struct midi_event_prog_t {
+struct midi_event_prog {
   unsigned char prog;
   unsigned char chan;
 };
 
-struct midi_event_pitch_t {
-  unsigned short wheel;
+struct midi_event_pitch {
+  unsigned short int wheel;
   unsigned char chan;
 };
 
-struct midi_event_control_t {
+struct midi_event_control {
   unsigned char id;
   unsigned char chan;
   unsigned char val;
 };
 
-struct midi_event_chanpressure_t {
+struct midi_event_chanpressure {
   unsigned char chan;
   unsigned char pressure;
 };
 
-struct midi_event_keypressure_t {
+struct midi_event_keypressure {
   unsigned char chan;
   unsigned char note;
   unsigned char pressure;
 };
 
-struct midi_event_sysex_t {
-  long sysexptr;
+struct midi_event_sysex {
+  long int sysexptr;
 };
 
-struct midi_event_t {
-  long next;
-  unsigned long deltatime;
+struct midi_event {
+  long int next;
+  unsigned long int deltatime;
   union {
-    struct midi_event_note_t note;
-    struct midi_event_prog_t prog;
-    struct midi_event_pitch_t pitch;
-    struct midi_event_control_t control;
-    struct midi_event_chanpressure_t chanpressure;
-    struct midi_event_keypressure_t keypressure;
-    struct midi_event_sysex_t sysex;
-    unsigned long tempoval;
+    struct midi_event_note note;
+    struct midi_event_prog prog;
+    struct midi_event_pitch pitch;
+    struct midi_event_control control;
+    struct midi_event_chanpressure chanpressure;
+    struct midi_event_keypressure keypressure;
+    struct midi_event_sysex sysex;
+    unsigned long int tempoval;
   } data;
   enum midi_midievent type;
 };
 
 /* returns number of tracks in midi file on success, neg val otherwise */
-int midi_readhdr(struct fiofile_t *f, int *format, unsigned short *timeunitdiv, unsigned long *tracklist, int maxtracks);
+int midi_readhdr(struct fiofile *f, int *format, unsigned short int *timeunitdiv, unsigned long int *tracklist, int maxtracks);
 
 /* parse a track object and returns the id of the first events in the linked list */
-long midi_track2events(struct fiofile_t *f, char *title, int titlemaxlen,
-                       char *copyright, int copyrightmaxlen, char *text,
-                       int textmaxlen, unsigned short *channelsusage,
+long int midi_track2events(struct fiofile *f, char *title, int titlemaxlen,
+                           char *copyright, int copyrightmaxlen, char *text,
+                           int textmaxlen, unsigned short int *channelsusage,
 #ifdef DBGFILE
-                       FILE *logf,
+                           FILE *logf,
 #endif
-                       unsigned long *tracklen, void *reqpatches);
+                           unsigned long int *tracklen, void *reqpatches);
 
 /* merge two MIDI tracks into a single (serialized) one. returns a "pointer"
  * to the unique track. I take care not to allocate/free memory here.

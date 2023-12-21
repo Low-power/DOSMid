@@ -12,7 +12,7 @@
 int main(void) {
   FILE *f;
   int i;
-  struct fiofile_t f;
+  struct fiofile f;
   long pos;
   static unsigned char buff[1024];
 

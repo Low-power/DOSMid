@@ -4,7 +4,7 @@
  *  - 128 percussions
  */
 
-static struct timbre_t gmtimbres[256] = {
+static struct timbre gmtimbres[256] = {
 /* ,---------+-------- Wave select settings                        *
  * | ,-------÷-+------ Sustain/release rates                       *
  * | | ,-----÷-÷-+---- Attack/decay rates                          *

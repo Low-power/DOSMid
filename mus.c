@@ -43,7 +43,7 @@
 /* loads a MUS file into memory, returns the id of the first event on success,
  * or -1 on error. channelsusage contains 16 flags indicating what channels
  * are used. */
-long mus_load(struct fiofile_t *f, unsigned long *totlen, unsigned short *timeunitdiv, unsigned short *channelsusage, void *reqpatches) {
+long int mus_load(struct fiofile *f, unsigned long int *totlen, unsigned short int *timeunitdiv, unsigned short int *channelsusage, void *reqpatches) {
   unsigned char hdr_or_chanvol[16];
   unsigned short scorestart;
   unsigned char bytebuff, bytebuff2, loadflag = 0;
@@ -53,7 +53,7 @@ long mus_load(struct fiofile_t *f, unsigned long *totlen, unsigned short *timeun
   long res = -1;
   int tickduration = 0;
   long mslen = 0;
-  struct midi_event_t midievent;
+  struct midi_event midievent;
 
   /* read the 16 bytes header first, and populate hdr data */
   if (fio_read(f, hdr_or_chanvol, 16) != 16) return(-8);
@@ -64,7 +64,7 @@ long mus_load(struct fiofile_t *f, unsigned long *totlen, unsigned short *timeun
   /* position the next reading position to first event */
   fio_seek(f, FIO_SEEK_START, scorestart);
   /* set tempo to 140 bpm (428571 us per quarter note) */
-  memset(&midievent, 0, sizeof(struct midi_event_t));
+  memset(&midievent, 0, sizeof(struct midi_event));
   midievent.type = EVENT_TEMPO;
   *timeunitdiv = TIMEUNITDIV;
   midievent.data.tempoval = TICKLEN;
@@ -90,7 +90,7 @@ long mus_load(struct fiofile_t *f, unsigned long *totlen, unsigned short *timeun
       event_channel = 15;
     }
     /* clear out midievent to make room for the incoming MIDI message */
-    memset(&midievent, 0, sizeof(struct midi_event_t));
+    memset(&midievent, 0, sizeof(struct midi_event));
     /* read complementary data, if any */
     switch (event_type) {
       case 0: /* release note (1 byte follows) */

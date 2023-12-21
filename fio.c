@@ -11,7 +11,7 @@
 
 #include "fio.h" /* include self for control */
 
-static void fio_seek_sync(struct fiofile_t *f) {
+static void fio_seek_sync(struct fiofile *f) {
 /* DOS 2+ - LSEEK - SET CURRENT FILE POSITION
    AH = 42h
    AL = origin of move
@@ -43,7 +43,7 @@ static void fio_seek_sync(struct fiofile_t *f) {
 }
 
 /* seek to offset position of file pointed at by fhandle. returns current file position on success, a negative error otherwise */
-signed long fio_seek(struct fiofile_t *f, unsigned short origin, signed long offset) {
+signed long int fio_seek(struct fiofile *f, unsigned short int origin, signed long int offset) {
   switch (origin) {
     case FIO_SEEK_START:
       if (offset < 1) {
@@ -63,7 +63,7 @@ signed long fio_seek(struct fiofile_t *f, unsigned short origin, signed long off
 }
 
 /* reads a line from file pointed at by fhandle, fill buff up to buflen bytes. returns the line length (possibly longer than buflen), or -1 on EOF */
-int fio_getline(struct fiofile_t *f, void far *buff, short buflen) {
+int fio_getline(struct fiofile *f, void far *buff, short int buflen) {
   unsigned char bytebuf;
   short linelen = 0;
   buflen--; /* leave space for the zero terminator */
@@ -85,7 +85,7 @@ int fio_getline(struct fiofile_t *f, void far *buff, short buflen) {
   return(linelen);
 }
 
-static void loadcache(struct fiofile_t *f) {
+static void loadcache(struct fiofile *f) {
   union REGS regs;
   struct SREGS sregs;
   fio_seek_sync(f);
@@ -100,7 +100,7 @@ static void loadcache(struct fiofile_t *f) {
 }
 
 /* open file fname and set fhandle with the associated file handle. returns 0 on success, non-zero otherwise */
-int fio_open(char far *fname, int mode, struct fiofile_t *f) {
+int fio_open(const char far *fname, int mode, struct fiofile *f) {
   /* DOS 2+ - OPEN - OPEN EXISTING FILE
      AH = 3Dh
      AL = access and sharing modes
@@ -142,7 +142,7 @@ int fio_open(char far *fname, int mode, struct fiofile_t *f) {
 }
 
 /* reads count bytes from file pointed at by fhandle, and writes the data into buff. returns the number of bytes actually read, or a negative number on error */
-int fio_read(struct fiofile_t *f, void far *buff, int count) {
+int fio_read(struct fiofile *f, void far *buff, int count) {
 /* DOS 2+ - READ - READ FROM FILE OR DEVICE
  * AH = 3Fh
  * BX = file handle
@@ -178,7 +178,7 @@ int fio_read(struct fiofile_t *f, void far *buff, int count) {
 }
 
 /* close file handle. returns 0 on success, non-zero otherwise */
-int fio_close(struct fiofile_t *f) {
+int fio_close(struct fiofile *f) {
   /* DOS 2+ - CLOSE - CLOSE FILE
      AH = 3Eh
      BX = file handle

@@ -28,16 +28,17 @@
  */
 
 #ifndef mem_h_sentinel
-  #define mem_h_sentinel
+#define mem_h_sentinel
 
-  #define MEM_MALLOC 1
-  #define MEM_XMS 0
+#define MEM_MALLOC 1
+#define MEM_XMS 0
 
-  unsigned int mem_init(int mode);
-  int mem_pull(long addr, void far *ptr, int sz);
-  int mem_push(void far *ptr, long addr, int sz);
-  int pusheventqueue(struct midi_event_t *event, long *root);
-  long mem_alloc(int sz);
-  void mem_close(void);
-  void mem_clear(void);
+unsigned int mem_init(int mode);
+int mem_pull(long addr, void far *ptr, int sz);
+int mem_push(void far *ptr, long addr, int sz);
+int pusheventqueue(const struct midi_event *event, long int *root);
+long mem_alloc(int sz);
+void mem_close(void);
+void mem_clear(void);
+
 #endif

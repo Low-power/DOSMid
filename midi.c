@@ -41,7 +41,7 @@ extern unsigned char wbuff[];
 /* PRIVATE ROUTINES USED FOR INTERNAL PROCESSING ONLY */
 
 /* fetch a variable length quantity value from a given offset. returns number of bytes read */
-static int midi_fetch_variablelen_fromfile(struct fiofile_t *f, unsigned long *result) {
+static int midi_fetch_variablelen_fromfile(struct fiofile *f, unsigned long int *result) {
   unsigned char bytebuff;
   int offset = 0;
   *result = 0;
@@ -56,7 +56,7 @@ static int midi_fetch_variablelen_fromfile(struct fiofile_t *f, unsigned long *r
 
 
 /* reads a MIDI file and computes a map of chunks (ie a list of offsets) */
-static int midi_gettrackmap(struct fiofile_t *f, unsigned long *tracklist, int maxchunks) {
+static int midi_gettrackmap(struct fiofile *f, unsigned long int *tracklist, int maxchunks) {
   short i;
   unsigned long ulvar;
   for (i = 0; i < maxchunks; i++) {
@@ -78,7 +78,7 @@ static int midi_gettrackmap(struct fiofile_t *f, unsigned long *tracklist, int m
 /* PUBLIC INTERFACE */
 
 
-int midi_readhdr(struct fiofile_t *f, int *format, unsigned short *timeunitdiv, unsigned long *tracklist, int maxtracks) {
+int midi_readhdr(struct fiofile *f, int *format, unsigned short int *timeunitdiv, unsigned long int *tracklist, int maxtracks) {
   unsigned short tracks;
   /*
    * Here's an example of a complete MThd chunk:
@@ -136,9 +136,9 @@ int midi_readhdr(struct fiofile_t *f, int *format, unsigned short *timeunitdiv, 
 
 /* returns a negative value on error, 0 on success, 1 on end of track */
 #ifdef DBGFILE
-static int ld_meta(struct midi_event_t *event, struct fiofile_t *f, FILE *logf, unsigned long *tracklen, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen) {
+static int ld_meta(struct midi_event *event, struct fiofile *f, FILE *logf, unsigned long int *tracklen, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen) {
 #else
-static int ld_meta(struct midi_event_t *event, struct fiofile_t *f, unsigned long *tracklen, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen) {
+static int ld_meta(struct midi_event *event, struct fiofile *f, unsigned long int *tracklen, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen) {
 #endif
 
   unsigned long metalen;
@@ -292,9 +292,9 @@ static int ld_meta(struct midi_event_t *event, struct fiofile_t *f, unsigned lon
 
 /* returns a negative value on error, 0 on success, 1 on end of track */
 #ifdef DBGFILE
-static int ld_sysex(struct midi_event_t *event, struct fiofile_t *f, FILE *logf, unsigned char statusbyte, unsigned long *tracklen) {
+static int ld_sysex(struct midi_event *event, struct fiofile *f, FILE *logf, unsigned char statusbyte, unsigned long int *tracklen) {
 #else
-static int ld_sysex(struct midi_event_t *event, struct fiofile_t *f, unsigned char statusbyte, unsigned long *tracklen) {
+static int ld_sysex(struct midi_event *event, struct fiofile *f, unsigned char statusbyte, unsigned long int *tracklen) {
 #endif
   unsigned long sysexlen;
   int sysexleneven; /* can be int, guaranteed to be less than 4K */
@@ -332,9 +332,9 @@ static int ld_sysex(struct midi_event_t *event, struct fiofile_t *f, unsigned ch
 
 
 #ifdef DBGFILE
-static int ld_note(struct midi_event_t *event, struct fiofile_t *f, FILE *logf, unsigned char statusbyte, unsigned long *tracklen, unsigned short *channelsusage, void *reqpatches) {
+static int ld_note(struct midi_event *event, struct fiofile *f, FILE *logf, unsigned char statusbyte, unsigned long int *tracklen, unsigned short int *channelsusage, void *reqpatches) {
 #else
-static int ld_note(struct midi_event_t *event, struct fiofile_t *f, unsigned char statusbyte, unsigned long *tracklen, unsigned short *channelsusage, void *reqpatches) {
+static int ld_note(struct midi_event *event, struct fiofile *f, unsigned char statusbyte, unsigned long int *tracklen, unsigned short int *channelsusage, void *reqpatches) {
 #endif
   unsigned char ubuff[2]; /* micro buffer for loading data */
   switch (statusbyte & 0xF0) { /* I care only about NoteOn/NoteOff events */
@@ -413,13 +413,13 @@ static int ld_note(struct midi_event_t *event, struct fiofile_t *f, unsigned cha
  * returns MIDI_TRACKERROR if the track is corrupted
  * returns MIDI_OUTOFMEM if failed to store events in memory */
 #ifdef DBGFILE
-long midi_track2events(struct fiofile_t *f, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen, unsigned short *channelsusage, FILE *logf, unsigned long *tracklen, void *reqpatches) {
+long int midi_track2events(struct fiofile *f, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen, unsigned short int *channelsusage, FILE *logf, unsigned long int *tracklen, void *reqpatches) {
 #else
-long midi_track2events(struct fiofile_t *f, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen, unsigned short *channelsusage, unsigned long *tracklen, void *reqpatches) {
+long int midi_track2events(struct fiofile *f, char *title, int titlemaxlen, char *copyright, int copyrightmaxlen, char *text, int textmaxlen, unsigned short int *channelsusage, unsigned long int *tracklen, void *reqpatches) {
 #endif
   unsigned long deltatime;
   unsigned char statusbyte = 0;
-  struct midi_event_t event;
+  struct midi_event event;
   long result = MIDI_EMPTYTRACK;
   unsigned long ignoreddeltas = 0;
 
@@ -508,12 +508,12 @@ long midi_mergetrack(long t0, long t1, unsigned long *totlen, unsigned short tim
   long res = -1, lasteventid = -1, selectedid;
   int selected;
   unsigned long curtempo = 500000l, utotlen = 0;
-  struct midi_event_t event[2], lastevent;
+  struct midi_event event[2], lastevent;
 
   if (totlen != NULL) *totlen = 0;
   /* fetch first events for both tracks */
-  if (t0 >= 0) mem_pull(t0, &event[0], sizeof(struct midi_event_t));
-  if (t1 >= 0) mem_pull(t1, &event[1], sizeof(struct midi_event_t));
+  if (t0 >= 0) mem_pull(t0, event, sizeof(struct midi_event));
+  if (t1 >= 0) mem_pull(t1, event + 1, sizeof(struct midi_event));
   /* start looping */
   while ((t0 >= 0) || (t1 >= 0)) {
     /* compare both tracks, and select the soonest one */
@@ -534,11 +534,11 @@ long midi_mergetrack(long t0, long t1, unsigned long *totlen, unsigned short tim
       res = selectedid;
     } else if (lastevent.next != selectedid) {                        /* otherwise attach selected */
       lastevent.next = selectedid;                                    /* track to last note, and   */
-      mem_push(&lastevent, lasteventid, sizeof(struct midi_event_t)); /* update last pointer (if   */
+      mem_push(&lastevent, lasteventid, sizeof(struct midi_event)); /* update last pointer (if   */
     }                                                                 /* not good already)         */
     /* save the last event into buffer for later, and remember its id */
     lasteventid = selectedid;
-    memcpy(&lastevent, &(event[selected]), sizeof(struct midi_event_t));
+    memcpy(&lastevent, event + selected, sizeof(struct midi_event));
     /* increment timer */
     if ((totlen != NULL) && (event[selected].deltatime != 0)) {
       utotlen += DELTATIME2US(event[selected].deltatime, curtempo, timeunitdiv);
@@ -553,17 +553,17 @@ long midi_mergetrack(long t0, long t1, unsigned long *totlen, unsigned short tim
     if (selected == 0) {
       if ((t1 >= 0) && (event[0].deltatime != 0)) {
         event[1].deltatime -= event[0].deltatime;
-        mem_push(&event[1], t1, sizeof(struct midi_event_t));
+        mem_push(event + 1, t1, sizeof(struct midi_event));
       }
       t0 = event[0].next;
-      if (t0 >= 0) mem_pull(t0, &event[0], sizeof(struct midi_event_t));
+      if (t0 >= 0) mem_pull(t0, event, sizeof(struct midi_event));
     } else { /* selected == 1 */
       if ((t0 >= 0) && (event[1].deltatime != 0)) {
         event[0].deltatime -= event[1].deltatime;
-        mem_push(&event[0], t0, sizeof(struct midi_event_t));
+        mem_push(event, t0, sizeof(struct midi_event));
       }
       t1 = event[1].next;
-      if (t1 >= 0) mem_pull(t1, &event[1], sizeof(struct midi_event_t));
+      if (t1 >= 0) mem_pull(t1, event + 1, sizeof(struct midi_event));
     }
   }
   return(res);

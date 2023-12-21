@@ -12,6 +12,6 @@
 #define SYXERR_INVALIDHEADER -4
 #define SYXERR_INVALIDFORMAT -5
 
-int syx_fetchnext(struct fiofile_t *fh, unsigned char *buff, int bufflen);
+int syx_fetchnext(struct fiofile *fh, unsigned char *buff, int bufflen);
 
 #endif

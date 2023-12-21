@@ -30,8 +30,8 @@
 #ifndef opl_h_sentinel
 #define opl_h_sentinel
 
-struct timbre_t {
-  unsigned long modulator_E862, carrier_E862;
+struct timbre {
+  unsigned long int modulator_E862, carrier_E862;
   unsigned char modulator_40, carrier_40;
   unsigned char feedconn;
   signed char finetune;
@@ -73,9 +73,9 @@ void opl_midi_controller(unsigned short oplport, int channel, int id, int value)
 /* assign a new instrument to emulated MIDI channel */
 void opl_midi_changeprog(int channel, int program);
 
-void opl_loadinstrument(unsigned short port, unsigned short voice, struct timbre_t *timbre);
+void opl_loadinstrument(unsigned short int port, unsigned short int voice, const struct timbre *timbre);
 
-/* loads an IBK bank from file into an array of 128 timbre_t structures.
+/* loads an IBK bank from file into an array of 128 'struct timbre' objects.
  * returns 0 on success, non-zero otherwise */
 int opl_loadbank(char *file);
 

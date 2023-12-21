@@ -66,7 +66,7 @@ static int outport_is_lpt = 0;
 /* loads a SBK sound font to AWE hardware */
 #ifdef SBAWE
 static int awe_loadfont(char *filename) {
-  struct fiofile_t f;
+  struct fiofile f;
   SOUND_PACKET sp;
   long banks[1];
   int i;
