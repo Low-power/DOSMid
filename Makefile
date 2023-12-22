@@ -24,15 +24,19 @@ DEFAULT_DEVICE = -DDOSMID_DEFAULT_DEVICE_TYPE=DEV_OPL -DDOSMID_DEFAULT_DEVICE_PO
 #  large      64K+ | 64K+
 MODE = s
 
-CFLAGS = -zp2 -lr -we -d0 -y -0 -s -m$(MODE) -wx
+CFLAGS = -y -zp2 -d0 -0 -s -wx -we -os -m$(MODE)
 
-all: dosmid.exe
+SOURCES = cms.c dosmid.c fio.c gus.c mem.c midi.c mpu401.c mus.c opl.c outdev.c rs232.c sbdsp.c syx.c timer.c ui.c xms.c
 
-dosmid.exe: cms.c dosmid.c fio.c gus.c mem.c midi.c mpu401.c mus.c opl.c outdev.c rs232.c sbdsp.c syx.c timer.c ui.c xms.c
-	wcl $(CFLAGS) $(FEATURES) $(DEFAULT_DEVICE) -fe=dosmid.exe -fm=dosmid.map *.c awe32\rawe32$(MODE).lib
-	wcl $(CFLAGS) $(FEATURESLT) $(DEFAULT_DEVICE) -fe=dosmidlt.exe -fm=dosmidlt.map *.c
-	upx --8086 -9 dosmid.exe
-	upx --8086 -9 dosmidlt.exe
+all:	dosmid.exe dosmidlt.exe
+
+dosmid.exe:	$(SOURCES)
+	*wcl $(CFLAGS) $(FEATURES) $(DEFAULT_DEVICE) -lr -fe=$@ -fm=dosmid.map *.c awe32\rawe32$(MODE).lib
+	upx --8086 -9 $@
+
+dosmidlt.exe:	$(SOURCES)
+	*wcl $(CFLAGS) $(FEATURESLT) $(DEFAULT_DEVICE) -lr -fe=$@ -fm=dosmidlt.map *.c
+	upx --8086 -9 $@
 
 clean: .symbolic
 	del *.obj
