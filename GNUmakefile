@@ -45,3 +45,5 @@ dosmidlt.exe:	$(SOURCES)
 
 clean:
 	rm -f *.o dosmid.map dosmid.exe dosmidlt.map dosmidlt.exe
+
+.PHONY:	all clean
