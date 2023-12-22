@@ -26,7 +26,7 @@ MODE = s
 
 CFLAGS = -y -zp2 -d0 -0 -s -wx -we -os -m$(MODE)
 
-SOURCES = cms.c dosmid.c fio.c gus.c mem.c midi.c mpu401.c mus.c opl.c outdev.c rs232.c sbdsp.c syx.c timer.c ui.c xms.c
+SOURCES = cms.c dosmid.c fio.c gus.c lpt.c mem.c midi.c mpu401.c mus.c opl.c outdev.c rs232.c sbdsp.c syx.c timer.c ui.c xms.c
 
 all:	dosmid.exe dosmidlt.exe
 

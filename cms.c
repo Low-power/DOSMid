@@ -32,6 +32,9 @@
 //#define DRUMS_ONLY		// for percussion debug purpouses
 
 #include "cms.h"
+#ifdef CMSLPT
+#include "lpt.h"
+#endif
 #include <conio.h>
 #include <assert.h>
 #ifdef CMS_DEBUG
@@ -168,27 +171,6 @@ static unsigned char NotePriority;
 
 static unsigned short channelpitch[16];
 
-#ifdef CMSLPT
-// Copied from CMSLPT project
-static void write_cmslpt(unsigned int byte, unsigned int ctrl)
-{
-  unsigned int port = cms_port;
-  outp(port, byte);
-  port += 2;
-  outp(port, ctrl);
-  outp(port, ctrl ^ 4);         // toggle WR
-  inp(port);
-  if (ctrl & 1) {
-    inp(port);
-    inp(port);
-    inp(port);
-    inp(port);
-    inp(port);
-  }
-  outp(port, ctrl);
-}
-#endif
-
 #if 0
 static void __declspec( naked ) asm_write_cms(void)
 {
@@ -266,8 +248,8 @@ static void write_cms(unsigned char chip_i, unsigned char reg, unsigned char val
 #ifdef CMSLPT
 	if(is_cmslpt) {
 		unsigned int ctrl = chip_i ? 6 : 12;
-		write_cmslpt(reg, ctrl);
-		write_cmslpt(value, ctrl + 1);
+		write_lpt(cms_port, reg, ctrl);
+		write_lpt(cms_port, value, ctrl | 1);
 	} else
 #endif
 	{
