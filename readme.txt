@@ -16,11 +16,16 @@ Used piece of software codes from third-party peoples, eg:
 
 New DOSMid options:
 
- /cms=XXX  Force dosmid to use Creative Music System / Game Blaster
-           on port XXX. The port part is optional, that means you can 
-           use "/cms" to just force CMS usage on default 220h port.
- /cms=lpt# Use CMSLPT card on LPT port #. The actual I/O port number is
-           retrieved from BIOS automatically.
+ /cms[=XXX] Use Creative Music System / Game Blaster on I/O port XXX in
+            hexadecimal number as output device. The default port 220 will be
+            used if omitted.
+ /cms=lpt#  Use CMSLPT card on LPT port #. The actual I/O port number is
+            retrieved from BIOS automatically.
+
+In addition to '/', this version of DOSMid also recognizes options begin with
+'-'. To play files that named with a leading '-', use the end-of-option marker
+'--', for example:
+ dosmid -cms -random -- -.m3u
 
 
 ============================= ORIGINAL DOSMID.TXT
