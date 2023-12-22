@@ -1459,7 +1459,7 @@ int main(int argc, char **argv) {
                " /cms[=XXX] use Creative Music System / Game Blaster for sound output\r\n"
 #endif
                " /sbmidi[=XXX] outputs MIDI to the SoundBlaster MIDI port at I/O addr XXX$");
-      dos_puts(" /com[=XXX] output MIDI messages to the RS-232 port at I/O address XXX\r\n"
+      dos_puts(" /com=XXX   output MIDI messages to the RS-232 port at I/O address XXX\r\n"
                " /comX      same as /com=XXX, but takes a COM port instead (example: /com1)\r\n"
                " /gus       use the Gravis UltraSound card (requires ULTRAMID)\r\n"
                " /syx=<FILE> use SYSEX instructions from FILE for MIDI initialization$");
