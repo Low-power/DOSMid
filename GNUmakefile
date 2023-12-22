@@ -14,6 +14,12 @@
 FEATURES   := -D SBAWE=1 -D OPL=1 -D CMS=1 -D CMSLPT=1
 FEATURESLT := -D OPL=1 -D CMS=1 -D CMSLPT=1
 
+# Configure the default output device for use when no device option specified
+# and no GUS, MPU and AWE configured via environment
+DEFAULT_DEVICE := \
+	-D DOSMID_DEFAULT_DEVICE_TYPE=DEV_OPL \
+	-D DOSMID_DEFAULT_DEVICE_PORT=0x388
+
 # memory segmentation mode (s = small ; c = compact ; m = medium ; l = large)
 #             code | data
 #  small      64K  | 64K
@@ -30,11 +36,11 @@ SOURCES := cms.c dosmid.c fio.c gus.c mem.c midi.c mpu401.c mus.c opl.c outdev.c
 all:	dosmid.exe dosmidlt.exe
 
 dosmid.exe:	$(SOURCES)
-	owcc $(CFLAGS) $(FEATURES) $(SOURCES) -fm=$(basename $@).map -o $@ awe32/rawe32$(CMODEL).lib
+	owcc $(CFLAGS) $(FEATURES) $(DEFAULT_DEVICE) $(SOURCES) -fm=$(basename $@).map -o $@ awe32/rawe32$(CMODEL).lib
 	$(UPX) --8086 -9 $@
 
 dosmidlt.exe:	$(SOURCES)
-	owcc $(CFLAGS) $(FEATURESLT) $(SOURCES) -fm=$(basename $@).map -o $@
+	owcc $(CFLAGS) $(FEATURESLT) $(DEFAULT_DEVICE) $(SOURCES) -fm=$(basename $@).map -o $@
 	$(UPX) --8086 -9 $@
 
 clean:

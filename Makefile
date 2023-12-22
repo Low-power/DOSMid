@@ -1,8 +1,6 @@
 #
 # DOSMid Makefile for Open Watcom Make
 # Copyright (C) 2014-2023 Mateusz Viste
-# DOSMid Makefile for OpenWatcom
-# Copyright (C) 2014-2023 Mateusz Viste
 #
 
 # you can control the availability of some features with the FEATURES string:
@@ -13,6 +11,10 @@
 #  -DCMSLPT   enables CMSLPT output, requires CMS
 FEATURES   = -DSBAWE -DOPL -DCMS -DCMSLPT
 FEATURESLT = -DOPL -DCMS -DCMSLPT
+
+# Configure the default output device for use when no device option specified
+# and no GUS, MPU and AWE configured via environment
+DEFAULT_DEVICE = -DDOSMID_DEFAULT_DEVICE_TYPE=DEV_OPL -DDOSMID_DEFAULT_DEVICE_PORT=0x388
 
 # memory segmentation mode (s = small ; c = compact ; m = medium ; l = large)
 #             code | data
@@ -27,8 +29,8 @@ CFLAGS = -zp2 -lr -we -d0 -y -0 -s -m$(MODE) -wx
 all: dosmid.exe
 
 dosmid.exe: cms.c dosmid.c fio.c gus.c mem.c midi.c mpu401.c mus.c opl.c outdev.c rs232.c sbdsp.c syx.c timer.c ui.c xms.c
-	wcl $(CFLAGS) $(FEATURES) -fe=dosmid.exe -fm=dosmid.map *.c awe32\rawe32$(MODE).lib
-	wcl $(CFLAGS) $(FEATURESLT) -fe=dosmidlt.exe -fm=dosmidlt.map *.c
+	wcl $(CFLAGS) $(FEATURES) $(DEFAULT_DEVICE) -fe=dosmid.exe -fm=dosmid.map *.c awe32\rawe32$(MODE).lib
+	wcl $(CFLAGS) $(FEATURESLT) $(DEFAULT_DEVICE) -fe=dosmidlt.exe -fm=dosmidlt.map *.c
 	upx --8086 -9 dosmid.exe
 	upx --8086 -9 dosmidlt.exe
 

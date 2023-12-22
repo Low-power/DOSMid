@@ -702,14 +702,13 @@ static void preload_outdev(struct clioptions *params) {
 
   /* look at what we got, and choose in order of preference */
 
+#if defined DOSMID_DEFAULT_DEVICE_TYPE && defined DOSMID_DEFAULT_DEVICE_PORT
+  params->device = DOSMID_DEFAULT_DEVICE_TYPE;
+  params->devport = DOSMID_DEFAULT_DEVICE_PORT;
+#else
   /* set NONE, just so we have anything set */
   params->device = DEV_NONE;
   params->devport = 0;
-
-  /* use OPL on port 0x388, if OPL output is compiled in */
-#ifdef OPL
-  params->device = DEV_OPL;
-  params->devport = 0x388;
 #endif
 
   /* never try using SBMIDI: it's unlikely anything's connected to it anyway */
