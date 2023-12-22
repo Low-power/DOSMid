@@ -417,6 +417,15 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       params->devport = hexstr2uint(o + 4);
       if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388$");
       params->nockdev = 1;
+    } else if (stringstartswith(o, "opl") && (o[3] == '2' || o[3] == '3') && (!o[4] || o[4] == '=')) {
+      params->device = o[3] == '3' ? DEV_OPL3 : DEV_OPL2;
+      params->devport = o[4] ? hexstr2uint(o + 5) : 0x388;
+      if (params->devport < 1) {
+        return params->device == DEV_OPL3 ?
+          "Invalid OPL3 port provided. Example: /opl3=388$" :
+          "Invalid OPL2 port provided. Example: /opl2=388$";
+      }
+      if(o[4]) params->nockdev = 1;
 #endif
 #ifdef CMS
     } else if (strcasecmp(o, "cms") == 0) {
@@ -1448,19 +1457,21 @@ int main(int argc, char **argv) {
                "Options:\r\n"
                " /noxms     use conventional memory instead of XMS (loads small files only)$");
       dos_puts(" /xmsdelay  wait 2ms before accessing XMS memory (AWEUTIL compatibility)\r\n"
-               " /mpu[=XXX] use MPU-401 on I/O port XXX; will read BLASTER for port if omitted\r\n"
+               " /mpu[=<X>] use MPU-401 on I/O port <X>; will read BLASTER for port if omitted\r\n"
 #ifdef SBAWE
-               " /awe[=XXX] use the EMU8K on SB AWE card; will read BLASTER for port if omitted\r\n"
+               " /awe[=<X>] use the EMU8K on SB AWE card; will read BLASTER for port if omitted\r\n"
 #endif
 #ifdef OPL
-               " /opl[=XXX] use an FM synthesis OPL2/OPL3 chip for sound output\r\n"
+               " /opl[=<X>] use an FM synthesis OPL2/OPL3 chip for sound output\r\n"
+               " /opl2[=<X>] use an OPL2-compatible chip for output even it is OPL3-compatible\r\n"
+               " /opl3[=<X>] use an OPL3-compatible chip for output without fallback\r\n"
 #endif
 #ifdef CMS
-               " /cms[=XXX] use Creative Music System / Game Blaster for sound output\r\n"
+               " /cms[=<X>] use Creative Music System / Game Blaster for sound output\r\n"
 #endif
-               " /sbmidi[=XXX] outputs MIDI to the SoundBlaster MIDI port at I/O addr XXX$");
-      dos_puts(" /com=XXX   output MIDI messages to the RS-232 port at I/O address XXX\r\n"
-               " /comX      same as /com=XXX, but takes a COM port instead (example: /com1)\r\n"
+               " /sbmidi[=<X>] outputs MIDI to the SoundBlaster MIDI port at I/O port <X>$");
+      dos_puts(" /com=<X>   output MIDI messages to the RS-232 port at I/O port <X>\r\n"
+               " /comX      same as /com=<X>, but takes a COM port instead (example: /com1)\r\n"
                " /gus       use the Gravis UltraSound card (requires ULTRAMID)\r\n"
                " /syx=<FILE> use SYSEX instructions from FILE for MIDI initialization$");
       dos_puts(" /sbnk=<FILE> load a custom sound bank file(s) (IBK on OPL, SBK on AWE)\r\n"
