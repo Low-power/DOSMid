@@ -39,23 +39,23 @@
 #include "opl-gm.h"
 #include "timer.h"
 
-struct voicealloc_t {
+struct voicealloc {
   unsigned short priority;
   signed short timbreid;
   signed char channel;
   signed char note;
 };
 
-struct oplstate_t {
+struct oplstate {
   signed char notes2voices[16][128];    /* keeps the map of channel:notes -> voice allocations */
   unsigned short channelpitch[16];      /* per-channel pitch level */
   unsigned short channelvol[16];        /* per-channel pitch level */
-  struct voicealloc_t voices2notes[18]; /* keeps the map of what voice is playing what note/channel currently */
+  struct voicealloc voices2notes[18]; /* keeps the map of what voice is playing what note/channel currently */
   unsigned char channelprog[16];        /* programs (patches) assigned to channels */
   int opl3; /* flag indicating whether or not the sound module is OPL3-compatible or only OPL2 */
 };
 
-struct oplstate_t *oplmem = NULL; /* memory area holding all OPL's current states */
+struct oplstate *oplmem = NULL; /* memory area holding all OPL's current states */
 
 const unsigned short freqtable[128] = {                          /* note # */
         345, 365, 387, 410, 435, 460, 488, 517, 547, 580, 615, 651,  /*  0 */
@@ -219,29 +219,25 @@ int opl_init(unsigned short int port, int *gen, int skip_checking) {
     if (y != 0xC0) return(-1); /* ok, an AdLib-compatible board is installed in the computer   */
   }
 
-  /* init memory */
-  oplmem = calloc(1, sizeof(struct oplstate_t));
-  if (oplmem == NULL) return(-3);
-
   /* is it an OPL3 or just an OPL2? */
   switch(*gen) {
     case -1:
-      if (inp(port) & 0x06 == 0) {
-        oplmem->opl3 = 1;
-        *gen = 3;
-      } else {
-        *gen = 2;
-      }
+      *gen = (inp(port) & 0x06) == 0 ? 3 : 2;
       break;
     case 2:
       break;
     case 3:
       if(inp(port) & 0x06) return -2;
-      oplmem->opl3 = 1;
       break;
     default:
       return -4;
   }
+
+  /* init memory */
+  oplmem = calloc(1, sizeof(struct oplstate));
+  if (oplmem == NULL) return(-3);
+
+  oplmem->opl3 = *gen == 3;
 
   /* init the hardware */
   voicescount = 9; /* OPL2 provides 9 melodic voices */
