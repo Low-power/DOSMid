@@ -416,7 +416,6 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       params->device = DEV_OPL;
       params->devport = hexstr2uint(o + 4);
       if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388$");
-      params->nockdev = 1;
     } else if (stringstartswith(o, "opl") && (o[3] == '2' || o[3] == '3') && (!o[4] || o[4] == '=')) {
       params->device = o[3] == '3' ? DEV_OPL3 : DEV_OPL2;
       if(o[4]) {
