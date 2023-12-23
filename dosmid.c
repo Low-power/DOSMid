@@ -1504,7 +1504,13 @@ int main(int argc, char **argv) {
   }
 
 #ifdef CMSLPT
-  if(params.onlpt) params.devport = get_lpt_port(params.onlpt);
+  if(params.onlpt) {
+    params.devport = get_lpt_port(params.onlpt);
+    if(!params.devport) {
+      fprintf(stderr, "LPT%c not found\r\n", params.onlpt + '0');
+      return 1;
+    }
+  }
 #endif
   params.devname = devtoname(params.device, params.devicesubtype);
 
