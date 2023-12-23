@@ -26,6 +26,7 @@ const unsigned short COLOR_ERRMSG[2]    = {0x7000u, 0x4700u};
 
 unsigned short far *screenptr = NULL;
 static int oldmode = 0;
+static unsigned int oldcursor = 0;
 static int colorflag = 0;
 
 extern unsigned long MEM_TOTALLOC; /* total allocated memory from MEM.C */
@@ -48,10 +49,13 @@ static void ui_printstr(int y, int x, char *string, int staticlen, unsigned shor
 
 void ui_init(void) {
   union REGS regs;
-  /* remember the current mode */
+  /* remember the current mode and cursor shape */
   regs.h.ah = 0x0F; /* get current video mode */
   int86(0x10, &regs, &regs);
   oldmode = regs.h.al;
+  regs.h.ah = 0x03; /* get cursor shape */
+  int86(0x10, &regs, &regs);
+  oldcursor = regs.w.cx;
   /* set text mode 80x25 */
   regs.h.ah = 0x00;  /* set video mode */
   screenptr = MK_FP(0xB800, 0);
@@ -85,6 +89,11 @@ void ui_close(void) {
   regs.h.ah = 0x00;  /* set video mode */
   regs.h.al = oldmode;
   int86(0x10, &regs, &regs);
+  if(oldcursor) {
+    regs.h.ah = 0x01;
+    regs.w.cx = oldcursor;
+    int86(0x10, &regs, &regs);
+  }
 }
 
 void ui_hidecursor(void) {
