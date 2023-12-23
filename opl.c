@@ -32,12 +32,13 @@
 #include <conio.h> /* inp(), out() */
 #include <stdlib.h> /* calloc() */
 #include <string.h> /* strdup() */
-
 #include "opl.h"
-
 #include "fio.h"
 #include "opl-gm.h"
 #include "timer.h"
+#ifdef OPLLPT
+#include "lpt.h"
+#endif
 
 struct voicealloc {
   unsigned short priority;
@@ -52,7 +53,10 @@ struct oplstate {
   unsigned short channelvol[16];        /* per-channel pitch level */
   struct voicealloc voices2notes[18]; /* keeps the map of what voice is playing what note/channel currently */
   unsigned char channelprog[16];        /* programs (patches) assigned to channels */
-  int opl3; /* flag indicating whether or not the sound module is OPL3-compatible or only OPL2 */
+  char opl3; /* flag indicating whether or not the sound module is OPL3-compatible or only OPL2 */
+#ifdef OPLLPT
+  char opllpt;
+#endif
 };
 
 struct oplstate *oplmem = NULL; /* memory area holding all OPL's current states */
@@ -127,33 +131,50 @@ const unsigned short op2offsets[18] = {0x03,0x04,0x05,0x0b,0x0c,0x0d,0x13,0x14,0
 /* number of melodic voices: 9 by default (OPL2), can go up to 18 (OPL3) */
 static int voicescount = 9;
 
+#define pdelay(port, ncycles) do { int i = (ncycles); while(i-- > 0) inp(port); } while(0)
 
 /* function used to write into a register 'reg' of the OPL chip located at
  * port 'port', writing byte 'data' into it. this function supports also OPL3.
  * to write into the secondary address of an OPL3, just OR your register with
  * the 0x100 value (the 0x100 flag will be removed then, and the data will be
  * written into port+3). */
-static void oplregwr(unsigned short port, unsigned short reg, unsigned char data) {
-  int i;
-  /* remap 'high' registers to second port (OPL3) */
-  if ((reg & 0x100) != 0) {
-    reg &= 0xff;
-    port += 2;
+static void write_opl(unsigned short int port, int is_opl3,
+#ifdef OPLLPT
+ int is_opllpt,
+#endif
+ unsigned short int reg, unsigned char data) {
+#ifdef OPLLPT
+  if(is_opllpt) {
+    write_lpt(port, reg & 0xff, (reg & 0x100) ? 0x5 : 0xd);
+    pdelay(port, 6);
+    write_lpt(port, data, 0xc);
+  } else
+#endif
+  {
+    /* remap 'high' registers to second port (OPL3) */
+    if ((reg & 0x100) != 0) {
+      reg &= 0xff;
+      port += 2;
+    }
+    /* select the register we want to write to, via the index register */
+    outp(port, reg);
+    /* OPL2 requires 3.3us to pass before writing to the data port. AdLib
+     * recommends reading 6 times from the index register to make time pass. */
+    pdelay(port, 6);
+    /* write the data to the data register */
+    outp(port+1, data);
   }
-  /* select the register we want to write to, via the index register */
-  outp(port, reg);
-  /* OPL2 requires 3.3us to pass before writing to the data port. AdLib
-   * recommends reading 6 times from the index register to make time pass. */
-  i = 6;
-  while (i--) inp(port);
-  /* write the data to the data register */
-  outp(port+1, data);
   /* OPL2 requires 23us to pass before writing to the data port. AdLib
    * recommends reading 35 times from the index register to make time pass. */
-  i = 35;
-  while (i--) inp(port);
+  pdelay(port, is_opl3 ? 6 : 35);
 }
-
+#ifdef OPLLPT
+#define WRITE_OPL(PORT,REG,VALUE) write_opl((PORT), oplmem->opl3, oplmem->opllpt, (REG), (VALUE))
+#define WRITE_OPL_PROBE(PORT,REG,VALUE) write_opl((PORT), 0, 0, (REG), (VALUE))
+#else
+#define WRITE_OPL(PORT,REG,VALUE) write_opl((PORT), oplmem->opl3, (REG), (VALUE))
+#define WRITE_OPL_PROBE(PORT,REG,VALUE) write_opl((PORT), 0, (REG), (VALUE))
+#endif
 
 /* 'volume' is in range 0..127 - take care to change only the 'attenuation'
  * part of the register, and never touch the KSL bits */
@@ -185,35 +206,41 @@ static void calc_vol(unsigned char *regbyte, int volume) {
  * -1	Auto-detect OPL2 and OPL3, detection result will be stored back
  * 2	Use the device as OPL2, even if it is OPL3-compatible
  * 3	Use the device as OPL3, fail if it isn't OPL3-compatible
+ * 'flags' can be 0 or bit-wise ored value of following flags:
+ * OPL_SKIP_CHECKING	Skip device presence checking
+ * OPL_ON_LPT		Specify the device is an OPL2LPT or OPL3LPT; because
+ *			this kind of device is write-only, the exact chip type
+ *			must be specified via '*gen'
  * Possible return values:
  * 0	Success
- * -1	Device presence check failed (possible only if 'skip_checking' is 0)
+ * -1	Device presence check failed (possible only if OPL_SKIP_CHECKING isn't
+ *	specified)
  * -2	Request OPL3 but device is OPL2
  * -3	Out of memory
  * -4	Invalid value in '*gen'
  * -5	Already initialized
  */
-int opl_init(unsigned short int port, int *gen, int skip_checking) {
+int opl_init(unsigned short int port, int *gen, int flags) {
   int x;
 
   /* make sure we're not inited yet */
   if (oplmem != NULL) return(-5);
 
-  if(!skip_checking) {
+  if(!(flags & OPL_SKIP_CHECKING) && !(flags & OPL_ON_LPT)) {
     int y;
     /* detect the hardware and return error if not found */
-    oplregwr(port, 0x04, 0x60); /* reset both timers by writing 60h to register 4 */
-    oplregwr(port, 0x04, 0x80); /* enable interrupts by writing 80h to register 4 (must be a separate write from the 1st one) */
+    WRITE_OPL_PROBE(port, 0x04, 0x60); /* reset both timers by writing 60h to register 4 */
+    WRITE_OPL_PROBE(port, 0x04, 0x80); /* enable interrupts by writing 80h to register 4 (must be a separate write from the 1st one) */
     x = inp(port) & 0xE0; /* read the status register (port 388h) and store the result */
-    oplregwr(port, 0x02, 0xff); /* write FFh to register 2 (Timer 1) */
-    oplregwr(port, 0x04, 0x21); /* start timer 1 by writing 21h to register 4 */
+    WRITE_OPL_PROBE(port, 0x02, 0xff); /* write FFh to register 2 (Timer 1) */
+    WRITE_OPL_PROBE(port, 0x04, 0x21); /* start timer 1 by writing 21h to register 4 */
     udelay(500); /* Creative Labs recommends a delay of at least 80 microseconds
                     I delay for 500us just to be sure. DO NOT perform inp()
                     calls for delay here, some cards do not initialize well then
                     (reported for CT2760) */
     y = inp(port) & 0xE0;  /* read the upper bits of the status register */
-    oplregwr(port, 0x04, 0x60); /* reset both timers and interrupts (see steps 1 and 2) */
-    oplregwr(port, 0x04, 0x80); /* reset both timers and interrupts (see steps 1 and 2) */
+    WRITE_OPL_PROBE(port, 0x04, 0x60); /* reset both timers and interrupts (see steps 1 and 2) */
+    WRITE_OPL_PROBE(port, 0x04, 0x80); /* reset both timers and interrupts (see steps 1 and 2) */
     /* test the stored results of steps 3 and 7 by ANDing them with E0h. The result of step 3 should be */
     if (x != 0) return(-1);    /* 00h, and the result of step 7 should be C0h. If both are     */
     if (y != 0xC0) return(-1); /* ok, an AdLib-compatible board is installed in the computer   */
@@ -222,12 +249,19 @@ int opl_init(unsigned short int port, int *gen, int skip_checking) {
   /* is it an OPL3 or just an OPL2? */
   switch(*gen) {
     case -1:
+#ifdef OPLLPT
+      if(flags & OPL_ON_LPT) return -1;
+#endif
       *gen = (inp(port) & 0x06) == 0 ? 3 : 2;
       break;
     case 2:
       break;
     case 3:
+#ifdef OPLLPT
+      if(!(flags & OPL_ON_LPT) && (inp(port) & 0x06)) return -2;
+#else
       if(inp(port) & 0x06) return -2;
+#endif
       break;
     default:
       return -4;
@@ -238,33 +272,36 @@ int opl_init(unsigned short int port, int *gen, int skip_checking) {
   if (oplmem == NULL) return(-3);
 
   oplmem->opl3 = *gen == 3;
+#ifdef OPLLPT
+  oplmem->opllpt = flags & OPL_ON_LPT;
+#endif
 
   /* init the hardware */
   voicescount = 9; /* OPL2 provides 9 melodic voices */
 
   /* enable OPL3 (if detected) and put it into 36 operators mode */
   if (oplmem->opl3 != 0) {
-    oplregwr(port, 0x105, 1);  /* enable OPL3 mode (36 operators) */
-    oplregwr(port, 0x104, 0);  /* disable four-operator voices */
+    WRITE_OPL(port, 0x105, 1);  /* enable OPL3 mode (36 operators) */
+    WRITE_OPL(port, 0x104, 0);  /* disable four-operator voices */
     voicescount = 18;          /* OPL3 provides 18 melodic channels */
 
     /* Init the secondary OPL chip
      * NOTE: this I don't do anymore, it turns my Aztech Waverider mute! */
-    /* oplregwr(port, 0x101, 0x20); */ /* enable Waveform Select */
-    /* oplregwr(port, 0x108, 0x40); */ /* turn off CSW mode and activate FM synth mode */
-    /* oplregwr(port, 0x1BD, 0x00); */ /* set vibrato/tremolo depth to low, set melodic mode */
+    /* WRITE_OPL(port, 0x101, 0x20); */ /* enable Waveform Select */
+    /* WRITE_OPL(port, 0x108, 0x40); */ /* turn off CSW mode and activate FM synth mode */
+    /* WRITE_OPL(port, 0x1BD, 0x00); */ /* set vibrato/tremolo depth to low, set melodic mode */
   }
 
-  oplregwr(port, 0x01, 0x20);  /* enable Waveform Select */
-  oplregwr(port, 0x04, 0x00);  /* turn off timers IRQs */
-  oplregwr(port, 0x08, 0x40);  /* turn off CSW mode and activate FM synth mode */
-  oplregwr(port, 0xBD, 0x00);  /* set vibrato/tremolo depth to low, set melodic mode */
+  WRITE_OPL(port, 0x01, 0x20);  /* enable Waveform Select */
+  WRITE_OPL(port, 0x04, 0x00);  /* turn off timers IRQs */
+  WRITE_OPL(port, 0x08, 0x40);  /* turn off CSW mode and activate FM synth mode */
+  WRITE_OPL(port, 0xBD, 0x00);  /* set vibrato/tremolo depth to low, set melodic mode */
 
   for (x = 0; x < voicescount; x++) {
-    oplregwr(port, 0x20 + op1offsets[x], 0x1);     /* set the modulator's multiple to 1 */
-    oplregwr(port, 0x20 + op2offsets[x], 0x1);     /* set the modulator's multiple to 1 */
-    oplregwr(port, 0x40 + op1offsets[x], 0x10);    /* set volume of all channels to about 40 dB */
-    oplregwr(port, 0x40 + op2offsets[x], 0x10);    /* set volume of all channels to about 40 dB */
+    WRITE_OPL(port, 0x20 + op1offsets[x], 0x1);     /* set the modulator's multiple to 1 */
+    WRITE_OPL(port, 0x20 + op2offsets[x], 0x1);     /* set the modulator's multiple to 1 */
+    WRITE_OPL(port, 0x40 + op1offsets[x], 0x10);    /* set volume of all channels to about 40 dB */
+    WRITE_OPL(port, 0x40 + op2offsets[x], 0x10);    /* set volume of all channels to about 40 dB */
   }
 
   opl_clear(port);
@@ -283,12 +320,12 @@ void opl_close(unsigned short port) {
 
   /* set volume to lowest level on all voices */
   for (x = 0; x < voicescount; x++) {
-    oplregwr(port, 0x40 + op1offsets[x], 0x1f);
-    oplregwr(port, 0x40 + op2offsets[x], 0x1f);
+    WRITE_OPL(port, 0x40 + op1offsets[x], 0x1f);
+    WRITE_OPL(port, 0x40 + op2offsets[x], 0x1f);
   }
 
   /* if OPL3, switch the chip back into its default OPL2 mode */
-  if (oplmem->opl3 != 0) oplregwr(port, 0x105, 0);
+  if (oplmem->opl3 != 0) WRITE_OPL(port, 0x105, 0);
 
   /* free state memory */
   free(oplmem);
@@ -302,7 +339,7 @@ void opl_clear(unsigned short port) {
   for (x = 0; x < voicescount; x++) opl_noteoff(port, x);
 
   /* reset the percussion bits at the 0xBD register */
-  oplregwr(port, 0xBD, 0);
+  WRITE_OPL(port, 0xBD, 0);
 
   /* mark all voices as unused */
   for (x = 0; x < voicescount; x++) {
@@ -328,9 +365,9 @@ void opl_clear(unsigned short port) {
 void opl_noteoff(unsigned short port, unsigned short voice) {
   /* if voice is one of the OPL3 set, adjust it and route over secondary OPL port */
   if (voice >= 9) {
-    oplregwr(port, 0x1B0 + voice - 9, 0);
+    WRITE_OPL(port, 0x1B0 + voice - 9, 0);
   } else {
-    oplregwr(port, 0xB0 + voice, 0);
+    WRITE_OPL(port, 0xB0 + voice, 0);
   }
 }
 
@@ -359,8 +396,8 @@ void opl_noteon(unsigned short port, unsigned short voice, unsigned int note, in
     voice |= 0x100;
   }
 
-  oplregwr(port, 0xA0 + voice, freq & 0xff); /* set lowfreq */
-  oplregwr(port, 0xB0 + voice, (freq >> 8) | (octave << 2) | 32); /* KEY ON + hifreq + octave */
+  WRITE_OPL(port, 0xA0 + voice, freq & 0xff); /* set lowfreq */
+  WRITE_OPL(port, 0xB0 + voice, (freq >> 8) | (octave << 2) | 32); /* KEY ON + hifreq + octave */
 }
 
 
@@ -403,24 +440,24 @@ void opl_midi_changeprog(int channel, int program) {
 
 void opl_loadinstrument(unsigned short int oplport, unsigned short int voice, const struct timbre *timbre) {
   /* KSL (key level scaling) / attenuation */
-  oplregwr(oplport, 0x40 + op1offsets[voice], timbre->modulator_40);
-  oplregwr(oplport, 0x40 + op2offsets[voice], timbre->carrier_40 | 0x3f); /* force volume to 0, it will be reajusted during 'note on' */
+  WRITE_OPL(oplport, 0x40 + op1offsets[voice], timbre->modulator_40);
+  WRITE_OPL(oplport, 0x40 + op2offsets[voice], timbre->carrier_40 | 0x3f); /* force volume to 0, it will be reajusted during 'note on' */
 
   /* select waveform on both operators */
-  oplregwr(oplport, 0xE0 + op1offsets[voice], timbre->modulator_E862 >> 24);
-  oplregwr(oplport, 0xE0 + op2offsets[voice], timbre->carrier_E862 >> 24);
+  WRITE_OPL(oplport, 0xE0 + op1offsets[voice], timbre->modulator_E862 >> 24);
+  WRITE_OPL(oplport, 0xE0 + op2offsets[voice], timbre->carrier_E862 >> 24);
 
   /* sustain / release */
-  oplregwr(oplport, 0x80 + op1offsets[voice], (timbre->modulator_E862 >> 16) & 0xff);
-  oplregwr(oplport, 0x80 + op2offsets[voice], (timbre->carrier_E862 >> 16) & 0xff);
+  WRITE_OPL(oplport, 0x80 + op1offsets[voice], (timbre->modulator_E862 >> 16) & 0xff);
+  WRITE_OPL(oplport, 0x80 + op2offsets[voice], (timbre->carrier_E862 >> 16) & 0xff);
 
   /* attack rate / decay */
-  oplregwr(oplport, 0x60 + op1offsets[voice], (timbre->modulator_E862 >> 8) & 0xff);
-  oplregwr(oplport, 0x60 + op2offsets[voice], (timbre->carrier_E862 >> 8) & 0xff);
+  WRITE_OPL(oplport, 0x60 + op1offsets[voice], (timbre->modulator_E862 >> 8) & 0xff);
+  WRITE_OPL(oplport, 0x60 + op2offsets[voice], (timbre->carrier_E862 >> 8) & 0xff);
 
   /* AM / vibrato / envelope */
-  oplregwr(oplport, 0x20 + op1offsets[voice], timbre->modulator_E862 & 0xff);
-  oplregwr(oplport, 0x20 + op2offsets[voice], timbre->carrier_E862 & 0xff);
+  WRITE_OPL(oplport, 0x20 + op1offsets[voice], timbre->modulator_E862 & 0xff);
+  WRITE_OPL(oplport, 0x20 + op2offsets[voice], timbre->carrier_E862 & 0xff);
 
   /* feedback / connection */
   if (voice >= 9) {
@@ -428,9 +465,9 @@ void opl_loadinstrument(unsigned short int oplport, unsigned short int voice, co
     voice |= 0x100;
   }
   if (oplmem->opl3 != 0) { /* on OPL3 make sure to enable LEFT/RIGHT unmute bits */
-    oplregwr(oplport, 0xC0 + voice, timbre->feedconn | 0x30);
+    WRITE_OPL(oplport, 0xC0 + voice, timbre->feedconn | 0x30);
   } else {
-    oplregwr(oplport, 0xC0 + voice, timbre->feedconn);
+    WRITE_OPL(oplport, 0xC0 + voice, timbre->feedconn);
   }
 
 }
@@ -444,7 +481,7 @@ static void voicevolume(unsigned short port, unsigned short voice, int program, 
   } else {
     calc_vol(&carrierval, volume);
   }
-  oplregwr(port, 0x40 + op2offsets[voice], carrierval);
+  WRITE_OPL(port, 0x40 + op2offsets[voice], carrierval);
 }
 
 

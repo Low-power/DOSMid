@@ -2,12 +2,13 @@ The Rivoreo customized version of DOSMid, based on upstream DOSMid 0.9.7 by
 Mateusz Viste, and the CMS-enabled fork made by Tronix.
 
 This fork adds native support for CMSLPT, a LPT sound card uses SAA1099P
-chips. So it is now possible for DOSMid to use this card without loading its
-TSR driver to emulate the CMS.
+chips, and also OPL2LPT / OPT3LPT, a LPT sound card uses OPL2 or OPL3 chip.
+So it is now possible for DOSMid to use these cards without loading their TSR
+driver to emulate the CMS or the AdLib card.
 
 DOSMid Copyright (C) 2014-2023 Mateusz Viste
 Creative Music System / Game Blaster output support version (C) Tronix 2021
-CMSLPT output support by WHR, Copyright 2023 Rivoreo
+CMSLPT, OPL2LPT and OPL3LPT output support by WHR, Copyright 2023 Rivoreo
 
 Used piece of software codes from third-party peoples, eg:
 - DEATHSHADOW'S Paku-Paku game by Jason M. Knight
@@ -21,11 +22,20 @@ New DOSMid options:
             used if omitted.
  /cms=lpt#  Use CMSLPT card on LPT port #. The actual I/O port number is
             retrieved from BIOS automatically.
+ /opl2[=XXX]
+            Use an OPL2-compatible chip on I/O port XXX in hexadecimal number
+            as output device. The default port 388 will be used if omitted.
+            It will be used in OPL2 mode, even the chip is OPL3-compatible.
+ /opl2=lpt# Use OPL2LPT card on LPT port #.
+ /opl3[=XXX]
+            Use an OPL3-compatible chip on I/O port XXX in hexadecimal number 
+            as output device. The default port 388 will be used if omitted.
+ /opl3=lpt# Use OPL3LPT card on LPT port #.
 
 In addition to '/', this version of DOSMid also recognizes options begin with
 '-'. To play files that named with a leading '-', use the end-of-option marker
 '--', for example:
- dosmid -cms -random -- -.m3u
+ dosmid -cms=lpt1 -random -- -.m3u
 
 
 ============================= ORIGINAL DOSMID.TXT

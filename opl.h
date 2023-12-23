@@ -37,20 +37,29 @@ struct timbre {
   signed char finetune;
 };
 
+#define OPL_SKIP_CHECKING (1 << 0)
+#define OPL_ON_LPT (1 << 1)
+
 /* Initialize hardware upon startup
  * Possible values for '*gen':
  * -1	Auto-detect OPL2 and OPL3, detection result will be stored back
  * 2	Use the device as OPL2, even if it is OPL3-compatible
  * 3	Use the device as OPL3, fail if it isn't OPL3-compatible
+ * 'flags' can be 0 or bit-wise ored value of following flags:
+ * OPL_SKIP_CHECKING	Skip device presence checking
+ * OPL_ON_LPT		Specify the device is an OPL2LPT or OPL3LPT; because
+ *			this kind of device is write-only, the exact chip type
+ *			must be specified via '*gen'
  * Possible return values:
  * 0	Success
- * -1	Device presence check failed (possible only if 'skip_checking' is 0)
+ * -1	Device presence check failed (possible only if OPL_SKIP_CHECKING isn't
+ *	specified)
  * -2	Request OPL3 but device is OPL2
  * -3	Out of memory
  * -4	Invalid value in '*gen'
  * -5	Already initialized
  */
-int opl_init(unsigned short int port, int *gen, int skip_checking);
+int opl_init(unsigned short int port, int *gen, int flags);
 
 /* close OPL device */
 void opl_close(unsigned short port);

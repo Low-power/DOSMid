@@ -51,6 +51,7 @@ static char far *presetbuf = NULL; /* used to allocate presets for custom sound 
 #endif
 
 #include "outdev.h" /* include self for control */
+#include <assert.h>
 
 /* force the compiler to load valid DS segment value before calling
  * the AWE32 API functions (in far data models, where DS is floating) */
@@ -138,6 +139,7 @@ char *dev_init(enum outdev_type dev, unsigned short int port, int is_on_lpt, int
   switch (outdev) {
 #ifdef OPL
       int gen;
+      int flags;
 #endif
     case DEV_MPU401:
       /* reset the MPU401 */
@@ -177,6 +179,7 @@ char *dev_init(enum outdev_type dev, unsigned short int port, int is_on_lpt, int
 #endif
 #ifdef OPL
     case DEV_OPL:
+      assert(!is_on_lpt);
       gen = -1;
       goto init_opl;
     case DEV_OPL2:
@@ -184,8 +187,11 @@ char *dev_init(enum outdev_type dev, unsigned short int port, int is_on_lpt, int
       goto init_opl;
     case DEV_OPL3:
       gen = 3;
-init_opl:
-      switch(opl_init(outport, &gen, skip_checking)) {
+    init_opl:
+      flags = 0;
+      if(skip_checking) flags |= OPL_SKIP_CHECKING;
+      if(is_on_lpt) flags |= OPL_ON_LPT;
+      switch(opl_init(outport, &gen, flags)) {
         case 0:
           break;
         case -1:

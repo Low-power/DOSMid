@@ -26,7 +26,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifdef CMSLPT
+#if defined CMSLPT || defined OPLLPT
 
 #include <conio.h>
 

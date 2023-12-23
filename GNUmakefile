@@ -8,11 +8,12 @@
 # You can control the availability of some features with following macros:
 #  SBAWE    enables SoundBlaster AWE drivers (+36K)
 #  OPL      enables MIDI emulation over OPL output (+9K)
+#  OPLLPT   enables OPL2LPT and OPL3LPT output, requires OPL
 #  CMS      enables Creative Music System / Game Blaster output
 #  CMSLPT   enables CMSLPT output, requires CMS
 #  DBGFILE  enables debug output to file (+10K)
-FEATURES   := -D SBAWE=1 -D OPL=1 -D CMS=1 -D CMSLPT=1
-FEATURESLT := -D OPL=1 -D CMS=1 -D CMSLPT=1
+FEATURES   := -D SBAWE=1 -D OPL=1 -D OPLLPT=1 -D CMS=1 -D CMSLPT=1
+FEATURESLT := -D OPL=1 -D OPLLPT=1 -D CMS=1 -D CMSLPT=1
 
 # Configure the default output device for use when no device option specified
 # and no GUS, MPU and AWE configured via environment

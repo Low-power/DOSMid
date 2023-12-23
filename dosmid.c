@@ -328,7 +328,7 @@ static enum fileformat header2fileformat(unsigned char *hdr) {
   return(FORMAT_UNKNOWN);
 }
 
-#ifdef CMSLPT
+#if defined CMSLPT || defined OPLLPT
 static unsigned short int get_lpt_port(unsigned int i) {
   return *(unsigned short int __far *)MK_FP(0x40, 6 + 2*i);
 }
@@ -419,13 +419,26 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       params->nockdev = 1;
     } else if (stringstartswith(o, "opl") && (o[3] == '2' || o[3] == '3') && (!o[4] || o[4] == '=')) {
       params->device = o[3] == '3' ? DEV_OPL3 : DEV_OPL2;
-      params->devport = o[4] ? hexstr2uint(o + 5) : 0x388;
-      if (params->devport < 1) {
-        return params->device == DEV_OPL3 ?
-          "Invalid OPL3 port provided. Example: /opl3=388$" :
-          "Invalid OPL2 port provided. Example: /opl2=388$";
+      if(o[4]) {
+#ifdef OPLLPT
+        if(stringstartswith(o + 5, "lpt")) {
+          char i = o[8];
+          if(i < '1' || i > '4' || o[9]) return "Invalid LPT index provided. Example: /opl3=lpt2$";
+          params->devicesubtype = params->onlpt = i - '0';
+        } else
+#endif
+        {
+          params->devport = hexstr2uint(o + 5);
+          if (params->devport < 1) {
+            return params->device == DEV_OPL3 ?
+              "Invalid OPL3 port provided. Example: /opl3=388$" :
+              "Invalid OPL2 port provided. Example: /opl2=388$";
+          }
+        }
+        params->nockdev = 1;
+      } else {
+        params->devport = 0x388;
       }
-      if(o[4]) params->nockdev = 1;
 #endif
 #ifdef CMS
     } else if (strcasecmp(o, "cms") == 0) {
@@ -1488,6 +1501,9 @@ int main(int argc, char **argv) {
       dos_puts("ENABLED FEATURES: ["
 #ifdef OPL
                " OPL"
+#ifdef OPLLPT
+               " OPLLPT"
+#endif
 #endif
 #ifdef CMS
                " CMS"
@@ -1503,7 +1519,7 @@ int main(int argc, char **argv) {
     return(1);
   }
 
-#ifdef CMSLPT
+#if defined CMSLPT || defined OPLLPT
   if(params.onlpt) {
     params.devport = get_lpt_port(params.onlpt);
     if(!params.devport) {
