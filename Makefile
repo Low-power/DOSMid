@@ -7,7 +7,7 @@
 #  -DSBAWE    enables SoundBlaster AWE drivers (+36K)
 #  -DOPL      enables MIDI emulation over OPL output (+9K)
 #  -DOPLLPT   enables OPL2LPT and OPL3LPT output, requires OPL
-#  -DCMS      enables Creative Music System / Game Blaster output
+#  -DCMS      enables Creative Music System / Game Blaster output (+5K)
 #  -DCMSLPT   enables CMSLPT output, requires CMS
 #  -DDBGFILE  enables debug output to file (+10K)
 FEATURES   = -DSBAWE -DOPL -DOPLLPT -DCMS -DCMSLPT
