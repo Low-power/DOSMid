@@ -362,6 +362,9 @@ static void getfileext(char *ext, char *filename, int limit) {
 }
 
 
+#define REQUEST_HELP ((char *)-1)
+#define REQUEST_VERSION ((char *)-2)
+
 /* interpret a single config argument, returns NULL on succes, or a pointer to
  * an error string otherwise */
 static char *feedarg(char *arg, struct clioptions *params, int option_allowed, int file_allowed) {
@@ -496,8 +499,10 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       if ((params->delay < 1) || (params->delay > 9000)) {
         return("Invalid delay value: must be in the range 1..9000$");
       }
-    } else if (strcasecmp(o, "?") == 0 || strcasecmp(o, "h") == 0 || strcasecmp(o, "help") == 0) {
-      return("");
+    } else if (strcmp(o, "?") == 0 || strcasecmp(o, "h") == 0 || strcasecmp(o, "help") == 0) {
+      return REQUEST_HELP;
+    } else if (strcasecmp(o, "version") == 0) {
+      return REQUEST_VERSION;
     } else {
       return("Unknown option.$");
     }
@@ -1456,20 +1461,15 @@ int main(int argc, char **argv) {
 
   errstr = loadconfigfile(&params);
   if (errstr == NULL) errstr = parseargv(argc, argv, &params);
-  if (errstr != NULL) {
-    if (*errstr != 0) {
-      dos_puts(errstr);
-      dos_puts("Run DOSMID /? for additional help$");
-    } else {
-      dos_puts("DOSMid " PVER "\r\n"
-               "Copyright (C) " PDATE " Mateusz Viste\r\n"
-               "\r\n"
-               "Usage: dosmid [<options>] <file> ...\r\n"
+  //switch(errstr) {
+  if(errstr == REQUEST_HELP) {
+      dos_puts("Usage: dosmid [<options>] <file> ...\r\n"
                "File can be m3u playlist.\r\n"
                "Options:\r\n"
-               " /noxms     use conventional memory instead of XMS (loads small files only)$");
-      dos_puts(" /xmsdelay  wait 2ms before accessing XMS memory (AWEUTIL compatibility)\r\n"
-               " /mpu[=<X>] use MPU-401 on I/O port <X>; will read BLASTER for port if omitted\r\n"
+               " /noxms     use conventional memory instead of XMS (loads small files only)\r\n"
+               " /xmsdelay  wait 2ms before accessing XMS memory (AWEUTIL compatibility)\r\n"
+               " /mpu[=<X>] use MPU-401 on I/O port <X>; will read BLASTER for port if omitted$");
+      dos_puts(
 #ifdef SBAWE
                " /awe[=<X>] use the EMU8K on SB AWE card; will read BLASTER for port if omitted\r\n"
 #endif
@@ -1481,12 +1481,14 @@ int main(int argc, char **argv) {
 #ifdef CMS
                " /cms[=<X>] use Creative Music System / Game Blaster for sound output\r\n"
 #endif
-               " /sbmidi[=<X>] outputs MIDI to the SoundBlaster MIDI port at I/O port <X>$");
+               " /sbmidi[=<X>] outputs MIDI to the SoundBlaster MIDI port at I/O port <X>$"
+      );
       dos_puts(" /com=<X>   output MIDI messages to the RS-232 port at I/O port <X>\r\n"
                " /comX      same as /com=<X>, but takes a COM port instead (example: /com1)\r\n"
                " /gus       use the Gravis UltraSound card (requires ULTRAMID)\r\n"
-               " /syx=<FILE> use SYSEX instructions from FILE for MIDI initialization$");
-      dos_puts(" /sbnk=<FILE> load a custom sound bank file(s) (IBK on OPL, SBK on AWE)\r\n"
+               " /syx=<FILE> use SYSEX instructions from FILE for MIDI initialization\r\n"
+               " /sbnk=<FILE> load a custom sound bank file(s) (IBK on OPL, SBK on AWE)$");
+      dos_puts(
 #ifdef DBGFILE
                " /log=<FILE> write highly verbose logs about DOSMid's activity to FILE\r\n"
 #endif
@@ -1495,27 +1497,39 @@ int main(int argc, char **argv) {
                " /dontstop  never wait for a keypress on error and continue the playlist\r\n"
                " /random    randomize playlist order\r\n"
                " /nosound   disable sound output\r\n"
-               "Options can begin with either '-' or '/'.\r\n"
-               "$"); /* DOS string terminator */
-      dos_puts("ENABLED FEATURES: ["
+               " /version   print version and optional features of this build\r\n"
+               "Options can begin with either '-' or '/'.$"
+      );
+      return 0;
+  }
+  if(errstr == REQUEST_VERSION) {
+      dos_puts("DOSMid " PVER "\r\n"
+               "Copyright (C) " PDATE " Mateusz Viste\r\n"
+               "$");
+      dos_puts("Enabled optional features:"
 #ifdef OPL
-               " OPL"
+               "\r\n  OPL"
 #ifdef OPLLPT
-               " OPLLPT"
+               "\r\n  OPLLPT"
 #endif
 #endif
 #ifdef CMS
-               " CMS"
+               "\r\n  CMS"
 #ifdef CMSLPT
-               " CMSLPT"
+               "\r\n  CMSLPT"
 #endif
 #endif
 #ifdef SBAWE
-               " AWE"
+               "\r\n  AWE"
 #endif
-               " ]$");
-    }
-    return(1);
+               "$");
+      return 0;
+  }
+  if(errstr) {
+    //default:
+      dos_puts(errstr);
+      dos_puts("Run DOSMID /? for additional help$");
+      return(1);
   }
 
 #if defined CMSLPT || defined OPLLPT
