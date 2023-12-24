@@ -37,6 +37,13 @@ In addition to '/', this version of DOSMid also recognizes options begin with
 '--', for example:
  dosmid -cms=lpt1 -random -- -.m3u
 
+Another feature in this fork is support for corss-building DOSMid from source
+on a Linux-based operating system; the required software in this case are Open
+Watcom C/C++ 1.8 or later for Linux, basic Unix utilities, sh(1)-compatible
+Unix shell, and GNU Make. The makefile is 'GNUmakefile', while the configuring
+steps are similar to native building using Open Watcom C/C++ for DOS; see the
+BUILDING section below for details.
+
 
 ============================= ORIGINAL DOSMID.TXT
            
