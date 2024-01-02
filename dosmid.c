@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2014-2022, Mateusz Viste
  * All rights reserved.
+ * Copyright 2015-2024 Rivoreo
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -88,6 +89,7 @@ struct clioptions {
 #ifdef DBGFILE
   FILE *logfile;      /* an open debug log file */
 #endif
+  int dev_clear_flags;
   unsigned char onlpt;
   /* 'flags' */
   unsigned char xmsdelay;
@@ -369,7 +371,7 @@ static void getfileext(char *ext, char *filename, int limit) {
  * an error string otherwise */
 static char *feedarg(char *arg, struct clioptions *params, int option_allowed, int file_allowed) {
   if(option_allowed && (arg[0] == '/' || arg[0] == '-')) {
-    const char *o = arg + 1;
+    char *o = arg + 1;
     if (strcasecmp(o, "noxms") == 0) {
       params->memmode = MEM_MALLOC;
     } else if (strcasecmp(o, "xmsdelay") == 0) {
@@ -499,6 +501,15 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       if ((params->delay < 1) || (params->delay > 9000)) {
         return("Invalid delay value: must be in the range 1..9000$");
       }
+    } else if(stringstartswith(o, "quirk=")) {
+      char *comma;
+      o += 6;
+      do {
+        comma = strchr(o, ',');
+        if(comma) *comma++ = 0;
+        if(strcmp(o, "norstctrl") == 0) params->dev_clear_flags |= DOSMID_DEV_NORSTCTRL;
+        else return "Unrecognized quirk name.$";
+      } while(comma && *(o = comma));
     } else if (strcmp(o, "?") == 0 || strcasecmp(o, "h") == 0 || strcasecmp(o, "help") == 0) {
       return REQUEST_HELP;
     } else if (strcasecmp(o, "version") == 0) {
@@ -1437,8 +1448,8 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
     }
   }
 
-  /* reinit the device (all notes off, reset master volume, etc) */
-  dev_clear();
+  /* reset the device (all notes off, reset master volume, etc) */
+  dev_clear(params->dev_clear_flags);
 
   return(exitaction);
 }
@@ -1528,7 +1539,7 @@ int main(int argc, char **argv) {
   if(errstr) {
     //default:
       dos_puts(errstr);
-      dos_puts("Run DOSMID /? for additional help$");
+      dos_puts("Run DOSMID /? for additional help.$");
       return(1);
   }
 

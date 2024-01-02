@@ -228,7 +228,7 @@ char *dev_init(enum outdev_type dev, unsigned short int port, int is_on_lpt, int
     case DEV_NONE:
       break;
   }
-  dev_clear();
+  dev_clear(0);
   return(NULL);
 }
 
@@ -320,13 +320,13 @@ void dev_close(void) {
 
 /* clears the out device (turns all sounds off...). this can be used
  * often (typically: after each song) */
-void dev_clear(void) {
+void dev_clear(int flags) {
   int i;
   /* iterate on MIDI channels and send 'off' messages */
   for (i = 0; i < 16; i++) {
     dev_controller(i, 123, 0);   /* "all notes off" */
     dev_controller(i, 120, 0);   /* "all sounds off" */
-    dev_controller(i, 121, 0);   /* "all controllers off" */
+    if(!(flags & DOSMID_DEV_NORSTCTRL)) dev_controller(i, 121, 0);   /* "all controllers off" */
   }
   /* execute hardware-specific actions */
   switch (outdev) {

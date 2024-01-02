@@ -73,7 +73,8 @@ void dev_close(void);
 
 /* clears/reinits the out device (turns all sounds off...). this can be used
  * often (typically: between each song). */
-void dev_clear(void);
+#define DOSMID_DEV_NORSTCTRL (1 << 0)
+void dev_clear(int flags);
 
 /* activate note on channel */
 void dev_noteon(int channel, int note, int velocity);
