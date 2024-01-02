@@ -38,7 +38,11 @@ void cms_noteon(unsigned char channel, unsigned char note, unsigned char velocit
 
 void cms_noteoff(unsigned char channel, unsigned char note);
 
+#if 0
 void cms_tick(void);
+#else
+#define cms_tick()
+#endif
 
 void cms_controller(unsigned char channel, unsigned char id, unsigned char val);
 
