@@ -164,13 +164,10 @@ static const unsigned char ChanReg[12] =  {000,001,002,003,004,005,000,001,002,0
 static const unsigned char OctavReg[12] = {0x10,0x10,0x11,0x11,0x12,0x12,0x10,0x10,0x11,0x11,0x12,0x12};
 
 static unsigned char octave_store[12];
-
 static unsigned char voice_enable[2];
-
-// Note priority
 static unsigned char note_priority;
-
-static unsigned short channel_pitch[16];
+static unsigned short int channel_pitch[16];
+static unsigned char channel_volume[16];
 static signed char pan[16];
 
 static void write_cms(unsigned char chip_i, unsigned char reg, unsigned char value) {
@@ -242,6 +239,7 @@ void cms_reset(unsigned short int port, int is_on_lpt)
 	}
 	for (i=0; i<16; i++) {
 		channel_pitch[i] = 8192;
+		channel_volume[i] = 127;
 		pan[i] = 0;
 	}
 	note_priority = 0;
@@ -439,9 +437,10 @@ first:
 }
 #endif
 
-static int scale_velocity(int velocity, signed char pan) {
+static int scale_velocity(int velocity, unsigned char volume, signed char pan) {
+	if(volume < 127) velocity = velocity * volume / 127;
 	if(!pan) return velocity;
-	velocity += velocity * pan / 32;
+	velocity += velocity * pan / 47;
 	if(velocity < 0) return 0;
 	if(velocity > 127) return 127;
 	return velocity;
@@ -490,8 +489,8 @@ void cms_pitchwheel(unsigned short oplport, int channel, int pitchwheel)
 		}
 
 #ifndef DRUMS_ONLY
-		left_velocity = scale_velocity(mch->velocity, -pan[channel]);
-		right_velocity = scale_velocity(mch->velocity, pan[channel]);
+		left_velocity = scale_velocity(mch->velocity, channel_volume[channel], -pan[channel]);
+		right_velocity = scale_velocity(mch->velocity, channel_volume[channel], pan[channel]);
 		cmsSound(mch->voice, CMSFreqMap[((notefreq-489)*128) / 489], octave, atten[left_velocity], atten[right_velocity]); 
 #endif
 
@@ -557,8 +556,8 @@ void cms_noteon(unsigned char channel, unsigned char note, unsigned char velocit
   int pitch;
 
   if(velocity) {
-    left_velocity = scale_velocity(velocity, -pan[channel]);
-    right_velocity = scale_velocity(velocity, pan[channel]);
+    left_velocity = scale_velocity(velocity, channel_volume[channel], -pan[channel]);
+    right_velocity = scale_velocity(velocity, channel_volume[channel], pan[channel]);
   }
 
   if (channel == 9)
@@ -726,6 +725,11 @@ void cms_controller(unsigned char channel, unsigned char id, unsigned char val)
 {
 	int i;
 	switch(id) {
+		case 7:
+			// Volume
+			if(val > 127) val = 127;
+			channel_volume[channel] = val;
+			break;
 		case 10:
 			// Pan
 			if(val > 127) val = 127;
@@ -735,9 +739,11 @@ void cms_controller(unsigned char channel, unsigned char id, unsigned char val)
 			// Reset controllers
 			for (i=0; i<16; i++) {
 				channel_pitch[i] = 8192;
+				channel_volume[i] = 127;
 				pan[i] = 0;
 			}
 			// Fallthrough
+		case 120:
 		case 123:
 			// All notes off
 			for (i=0; i<MAX_CMS_CHANNELS; i++) {
