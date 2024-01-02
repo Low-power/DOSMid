@@ -6,9 +6,12 @@ chips, and also OPL2LPT / OPT3LPT, a LPT sound card uses OPL2 or OPL3 chip.
 So it is now possible for DOSMid to use these cards without loading their TSR
 driver to emulate the CMS or the AdLib card.
 
+This fork also implements Pan control change message (10) in CMS output
+support, enabling stereo playback using CMS.
+
 DOSMid Copyright (C) 2014-2023 Mateusz Viste
 Creative Music System / Game Blaster output support version (C) Tronix 2021
-CMSLPT, OPL2LPT and OPL3LPT output support by WHR, Copyright 2023 Rivoreo
+CMSLPT, OPL2LPT and OPL3LPT output support by WHR, Copyright 2024 Rivoreo
 
 Used piece of software codes from third-party peoples, eg:
 - DEATHSHADOW'S Paku-Paku game by Jason M. Knight
@@ -31,6 +34,10 @@ New DOSMid options:
             Use an OPL3-compatible chip on I/O port XXX in hexadecimal number 
             as output device. The default port 388 will be used if omitted.
  /opl3=lpt# Use OPL3LPT card on LPT port #.
+ /quirk=<name>[,<name>[,...]]
+            Activate one or more workarounds for the specified quirks.
+            Recognized quirk names:
+             norstctrl  Don't reset controllers on end of each file.
 
 In addition to '/', this version of DOSMid also recognizes options begin with
 '-'. To play files that named with a leading '-', use the end-of-option marker
