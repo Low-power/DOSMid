@@ -518,6 +518,14 @@ first:
 }
 #endif
 
+static int scale_velocity(int velocity, signed char pan) {
+	if(!pan) return velocity;
+	velocity += velocity * pan / 32;
+	if(velocity < 0) return 0;
+	if(velocity > 127) return 127;
+	return velocity;
+}
+
 // ****
 // High-level CMS synth procedures
 // ****
@@ -561,12 +569,8 @@ void cms_pitchwheel(unsigned short oplport, int channel, int pitchwheel)
 		}
 
 #ifndef DRUMS_ONLY
-		left_velocity = (int)mch->velocity - pan[channel];
-		if(left_velocity > 127) left_velocity = 127;
-		else if(left_velocity < 0) left_velocity = 0;
-		right_velocity = (int)mch->velocity + pan[channel];
-		if(right_velocity > 127) right_velocity = 127;
-		else if(right_velocity < 0) right_velocity = 0;
+		left_velocity = scale_velocity(mch->velocity, -pan[channel]);
+		right_velocity = scale_velocity(mch->velocity, pan[channel]);
 		cmsSound(mch->voice, CMSFreqMap[((notefreq-489)*128) / 489], octave, atten[left_velocity], atten[right_velocity]); 
 #endif
 
@@ -632,12 +636,8 @@ void cms_noteon(unsigned char channel, unsigned char note, unsigned char velocit
   int pitch;
 
   if(velocity) {
-    left_velocity = (int)velocity - pan[channel];
-    if(left_velocity > 127) left_velocity = 127;
-    else if(left_velocity < 0) left_velocity = 0;
-    right_velocity = (int)velocity + pan[channel];
-    if(right_velocity > 127) right_velocity = 127;
-    else if(right_velocity < 0) right_velocity = 0;
+    left_velocity = scale_velocity(velocity, -pan[channel]);
+    right_velocity = scale_velocity(velocity, pan[channel]);
   }
 
   if (channel == 9)
