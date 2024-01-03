@@ -496,50 +496,42 @@ void cms_pitchwheel(unsigned short oplport, int channel, int pitchwheel)
 
 void cms_noteoff(unsigned char channel, unsigned char note)
 {
-	int i;
-	unsigned char voice;
+	int i, j;
 
 	if (channel == 9) {
 #ifdef CMS_DEBUG
-		debug_log("DRUM OFF note= %u\n",note);
+		debug_log("DRUM OFF note %u\n", note);
 #endif
 		write_cms(1, 0x19, 0x0);
 		write_cms(1, 0x15, 0x0); // noise ch 11
 		cmsDisableVoice(11);
 	} else {
-
-		voice = MAX_CMS_CHANNELS;
 		for(i=0; i<MAX_CMS_CHANNELS; i++) {
-			if(cms_synth[i].note == note) {
-				voice = i;
-				break;
+			struct mid_channel *mch = cms_synth + i;
+			if(mch->note != note) continue;
+			if(mch->ch != channel) continue;
+
+			// decrease priority for all notes greater than current
+			for (j=0; j<MAX_CMS_CHANNELS; j++) {
+				if (cms_synth[j].priority <= mch->priority) continue;
+				cms_synth[j].priority--;
 			}
-		}
 
+			if (note_priority != 0) note_priority--;
 
-		// Note not found, ignore note off command
-		if(voice == MAX_CMS_CHANNELS) {
-#ifdef CMS_DEBUG
-			debug_log("not found Ch=%u,note=%u\n",channel & 0xFF,note & 0xFF);
-#endif
+			cmsDisableVoice(i);
+			mch->note = 0;
+			mch->priority = 0;
+			mch->ch = 0;
+			mch->voice = 0;
+			mch->velocity = 0;
 			return;
 		}
 
-		// decrease priority for all notes greater than current
-		for (i=0; i<MAX_CMS_CHANNELS; i++) {
-			if (cms_synth[i].priority > cms_synth[voice].priority) {
-				cms_synth[i].priority = cms_synth[i].priority - 1;
-			}
-		}
-
-		if (note_priority != 0) note_priority--;
-
-		cmsDisableVoice(voice);
-		cms_synth[voice].note = 0;
-		cms_synth[voice].priority = 0;
-		cms_synth[voice].ch = 0;
-		cms_synth[voice].voice = 0;
-		cms_synth[voice].velocity = 0;
+		// Note not found, ignore note off command
+#ifdef CMS_DEBUG
+		debug_log("note %u channel %u not found\n", (unsigned int)channel, (unsigned int)note);
+#endif
 	}
 }
 
