@@ -34,6 +34,7 @@ New DOSMid options:
             Use an OPL3-compatible chip on I/O port XXX in hexadecimal number 
             as output device. The default port 388 will be used if omitted.
  /opl3=lpt# Use OPL3LPT card on LPT port #.
+ /volume=#  Set default volume in percentage #.
  /quirk=<name>[,<name>[,...]]
             Activate one or more workarounds for the specified quirks.
             Recognized quirk names:

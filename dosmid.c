@@ -91,6 +91,7 @@ struct clioptions {
 #endif
   int dev_clear_flags;
   unsigned char onlpt;
+  unsigned char volume;
   /* 'flags' */
   unsigned char xmsdelay;
   char nockdev;
@@ -501,6 +502,11 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       if ((params->delay < 1) || (params->delay > 9000)) {
         return("Invalid delay value: must be in the range 1..9000$");
       }
+    } else if (stringstartswith(o, "volume=")) {
+      int v = atoi(o + 7);
+      if(v < 1) return "Invalid volume setting.$";
+      if(v > 100) v = 100;
+      params->volume = v;
     } else if(stringstartswith(o, "quirk=")) {
       char *comma;
       o += 6;
@@ -1102,7 +1108,7 @@ static void init_trackinfo(struct trackinfodata *trackinfo, const struct cliopti
 
 /* plays a file. returns 0 on success, non-zero if the program must exit */
 static enum playaction playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event *eventscache, enum order playlist_order) {
-  static int volume = 100; /* volume is static because it needs to be retained between songs */
+  static int volume = -1; /* volume is static because it needs to be retained between songs */
   int i;
   enum playaction exitaction;
   unsigned long nexteventtime;
@@ -1122,6 +1128,8 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
     case 'q':
       return(ACTION_EXIT);
   }
+
+  if(volume < 0) volume = params->volume;
 
   /* flush all MIDI events from memory for new events to have where to load */
   mem_clear();
@@ -1464,8 +1472,7 @@ int main(int argc, char **argv) {
   static struct clioptions params;
   enum order playlistdir;
 
-  /* make sure to init all CLI params to empty values */
-  /* memset(&params, 0, sizeof(params)); */ /* no need to (static storage) */
+  params.volume = 100;
 
   /* preload the mpu port to be used (might be forced later via **argv) */
   preload_outdev(&params);
