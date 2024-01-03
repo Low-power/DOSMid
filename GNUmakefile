@@ -34,6 +34,9 @@ UPX_FLAGS ?= -9
 CFLAGS += -b dos -fpack-struct=2 -Wall -Werror -Wc,-0 -fno-stack-check -mcmodel=$(CMODEL) -Os
 #LDFLAGS += -s
 
+# upx(1) chokes on UPX environment variable
+unexport UPX
+
 SOURCES := cms.c dosmid.c fio.c gus.c lpt.c mem.c midi.c mpu401.c mus.c opl.c outdev.c rs232.c sbdsp.c syx.c timer.c ui.c xms.c
 
 all:	dosmid.exe dosmidlt.exe
