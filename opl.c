@@ -417,6 +417,7 @@ void opl_midi_pitchwheel(unsigned short oplport, int channel, int pitchwheel) {
 void opl_midi_controller(unsigned short oplport, int channel, int id, int value) {
   int x;
   switch (id) {
+    case 7:
     case 11: /* "Expression" (meaning "channel volume") */
       oplmem->channelvol[channel] = value;
       break;
