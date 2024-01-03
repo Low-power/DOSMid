@@ -324,30 +324,25 @@ skip_inc:
 }
 #endif
 
-#if 0
-static void cmsSetVolume(unsigned char voice, unsigned char amplitudeLeft, unsigned char amplitudeRight)
-{
-_asm
-   {
-		xor   bh,bh
-		mov   bl,voice
-		
+static void cms_set_volume(unsigned char voice, unsigned char left_amplitude, unsigned char right_amplitude) {
+	__asm {
+		xor	bh,bh
+		mov	bl, voice
 		xor	dx, dx
-		cmp   bl,06h		; check channel num > 5?
-		jl    setVol	; yes - set port = port + 2
-		add   dx,2
-setVol:
-		mov   bl,ChanReg[bx]	; bx = true channel (0 - 5)
-		mov   al,byte ptr amplitudeLeft
-		mov   ah,byte ptr amplitudeRight
-		mov   cl,4
-		shl   ah,cl
-		or    al,ah
-		mov   ah,bl
+		cmp	bl, 6			; check channel num > 5?
+		jl	skip_inc		; yes - set port = port + 2
+		add	dx, 2
+	skip_inc:
+		mov	bl, ChanReg[bx]		; bx = true channel (0 - 5)
+		mov	al, byte ptr left_amplitude
+		mov	ah, byte ptr right_amplitude
+		mov	cl, 4
+		shl	ah, cl
+		or	al, ah
+		mov	ah, bl
 		call	asm_write_cms
-   }
+	}
 }
-#endif
 
 #if 1
 static void cmsSound(unsigned char voice, unsigned char freq, unsigned char octave, unsigned char amplitudeLeft, unsigned char amplitudeRight)
@@ -729,6 +724,15 @@ void cms_controller(unsigned char channel, unsigned char id, unsigned char val)
 			// Volume
 			if(val > 127) val = 127;
 			channel_volume[channel] = val;
+			for(i=0; i<MAX_CMS_CHANNELS; i++) {
+				int left_velocity, right_velocity;
+				const struct mid_channel *mch = cms_synth + i;
+				if(!mch->note) continue;
+				if(!mch->ch != channel) continue;
+				left_velocity = scale_velocity(mch->velocity, val, -pan[channel]);
+				right_velocity = scale_velocity(mch->velocity, val, pan[channel]);
+				cms_set_volume(i, left_velocity, right_velocity);
+			}
 			break;
 		case 10:
 			// Pan
