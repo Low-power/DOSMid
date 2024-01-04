@@ -1108,7 +1108,6 @@ static void init_trackinfo(struct trackinfodata *trackinfo, const struct cliopti
 
 /* plays a file. returns 0 on success, non-zero if the program must exit */
 static enum playaction playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event *eventscache, enum order playlist_order) {
-  static int volume = -1; /* volume is static because it needs to be retained between songs */
   int i;
   enum playaction exitaction;
   unsigned long nexteventtime;
@@ -1129,8 +1128,6 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
       return(ACTION_EXIT);
   }
 
-  if(volume < 0) volume = params->volume;
-
   /* flush all MIDI events from memory for new events to have where to load */
   mem_clear();
 
@@ -1140,7 +1137,7 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
 
   /* update screen with the next operation */
   sprintf(trackinfo->title[0], "Loading file...");
-  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, params->onlpt, volume);
+  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, params->onlpt, params->volume);
   refreshflags = UI_REFRESH_ALL;
 
   /* if running on a playlist, load next song */
@@ -1233,7 +1230,7 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
   sprintf(trackinfo->title[0], "Loading...");
   filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
   ucasestr(trackinfo->filename);
-  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, params->onlpt, volume);
+  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, params->onlpt, params->volume);
   memset(trackinfo->title[0], 0, 16);
   refreshflags = UI_REFRESH_ALL;
 
@@ -1255,7 +1252,7 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
     }
   }
   /* draw the gui with track's data */
-  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, params->onlpt, volume);
+  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, params->onlpt, params->volume);
   for (;;) {
     timer_read(&midiplaybackstart); /* save start time so we can compute elapsed time later */
     if (midiplaybackstart >= nexteventtime) break; /* wait until the scheduled start time is met */
@@ -1303,13 +1300,13 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
             exitaction = ACTION_PREV;
             break;
           case '+':  /* volume up */
-            volume += 5;                       /* note: I could also use a MIDI command to */
-            if (volume > 100) volume = 100;    /* adjust the MPU's global volume but this  */
-            refreshflags |= UI_REFRESH_VOLUME; /* is messy because the MIDI file might use */
-            break;                             /* such message, too. Besides, some MPUs do */
-          case '-':  /* volume down */         /* not support volume control (eg. my SB64) */
-            volume -= 5;
-            if (volume < 0) volume = 0;
+            params->volume += 5;
+            if (params->volume > 100) params->volume = 100;
+            refreshflags |= UI_REFRESH_VOLUME;
+            break;
+          case '-':  /* volume down */
+            if(params->volume < 5) params->volume = 0;
+            else params->volume -= 5;
             refreshflags |= UI_REFRESH_VOLUME;
             break;
           case ' ':  /* pause */
@@ -1320,7 +1317,7 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
         }
         /* do I need to refresh the screen now? if not, just call INT28h */
         if (refreshflags != 0) {
-          ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, params->onlpt, volume);
+          ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, params->onlpt, params->volume);
         } else if (params->nopowersave == 0) { /* if no screen refresh is     */
           union REGS regs;                     /* needed, and power saver not */
           int86(0x28, &regs, &regs);           /* disabled, then call INT 28h */
@@ -1336,7 +1333,11 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
           fprintf(params->logfile, "%lu: NOTE ON chan: %d / note: %d / vel: %d\n", trackinfo->elapsedsec, curevent->data.note.chan, curevent->data.note.note, curevent->data.note.velocity);
         }
 #endif
-        dev_noteon(curevent->data.note.chan, curevent->data.note.note, (volume * curevent->data.note.velocity) / 100);
+        /* note: I could also use a MIDI command to adjust the MPU's global
+         * volume, but this is messy because the MIDI file might use such
+         * message, too. Besides, some MPUs do not support volume control (eg.
+         * my SB64) */
+        dev_noteon(curevent->data.note.chan, curevent->data.note.note, params->volume * curevent->data.note.velocity / 100);
         trackinfo->notestates[curevent->data.note.note] |= (1 << curevent->data.note.chan);
         refreshflags |= UI_REFRESH_NOTES;
         refreshchans |= (1 << curevent->data.note.chan);
