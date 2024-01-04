@@ -1700,9 +1700,9 @@ int main(int argc, char **argv) {
   /* reset screen (clears the screen and makes the cursor visible again) */
   ui_close();
 
-  /* free the allocated strings, if any */
-  if (params.sbnk != NULL) free(params.sbnk);
-  if (params.syxrst != NULL) free(params.syxrst);
+  free(params.sbnk);
+  free(params.syxrst);
+  free(playlist_offsets);
 
   /* if a verbose log file was used, close it now */
 #ifdef DBGFILE
