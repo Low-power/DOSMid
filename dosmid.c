@@ -178,7 +178,7 @@ static void dos_puts(char *s) {
 }
 
 /* returns a pseudo-random number, based on the DOS system timer */
-static unsigned long rnd(void) {
+static unsigned long int clock_rnd(void) {
   unsigned long res;
   union REGS regs;
   regs.h.ah = 0;
@@ -190,7 +190,7 @@ static unsigned long rnd(void) {
 }
 
 /* copies the base name of a file (ie without directory path) into a string */
-static void filename2basename(char *fromname, char *tobasename, char *todirname, int maxlen) {
+static int filename2basename(const char *fromname, char *tobasename, char *todirname, int maxlen) {
   int x, x2, firstchar = 0;
   /* find the first character of the base name */
   for (x = 0; fromname[x] != 0; x++) {
@@ -220,6 +220,7 @@ static void filename2basename(char *fromname, char *tobasename, char *todirname,
     }
     todirname[x2] = 0;
   }
+  return firstchar;
 }
 
 
@@ -783,44 +784,46 @@ static void preload_outdev(struct clioptions *params) {
 enum order {
   FORWARD_ORDER, REVERSE_ORDER, RANDOM_ORDER
 };
+
+static void randomize_playlist(long int *offsets, unsigned int nitems) {
+  size_t i = 0;
+  while(i < nitems - 1) {
+    size_t j = i + rand() / (RAND_MAX / (nitems - i) + 1);
+    long int tmp = offsets[j];
+    offsets[j] = offsets[i];
+    offsets[i++] = tmp;
+  }
+}
+
 /* reads a position from an M3U file and returns a ptr from static mem */
-static char *getnextm3uitem(char *playlist, enum order order) {
+static char *getnextm3uitem(int loop, const char *playlist, long int *playlist_offsets, unsigned int playlist_len, enum order playlist_order) {
   static char fnamebuf[256];
+  static unsigned int i;
   char tempstr[256];
-  long fsize;
-  static long pos = 0;
   int slen;
   struct fiofile f;
+
+  if(playlist_len > 1 && playlist_order == REVERSE_ORDER) {
+    switch(i) {
+      case 0:
+        i = playlist_len - 2;
+        break;
+      case 1:
+        i = playlist_len - 1;
+        break;
+      default:
+        i -= 2;
+        break;
+    }
+  } else if(i >= playlist_len) {
+    if(!loop) return "";
+    i = 0;
+    if(playlist_order == RANDOM_ORDER) randomize_playlist(playlist_offsets, playlist_len);
+  }
+
   /* open the playlist and read its size */
   if (fio_open(playlist, FIO_OPEN_RD, &f) != 0) return(NULL);
-  fsize = fio_seek(&f, FIO_SEEK_END, 0);
-  if (fsize < 3) { /* a one-entry m3u would be at least 3 bytes long */
-    fio_close(&f);
-    return(NULL);
-  }
-  if (order == RANDOM_ORDER) {
-    /* go to a random position (avoid last bytes, could be an empty \r\n record) */
-    pos = (rnd() << 1) % (fsize - 2); /* mul rnd by 2 to speed up 'randomness' at the cost of getting only even offsets */
-  } else if (order == REVERSE_ORDER) pos -= 3;
-  GOHEREFORPREV:
-  if (pos < 0) pos = 0;
-  fio_seek(&f, FIO_SEEK_START, pos);
-  /* rewind back to nearest \n or 0 position */
-  while (pos > 0) {
-    fio_read(&f, tempstr, 1);
-    if (tempstr[0] != '\n') {
-      fio_seek(&f, FIO_SEEK_CUR, -2);
-      pos--;
-    } else {
-      pos++;
-      break;
-    }
-  }
-  if (order == REVERSE_ORDER) {
-    pos -= 3;
-    order = FORWARD_ORDER;
-    goto GOHEREFORPREV;
-  }
+  fio_seek(&f, FIO_SEEK_START, playlist_offsets[i++]);
 
   /* read the string into fnamebuf */
   slen = 0;
@@ -828,28 +831,12 @@ static char *getnextm3uitem(char *playlist, enum order order) {
   for (;;) {
     char c;
     if ((fio_read(&f, &c, 1) != 1) || (c == '\r') || (c == '\n')) break;
-    pos++;
     fnamebuf[slen++] = c;
     if (slen == sizeof(fnamebuf)) { /* overflow! */
       fnamebuf[0] = 0;
       break;
     }
     fnamebuf[slen] = 0;
-  }
-
-  /* if sequential reading of the playlist, then jump to next entry */
-  if (order == FORWARD_ORDER) {
-    for (;;) {
-      char c;
-      if (fio_read(&f, &c, 1) != 1) {
-        pos = 0;
-        break;
-      } else if ((c == '\r') || (c == '\n')) {
-        pos++;
-      } else {
-        break;
-      }
-    }
   }
 
   /* close the file */
@@ -859,10 +846,13 @@ static char *getnextm3uitem(char *playlist, enum order order) {
   /* if empty, something went wrong */
   if (fnamebuf[0] == 0) return(NULL);
   /* if the file is a relative path, then prepend it with the path of the playlist */
-  if (fnamebuf[1] != ':') {
-    strcpy(tempstr, fnamebuf);
-    filename2basename(playlist, NULL, fnamebuf, sizeof(fnamebuf) - 1);
-    strncat(fnamebuf, tempstr, sizeof(fnamebuf) - 1);
+  if (fnamebuf[0] != '/' && fnamebuf[0] != '\\' && fnamebuf[1] != ':') {
+    int dirnamelen;
+    size_t fnamelen = strlen(fnamebuf) + 1;
+    memcpy(tempstr, fnamebuf, fnamelen);
+    dirnamelen = filename2basename(playlist, NULL, fnamebuf, sizeof(fnamebuf) - 1);
+    if(dirnamelen + fnamelen < sizeof fnamebuf) memcpy(fnamebuf + dirnamelen, tempstr, fnamelen);
+    else memcpy(fnamebuf, tempstr, fnamelen);
   }
   /* return the result */
   return(fnamebuf);
@@ -1105,9 +1095,50 @@ static void init_trackinfo(struct trackinfodata *trackinfo, const struct cliopti
   ucasestr(trackinfo->filename);
 }
 
+static int load_playlist_offsets(const char *playlist_path, int should_randomize, long int **offsets, unsigned int *nitems) {
+  struct fiofile f;
+  long int next_line_offset = -1;
+  if(fio_open(playlist_path, FIO_OPEN_RD, &f) < 0) {
+    ui_puterrmsg("Playlist error", "Failed to open playlist file");
+    return ACTION_ERR_HARD;
+  }
+  if(fio_seek(&f, FIO_SEEK_END, 0) < 2) {
+    // Too small to be a valid playlist file
+    ui_puterrmsg("Playlist error", "Playlist file too small");
+    fio_close(&f);
+    return ACTION_ERR_HARD;
+  }
+  fio_seek(&f, FIO_SEEK_START, 0);
+  *offsets = malloc(sizeof(long int));
+  if(!*offsets) {
+    ui_puterrmsg("Playlist error", "Out of memory");
+    fio_close(&f);
+    return ACTION_ERR_HARD;
+  }
+  **offsets = 0;
+  *nitems = 1;
+  do {
+    char c;
+    if(fio_read(&f, &c, 1) < 1) break;
+    if(c == '\n') {
+      next_line_offset = fio_seek(&f, FIO_SEEK_CUR, 0);
+      if(next_line_offset < 0) break;
+    } else if(c != '\r' && next_line_offset > 0) {
+      long int *new_p = realloc(*offsets, (*nitems + 1) * sizeof(long int));
+      if(!new_p) break;
+      new_p[*nitems] = next_line_offset;
+      *offsets = new_p;
+      (*nitems)++;
+      next_line_offset = -1;
+    }
+  } while(*nitems < UINT_MAX);
+  fio_close(&f);
+  if(should_randomize) randomize_playlist(*offsets, *nitems);
+  return ACTION_NEXT;
+}
 
 /* plays a file. returns 0 on success, non-zero if the program must exit */
-static enum playaction playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event *eventscache, enum order playlist_order) {
+static enum playaction playfile(struct clioptions *params, struct trackinfodata *trackinfo, struct midi_event *eventscache, long int *playlist_offsets, unsigned int playlist_len, enum order playlist_order) {
   int i;
   enum playaction exitaction;
   unsigned long nexteventtime;
@@ -1142,11 +1173,12 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
 
   /* if running on a playlist, load next song */
   if (params->playlist != NULL) {
-    params->midifile = getnextm3uitem(params->playlist, playlist_order);
+    params->midifile = getnextm3uitem(params->dontstop, params->playlist, playlist_offsets, playlist_len, playlist_order);
     if (params->midifile == NULL) {
       ui_puterrmsg("Playlist error", "Failed to fetch an entry from the playlist");
       return(ACTION_ERR_HARD); /* this must be a hard error otherwise DOSMid might be trapped in a loop */
     }
+    if(!*params->midifile) return ACTION_EXIT;
   }
 
   /* reset the timer, to make sure it doesn't wrap around during playback */
@@ -1471,6 +1503,8 @@ int main(int argc, char **argv) {
   static struct trackinfodata trackinfo;
   static struct midi_event eventscache[EVENTSCACHESIZE];
   static struct clioptions params;
+  long int *playlist_offsets = NULL;
+  unsigned int playlist_len = 0;
   enum order playlistdir;
 
   params.volume = 100;
@@ -1562,6 +1596,9 @@ int main(int argc, char **argv) {
 #endif
   params.devname = devtoname(params.device, params.devicesubtype);
 
+  /* Seed C library RNG */
+  if(params.random) srand(clock_rnd());
+
   /* populate trackinfo with initial data */
   init_trackinfo(&trackinfo, &params);
 
@@ -1576,7 +1613,7 @@ int main(int argc, char **argv) {
   sprintf(trackinfo.title[0], "Sound hardware initialization...");
   {
     unsigned short rflags = 0xffffu, rchans = 0xffffu;
-    ui_draw(&trackinfo, &rflags, &rchans, params.devname, params.devport, params.onlpt, 100);
+    ui_draw(&trackinfo, &rflags, &rchans, params.devname, params.devport, params.onlpt, params.volume);
   }
 #ifdef DBGFILE
   if (params.logfile) fprintf(params.logfile, "INIT SOUND HARDWARE\n");
@@ -1602,10 +1639,17 @@ int main(int argc, char **argv) {
     goto memallocfail;
   }
 
+  if(params.playlist) {
+    unsigned short int rflags = UI_REFRESH_TITLECOPYR, rchans = 0;
+    sprintf(trackinfo.title[0], "Loading playlist...");
+    ui_draw(&trackinfo, &rflags, &rchans, params.devname, params.devport, params.onlpt, params.volume);
+    action = load_playlist_offsets(params.playlist, params.random, &playlist_offsets, &playlist_len);
+  }
+
   /* playlist loop */
   while (action != ACTION_EXIT) {
-    playlistdir = params.random ? RANDOM_ORDER : FORWARD_ORDER;
-    action = playfile(&params, &trackinfo, eventscache, playlistdir);
+    if(action != ACTION_PREV) playlistdir = params.random ? RANDOM_ORDER : FORWARD_ORDER;
+    action = playfile(&params, &trackinfo, eventscache, playlist_offsets, playlist_len, playlistdir);
     switch (action) {
       case ACTION_EXIT:
         /* do nothing, we will exit at the end of the loop anyway */
