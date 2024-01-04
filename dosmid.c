@@ -1482,7 +1482,7 @@ int main(int argc, char **argv) {
   if (errstr == NULL) errstr = parseargv(argc, argv, &params);
   //switch(errstr) {
   if(errstr == REQUEST_HELP) {
-      dos_puts("Usage: dosmid [<options>] <file> ...\r\n"
+      dos_puts("Usage: dosmid [<options>] <file>\r\n"
                "File can be m3u playlist.\r\n"
                "Options:\r\n"
                " /noxms     use conventional memory instead of XMS (loads small files only)\r\n"
