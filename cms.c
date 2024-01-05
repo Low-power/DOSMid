@@ -720,7 +720,7 @@ void cms_controller(unsigned char channel, unsigned char id, unsigned char val)
 				int left_velocity, right_velocity;
 				const struct mid_channel *mch = cms_synth + i;
 				if(!mch->note) continue;
-				if(!mch->ch != channel) continue;
+				if(mch->ch != channel) continue;
 				left_velocity = scale_velocity(mch->velocity, val, -pan[channel]);
 				right_velocity = scale_velocity(mch->velocity, val, pan[channel]);
 				cms_set_volume(i, left_velocity, right_velocity);
