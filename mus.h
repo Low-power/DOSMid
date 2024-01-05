@@ -30,6 +30,8 @@
 #ifndef mus_h_sentinel
 #define mus_h_sentinel
 
+struct fiofile;
+
 #define MUS_OUTOFMEM -10
 
 /* loads a MUS file into memory, returns the id of the first event on success,

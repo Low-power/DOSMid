@@ -30,6 +30,8 @@
 #ifndef mem_h_sentinel
 #define mem_h_sentinel
 
+struct midi_event;
+
 #define MEM_MALLOC 1
 #define MEM_XMS 0
 

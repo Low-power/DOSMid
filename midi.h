@@ -30,6 +30,8 @@
 #ifndef midi_h_sentinel
 #define midi_h_sentinel
 
+struct fiofile;
+
 /* Rule used to translate an amount of deltatime units into microseconds
  *
  * The MIDI file comes with a "divisor", it is a single 16-bit value in the

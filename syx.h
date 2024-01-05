@@ -6,6 +6,8 @@
 #ifndef SYX_H_SENTINEL
 #define SYX_H_SENTINEL
 
+struct fiofile;
+
 #define SYXERR_INVALIDPARAM  -1
 #define SYXERR_UNEXPECTEDEOF -2
 #define SYXERR_BUFFEROVERRUN -3
