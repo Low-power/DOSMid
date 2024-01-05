@@ -1498,7 +1498,7 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
 
 int main(int argc, char **argv) {
   char *errstr;
-  enum playaction action = ACTION_NONE;
+  enum playaction action = ACTION_NEXT;
   /* below objects are declared static so they land in the data segment and not in stack */
   static struct trackinfodata trackinfo;
   static struct midi_event eventscache[EVENTSCACHESIZE];
@@ -1647,19 +1647,8 @@ int main(int argc, char **argv) {
   }
 
   /* playlist loop */
-  while (action != ACTION_EXIT) {
-    if(action != ACTION_PREV) playlistdir = params.random ? RANDOM_ORDER : FORWARD_ORDER;
-    action = playfile(&params, &trackinfo, eventscache, playlist_offsets, playlist_len, playlistdir);
+  do {
     switch (action) {
-      case ACTION_EXIT:
-        /* do nothing, we will exit at the end of the loop anyway */
-        break;
-      case ACTION_PREV:
-        playlistdir = REVERSE_ORDER;
-        break;
-      case ACTION_NEXT:
-        /* no explicit action - we will do a 'next' action by default */
-        break;
       case ACTION_ERR_HARD: /* wait for a keypress and quit */
         udelay(2000000lu);
         getkey();
@@ -1676,16 +1665,22 @@ int main(int argc, char **argv) {
         }
         /* FALLTHRU */
       case ACTION_NONE: /* choose an action depending on the mode we are in */
-        if (params.playlist == NULL) {
-          /* wait 1s before quit, so it doesn't feel 'brutal', but don't if */
-          if (action == ACTION_NONE) udelay(1000000lu); /* an error occured */
-          action = ACTION_EXIT;
-        } else {
-          action = ACTION_NEXT;
-        }
+        if (params.playlist) goto next;
+        /* wait 1s before quit, so it doesn't feel 'brutal', but don't if */
+        if (action == ACTION_NONE) udelay(1000000lu); /* an error occured */
+        action = ACTION_EXIT;
+        break;
+      case ACTION_PREV:
+        playlistdir = REVERSE_ORDER;
+        goto play;
+      case ACTION_NEXT:
+      next:
+        playlistdir = params.random ? RANDOM_ORDER : FORWARD_ORDER;
+      play:
+        action = playfile(&params, &trackinfo, eventscache, playlist_offsets, playlist_len, playlistdir);
         break;
     }
-  }
+  } while (action != ACTION_EXIT);
 
   /* unload XMS memory */
   mem_close();
