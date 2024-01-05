@@ -47,7 +47,7 @@ static void ui_printstr(int y, int x, char *string, int staticlen, unsigned shor
   for (; xs < staticlen; xs++) ui_printchar(y, x++, ' ' | attrib);
 }
 
-void ui_init(void) {
+void ui_init(int flags) {
   union REGS regs;
   /* remember the current mode and cursor shape */
   regs.h.ah = 0x0F; /* get current video mode */
@@ -70,7 +70,7 @@ void ui_init(void) {
       screenptr = MK_FP(0xB000, 0);
       break;
     default:
-      colorflag = 1;
+      if(!(flags & UI_NOCOLOR)) colorflag = 1;
       regs.h.al = 0x03;  /* 80x25, 16 colors */
       break;
   }

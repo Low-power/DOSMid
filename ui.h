@@ -45,7 +45,8 @@ struct trackinfodata {
 };
 
 /* inits ui, sets colorflag (0=mono ; non-zero=color) */
-void ui_init(void);
+#define UI_NOCOLOR (1 << 0)
+void ui_init(int flags);
 
 /* cleanup and restores initial video mode */
 void ui_close(void);

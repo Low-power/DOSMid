@@ -89,6 +89,7 @@ struct clioptions {
 #ifdef DBGFILE
   FILE *logfile;      /* an open debug log file */
 #endif
+  int ui_init_flags;
   int dev_clear_flags;
   unsigned char onlpt;
   unsigned char volume;
@@ -508,6 +509,8 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       if(v < 1) return "Invalid volume setting.$";
       if(v > 100) v = 100;
       params->volume = v;
+    } else if (strcasecmp(o, "nocolor") == 0) {
+      params->ui_init_flags |= UI_NOCOLOR;
     } else if(stringstartswith(o, "quirk=")) {
       char *comma;
       o += 6;
@@ -1606,7 +1609,7 @@ int main(int argc, char **argv) {
   timer_init();
 
   /* init ui and hide the blinking cursor */
-  ui_init();
+  ui_init(params.ui_init_flags);
   ui_hidecursor();
 
   /* init the sound device */
