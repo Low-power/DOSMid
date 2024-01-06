@@ -195,7 +195,7 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
   }
   /* filename and props (format, tracks) */
   if (*refreshflags & UI_REFRESH_FNAME) {
-    char tempstr[4], *sptr;
+    char buffer[8], *sptr;
     /* print filename (unless NULL - might happen early at playlist load) */
     if (trackinfo->filename != NULL) {
       ui_printstr(18, 50, trackinfo->filename, 12, COLOR_TEMPO[colorflag]);
@@ -203,8 +203,8 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
       ui_printstr(18, 50, "", 12, COLOR_TEMPO[colorflag]);
     }
     /* total allocated memory */
-    sprintf(tempstr, "%luK", MEM_TOTALLOC >> 10);
-    ui_printstr(22, 59, tempstr, 6, COLOR_TEMPO[colorflag]);
+    snprintf(buffer, sizeof buffer, "%luK", MEM_TOTALLOC >> 10);
+    ui_printstr(22, 59, buffer, 6, COLOR_TEMPO[colorflag]);
 
     /* print format */
     switch ((trackinfo->fileformat << 1) | trackinfo->midiformat) {
@@ -229,8 +229,8 @@ void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsi
     }
     ui_printstr(20, 75, sptr, 4, COLOR_TEMPO[colorflag]);
     /* print number of tracks */
-    utoa(trackinfo->trackscount, tempstr, 10);
-    ui_printstr(21, 75, tempstr, 4, COLOR_TEMPO[colorflag]);
+    utoa(trackinfo->trackscount, buffer, 10);
+    ui_printstr(21, 75, buffer, 4, COLOR_TEMPO[colorflag]);
   }
   /* tempo */
   if (*refreshflags & UI_REFRESH_TEMPO) {
