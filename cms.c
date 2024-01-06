@@ -707,7 +707,7 @@ void cms_controller(unsigned char channel, unsigned char id, unsigned char val)
 				if(mch->ch != channel) continue;
 				left_velocity = scale_velocity(mch->velocity, val, -pan[channel]);
 				right_velocity = scale_velocity(mch->velocity, val, pan[channel]);
-				cms_set_volume(i, left_velocity, right_velocity);
+				cms_set_volume(i, atten[left_velocity], atten[right_velocity]);
 			}
 			break;
 		case 10:
