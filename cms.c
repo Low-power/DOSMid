@@ -259,35 +259,6 @@ static void cmsDisableVoice(unsigned char voice)
 #endif
 
 #if 0
-static void cmsSound(unsigned char voice, unsigned char freq, unsigned char octave, unsigned char amplitudeLeft, unsigned char amplitudeRight)
-{
-	if (voice > 5) {
-		if (ChanReg[voice]&0x1 == 0) {
-			octave_store[OctavReg[voice]-0x10+3] = (octave_store[OctavReg[voice]-0x10+3] & 0xF0) | octave;
-		} else {
-			octave_store[OctavReg[voice]-0x10+3] = ((octave_store[OctavReg[voice]-0x10+3] & 0xF) << 4) | octave;
-		}
-		write_cms(1, OctavReg[voice], octave_store[OctavReg[voice]-0x10+3]);
-		write_cms(1, ChanReg[voice], (amplitudeLeft << 4) | amplitudeRight);
-		write_cms(1, ChanReg[voice] | 0x8, freq);
-		voice_enable[1] |= 1 << ChanReg[voice];
-		write_cms(1, 0x14, voice_enable[1]);
-	} else {
-		if (ChanReg[voice]&0x1 == 0) {
-			octave_store[OctavReg[voice]-0x10] = (octave_store[OctavReg[voice]-0x10] & 0xF0) | octave;
-		} else {
-			octave_store[OctavReg[voice]-0x10] = ((octave_store[OctavReg[voice]-0x10] & 0xF) << 4) | octave;
-		}
-		write_cms(0, OctavReg[voice], octave_store[OctavReg[voice]-0x10]);
-		write_cms(0, ChanReg[voice], (amplitudeLeft << 4) | amplitudeRight);
-		write_cms(0, ChanReg[voice] | 0x8, freq);
-		voice_enable[0] |= 1 << ChanReg[voice];
-		write_cms(0, 0x14, voice_enable[0]);
-	}
-}
-#endif
-
-#if 0
 static void cmsDisableVoice(unsigned char voice)
 {
 _asm
@@ -344,11 +315,10 @@ static void cms_set_volume(unsigned char voice, unsigned char left_amplitude, un
 	}
 }
 
-#if 1
 static void cmsSound(unsigned char voice, unsigned char freq, unsigned char octave, unsigned char amplitudeLeft, unsigned char amplitudeRight)
 {
-_asm
-   {
+#if 1
+  __asm {
 		xor   bh,bh
 		mov   bl,voice
 
@@ -428,9 +398,33 @@ skip_inc2:
 		dec	ax
 first:
 		call	write_cms
-    }
-}
+  }
+#else
+	if (voice > 5) {
+		if (!(ChanReg[voice] & 1)) {
+			octave_store[OctavReg[voice]-0x10+3] = (octave_store[OctavReg[voice]-0x10+3] & 0xF0) | octave;
+		} else {
+			octave_store[OctavReg[voice]-0x10+3] = ((octave_store[OctavReg[voice]-0x10+3] & 0xF) << 4) | octave;
+		}
+		write_cms(1, OctavReg[voice], octave_store[OctavReg[voice]-0x10+3]);
+		write_cms(1, ChanReg[voice], (amplitudeLeft << 4) | amplitudeRight);
+		write_cms(1, ChanReg[voice] | 0x8, freq);
+		voice_enable[1] |= 1 << ChanReg[voice];
+		write_cms(1, 0x14, voice_enable[1]);
+	} else {
+		if (!(ChanReg[voice] & 1)) {
+			octave_store[OctavReg[voice]-0x10] = (octave_store[OctavReg[voice]-0x10] & 0xF0) | octave;
+		} else {
+			octave_store[OctavReg[voice]-0x10] = ((octave_store[OctavReg[voice]-0x10] & 0xF) << 4) | octave;
+		}
+		write_cms(0, OctavReg[voice], octave_store[OctavReg[voice]-0x10]);
+		write_cms(0, ChanReg[voice], (amplitudeLeft << 4) | amplitudeRight);
+		write_cms(0, ChanReg[voice] | 0x8, freq);
+		voice_enable[0] |= 1 << ChanReg[voice];
+		write_cms(0, 0x14, voice_enable[0]);
+	}
 #endif
+}
 
 static int scale_velocity(int velocity, unsigned char volume, signed char pan) {
 	if(volume < 127) velocity = velocity * volume / 127;
