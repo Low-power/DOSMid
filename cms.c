@@ -315,7 +315,7 @@ static void cms_set_volume(unsigned char voice, unsigned char left_amplitude, un
 	}
 }
 
-static void cmsSound(unsigned char voice, unsigned char freq, unsigned char octave, unsigned char amplitudeLeft, unsigned char amplitudeRight)
+static void cmsSound(unsigned char voice, unsigned char freq, unsigned char octave, unsigned char left_amplitude, unsigned char right_amplitude)
 {
 #if 1
   __asm {
@@ -364,8 +364,8 @@ outOctave:
 		mov   byte ptr octave_store[di],al
 		call	asm_write_cms	; set octave to CMS
 setAmp:
-		mov   al,byte ptr amplitudeLeft
-		mov   ah,byte ptr amplitudeRight
+		mov   al,byte ptr left_amplitude
+		mov   ah,byte ptr right_amplitude
 		;and   al,0Fh
 		mov   cl,4
 		shl   ah,cl
@@ -400,29 +400,19 @@ first:
 		call	write_cms
   }
 #else
-	if (voice > 5) {
-		if (!(ChanReg[voice] & 1)) {
-			octave_store[OctavReg[voice]-0x10+3] = (octave_store[OctavReg[voice]-0x10+3] & 0xF0) | octave;
-		} else {
-			octave_store[OctavReg[voice]-0x10+3] = ((octave_store[OctavReg[voice]-0x10+3] & 0xF) << 4) | octave;
-		}
-		write_cms(1, OctavReg[voice], octave_store[OctavReg[voice]-0x10+3]);
-		write_cms(1, ChanReg[voice], (amplitudeLeft << 4) | amplitudeRight);
-		write_cms(1, ChanReg[voice] | 0x8, freq);
-		voice_enable[1] |= 1 << ChanReg[voice];
-		write_cms(1, 0x14, voice_enable[1]);
+	unsigned char chip_i = voice > 5;
+	unsigned char *octave_p = octave_store + (OctavReg[voice] - 0x10);
+	if(voice > 5) octave_p += 3;
+	if (!(ChanReg[voice] & 1)) {
+		*octave_p = (*octave_p & 0xF0) | octave;
 	} else {
-		if (!(ChanReg[voice] & 1)) {
-			octave_store[OctavReg[voice]-0x10] = (octave_store[OctavReg[voice]-0x10] & 0xF0) | octave;
-		} else {
-			octave_store[OctavReg[voice]-0x10] = ((octave_store[OctavReg[voice]-0x10] & 0xF) << 4) | octave;
-		}
-		write_cms(0, OctavReg[voice], octave_store[OctavReg[voice]-0x10]);
-		write_cms(0, ChanReg[voice], (amplitudeLeft << 4) | amplitudeRight);
-		write_cms(0, ChanReg[voice] | 0x8, freq);
-		voice_enable[0] |= 1 << ChanReg[voice];
-		write_cms(0, 0x14, voice_enable[0]);
+		*octave_p = (*octave_p & 0xF) | (octave << 4);
 	}
+	write_cms(chip_i, OctavReg[voice], *octave_p);
+	write_cms(chip_i, ChanReg[voice], (right_amplitude << 4) | left_amplitude);
+	write_cms(chip_i, ChanReg[voice] | 0x8, freq);
+	voice_enable[chip_i] |= 1 << ChanReg[voice];
+	write_cms(chip_i, 0x14, voice_enable[chip_i]);
 #endif
 }
 
