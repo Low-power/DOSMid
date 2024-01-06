@@ -439,7 +439,7 @@ static int scale_velocity(int velocity, unsigned char volume, signed char pan) {
 // High-level CMS synth procedures
 // ****
 
-void cms_pitchwheel(unsigned short oplport, int channel, int pitchwheel)
+void cms_pitchwheel(int channel, int pitchwheel)
 {
   int i;
   unsigned short notefreq;

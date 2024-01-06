@@ -31,19 +31,14 @@
 #define MAX_CMS_CHANNELS 10
 
 void cms_reset(unsigned short int port, int is_on_lpt);
-
-void cms_pitchwheel(unsigned short oplport, int channel, int pitchwheel);
-
+void cms_pitchwheel(int channel, int pitchwheel);
 void cms_noteon(unsigned char channel, unsigned char note, unsigned char velocity);
-
 void cms_noteoff(unsigned char channel, unsigned char note);
-
 #if 0
 void cms_tick(void);
 #else
 #define cms_tick()
 #endif
-
 void cms_controller(unsigned char channel, unsigned char id, unsigned char val);
 
 #endif

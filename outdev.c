@@ -483,7 +483,7 @@ void dev_pitchwheel(int channel, int wheelvalue) {
 #endif
 #ifdef CMS
     case DEV_CMS:
-      cms_pitchwheel(outport, channel, wheelvalue);
+      cms_pitchwheel(channel, wheelvalue);
       break;
 #endif
 #ifdef SBAWE
