@@ -4,6 +4,9 @@
  * Copyright 2015-2024 Rivoreo
  */
 
+#if !defined MSDOS && defined WCHAR
+#define _XOPEN_SOURCE
+#endif
 #include <stdint.h>
 #ifdef MSDOS
 #include <dos.h>     /* REGS */
@@ -11,6 +14,7 @@
 #ifdef WCHAR
 #define NCURSES_WIDECHAR 1
 #endif
+#include <wchar.h>
 #include <curses.h>
 #endif
 #include <stdlib.h>  /* ultoa() */
@@ -368,7 +372,44 @@ unsigned int port, int onlpt, int volume) {
   if (*refreshflags & UI_REFRESH_FNAME) {
     char buffer[8], *sptr;
     /* print filename (unless NULL - might happen early at playlist load) */
-    if (trackinfo->filename != NULL) {
+    if (trackinfo->filename && *trackinfo->filename) {
+#if !defined MSDOS && defined WCHAR
+      if(use_wchar) {
+        size_t len = strlen(trackinfo->filename) + 1;
+        wchar_t wcs[len];
+        size_t truncate_count = 0;
+        while(1) {
+          size_t wc_count = mbstowcs(wcs, trackinfo->filename, len - truncate_count);
+          if(wc_count == (size_t)-1) {
+            if(++truncate_count >= len) {
+              ui_printstr(18, 50, "?", 12, COLOR_TEMPO[colorflag]);
+              break;
+            }
+            continue;
+          }
+          size_t i = 0;
+          x = 50;
+          do {
+            if(i < wc_count) {
+              wchar_t c = wcs[i++];
+              int cw = wcwidth(c);
+              if(cw < 0) {
+                c = L'?';
+                cw = 1;
+              } else if(x + cw > 62) {
+                i = wc_count;
+                continue;
+              }
+              ui_printwchar(18, x, c, COLOR_TEMPO[colorflag]);
+              x += cw;
+            } else {
+              ui_printchar(18, x++, ' ' | COLOR_TEMPO[colorflag]);
+            }
+          } while(x < 62);
+          break;
+        }
+      } else
+#endif
       ui_printstr(18, 50, trackinfo->filename, 12, COLOR_TEMPO[colorflag]);
     } else {
       ui_printstr(18, 50, "", 12, COLOR_TEMPO[colorflag]);

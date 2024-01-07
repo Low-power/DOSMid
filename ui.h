@@ -18,7 +18,11 @@
 
 #define UI_TITLEMAXLEN 48
 #define UI_TITLENODES 12
+#if defined MSDOS || !defined WCHAR
 #define UI_FILENAMEMAXLEN 16
+#else
+#define UI_FILENAMEMAXLEN 24
+#endif
 
 enum fileformat {
   FORMAT_UNKNOWN,
