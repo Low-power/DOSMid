@@ -76,6 +76,10 @@ void write_lpt_fd(int fd, unsigned int data, unsigned int ctrl) {
   value = data;
   ioctl(fd, PPISDATA, &value);
 }
+
+int claim_lpt(int fd) {
+  return 0;
+}
 #elif defined __linux__
 #include <sys/ioctl.h>
 #include <linux/ppdev.h>
@@ -92,10 +96,18 @@ void write_lpt_fd(int fd, unsigned int data, unsigned int ctrl) {
   value = data;
   ioctl(fd, PPWDATA, &value);
 }
+
+int claim_lpt(int fd) {
+  return ioctl(fd, PPCLAIM);
+}
 #elif !defined MSDOS
 #include <stdlib.h>
 
 void write_lpt_fd(int fd, unsigned int data, unsigned int ctrl) {
+  abort();
+}
+
+int claim_lpt(int fd) {
   abort();
 }
 #endif

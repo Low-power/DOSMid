@@ -31,5 +31,6 @@
 
 void write_lpt(unsigned int port, unsigned int byte, unsigned int ctrl);
 void write_lpt_fd(int fd, unsigned int data, unsigned int ctrl);
+int claim_lpt(int fd);
 
 #endif

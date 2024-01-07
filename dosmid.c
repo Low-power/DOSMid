@@ -54,6 +54,9 @@
 #include <fcntl.h>
 #include <errno.h>
 #endif
+#if defined CMSLPT || defined OPLLPT
+#include "lpt.h"
+#endif
 #include <stdio.h>  /* printf() */
 #include <limits.h> /* ULONG_MAX */
 #include <stdlib.h> /* rand() */
@@ -433,7 +436,15 @@ static int try_parse_lpt_name(struct clioptions *config, const char *s) {
   if(stringstartswith(devname, "parport")) {
 #endif
     open_device(config, s, 0);
-    if(config->devfd != -1) config->devicesubtype = config->onlpt = 255;
+    if(config->devfd != -1) {
+      if(claim_lpt(config->devfd) < 0) {
+        int e = errno;
+        close_device(config);
+        errno = e;
+        return 0;
+      }
+      config->devicesubtype = config->onlpt = 255;
+    }
     return config->onlpt;
   }
 #endif
@@ -1858,7 +1869,7 @@ int main(int argc, char **argv) {
   if (params.logfile) fprintf(params.logfile, "INIT SOUND HARDWARE\n");
 #endif
 #ifndef MSDOS
-  if(params.devport) open_port_io_device();
+  if(params.devfd == -1 && params.devport) open_port_io_device();
 #endif
   errstr = dev_init(params.device, params.devport,
 #ifndef MSDOS
