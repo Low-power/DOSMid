@@ -245,8 +245,7 @@ void cms_reset(unsigned short int port, int is_on_lpt)
 	note_priority = 0;
 }
 
-#if 1
-static void cmsDisableVoice(unsigned char voice)
+static void cms_disable_voice(unsigned char voice)
 {
 	if (voice > 5) {
 		voice_enable[1] &= ~(1 << ChanReg[voice]);
@@ -256,66 +255,8 @@ static void cmsDisableVoice(unsigned char voice)
 		write_cms(0, 0x14, voice_enable[0]);
 	}
 }
-#endif
 
-#if 0
-static void cmsDisableVoice(unsigned char voice)
-{
-_asm
-   {
-		xor   bh,bh
-		mov   bl,voice
-
-		mov   dx,cms_port	// FIXME !!!
-
-		mov   bl,ChanReg[bx]	; bl = true channel (0 - 5)
-
-		xor   di,di
-		mov   cl,voice
-		cmp   cl,06h
-                jl    skip_inc
-		inc   di
-                add   dx,2
-skip_inc:
-		mov   al,14h
-		inc   dx
-		out   dx,al
-		dec   dx
-
-		mov   al,voice_enable[di]
-		mov   ah,01h
-		mov   cl,bl
-		shl   ah,cl
-		not   ah
-		and   al,ah		; al = voice enable reg
-
-		out   dx,al
-		mov   voice_enable[di],al
-    }
-}
-#endif
-
-static void cms_set_volume(unsigned char voice, unsigned char left_amplitude, unsigned char right_amplitude) {
-	__asm {
-		xor	bh,bh
-		mov	bl, voice
-		xor	dx, dx
-		cmp	bl, 6			; check channel num > 5?
-		jl	skip_inc		; yes - set port = port + 2
-		add	dx, 2
-	skip_inc:
-		mov	bl, ChanReg[bx]		; bx = true channel (0 - 5)
-		mov	al, byte ptr left_amplitude
-		mov	ah, byte ptr right_amplitude
-		mov	cl, 4
-		shl	ah, cl
-		or	al, ah
-		mov	ah, bl
-		call	asm_write_cms
-	}
-}
-
-static void cmsSound(unsigned char voice, unsigned char freq, unsigned char octave, unsigned char left_amplitude, unsigned char right_amplitude)
+static void cms_enable_voice(unsigned char voice, unsigned char freq, unsigned char octave, unsigned char left_amplitude, unsigned char right_amplitude)
 {
 #if 1
   __asm {
@@ -416,6 +357,26 @@ first:
 #endif
 }
 
+static void cms_set_volume(unsigned char voice, unsigned char left_amplitude, unsigned char right_amplitude) {
+	__asm {
+		xor	bh,bh
+		mov	bl, voice
+		xor	dx, dx
+		cmp	bl, 6			; check channel num > 5?
+		jl	skip_inc		; yes - set port = port + 2
+		add	dx, 2
+	skip_inc:
+		mov	bl, ChanReg[bx]		; bx = true channel (0 - 5)
+		mov	al, byte ptr left_amplitude
+		mov	ah, byte ptr right_amplitude
+		mov	cl, 4
+		shl	ah, cl
+		or	al, ah
+		mov	ah, bl
+		call	asm_write_cms
+	}
+}
+
 static int scale_velocity(int velocity, unsigned char volume, signed char pan) {
 	if(volume < 127) velocity = velocity * volume / 127;
 	if(!pan) return velocity;
@@ -470,7 +431,7 @@ void cms_pitchwheel(int channel, int pitchwheel)
 #ifndef DRUMS_ONLY
 		left_velocity = scale_velocity(mch->velocity, channel_volume[channel], -pan[channel]);
 		right_velocity = scale_velocity(mch->velocity, channel_volume[channel], pan[channel]);
-		cmsSound(mch->voice, CMSFreqMap[((notefreq-489)*128) / 489], octave, atten[left_velocity], atten[right_velocity]); 
+		cms_enable_voice(mch->voice, CMSFreqMap[((notefreq-489)*128) / 489], octave, atten[left_velocity], atten[right_velocity]); 
 #endif
 
         }
@@ -488,7 +449,7 @@ void cms_noteoff(unsigned char channel, unsigned char note)
 #endif
 		write_cms(1, 0x19, 0x0);
 		write_cms(1, 0x15, 0x0); // noise ch 11
-		cmsDisableVoice(11);
+		cms_disable_voice(11);
 	} else {
 		for(i=0; i<MAX_CMS_CHANNELS; i++) {
 			struct mid_channel *mch = cms_synth + i;
@@ -503,7 +464,7 @@ void cms_noteoff(unsigned char channel, unsigned char note)
 
 			if (note_priority != 0) note_priority--;
 
-			cmsDisableVoice(i);
+			cms_disable_voice(i);
 			mch->note = 0;
 			mch->priority = 0;
 			mch->ch = 0;
@@ -543,56 +504,56 @@ void cms_noteon(unsigned char channel, unsigned char note, unsigned char velocit
 		case 37: // Side Stick
 			write_cms(1, 0x16, 0x00); // noise gen 1 31.3kHz
 			write_cms(1, 0x15, 0x20); // noise ch 11
-			cmsSound(11, 0, 2, atten[left_velocity], atten[right_velocity]);
+			cms_enable_voice(11, 0, 2, atten[left_velocity], atten[right_velocity]);
 			break;
 		case 38: // Acoustic Snare
 			write_cms(1, 0x16, 0x00); // noise gen 1 31.3kHz
 			write_cms(1, 0x15, 0x20); // noise ch 11
-			cmsSound(11, 0, 0, atten[left_velocity], atten[right_velocity]);
+			cms_enable_voice(11, 0, 0, atten[left_velocity], atten[right_velocity]);
 			break;
 		case 39: // Hand Clap
 			write_cms(1, 0x16, 0x10); // noise gen 1 15.6kHz
 			write_cms(1, 0x15, 0x20); // noise ch 11
-			cmsSound(11, 0, 3, atten[left_velocity], atten[right_velocity]);
+			cms_enable_voice(11, 0, 3, atten[left_velocity], atten[right_velocity]);
 			break;
 		case 40: // Electric Snare
 			write_cms(1, 0x16, 0x10); // noise gen 1 15.6kHz
 			write_cms(1, 0x15, 0x20); // noise ch 11
-			cmsSound(11, 0, 1, atten[left_velocity], atten[right_velocity]);
+			cms_enable_voice(11, 0, 1, atten[left_velocity], atten[right_velocity]);
 			break;
 		case 42: // Closed Hi Hat
 			write_cms(1, 0x16, 0x10); // noise gen 1 15.6kHz
 			write_cms(1, 0x15, 0x20); // noise ch 11
-			cmsSound(11, 0, 2, atten[left_velocity], atten[right_velocity]);
+			cms_enable_voice(11, 0, 2, atten[left_velocity], atten[right_velocity]);
 			break;
 		case 44: // Pedal Hi-Hat
 			write_cms(1, 0x16, 0x10); // noise gen 1 15.6kHz
 			write_cms(1, 0x15, 0x20); // noise ch 11
-			cmsSound(11, 0, 0, atten[left_velocity], atten[right_velocity]);
+			cms_enable_voice(11, 0, 0, atten[left_velocity], atten[right_velocity]);
 			break;
 		case 52: // Chinese Cymbal
 			write_cms(1, 0x16, 0x20); // noise gen 1 7.6kHz
 			write_cms(1, 0x15, 0x20); // noise ch 11
-			cmsSound(11, 0, 2, atten[left_velocity], atten[right_velocity]);
+			cms_enable_voice(11, 0, 2, atten[left_velocity], atten[right_velocity]);
 			break;
 		case 55: // Splash Cymbal
 			write_cms(1, 0x16, 0x20); // noise gen 1 7.6kHz
 			write_cms(1, 0x15, 0x20); // noise ch 11
-			cmsSound(11, 0, 0, atten[left_velocity], atten[right_velocity]);
+			cms_enable_voice(11, 0, 0, atten[left_velocity], atten[right_velocity]);
 			break;
 		case 71: // Short Whistle
 		case 72: // Long Whistle
-			cmsSound(11, 0, 6, atten[left_velocity], atten[right_velocity]);
+			cms_enable_voice(11, 0, 6, atten[left_velocity], atten[right_velocity]);
 			break;
 		default:
-			cmsSound(11, 0, 1, atten[left_velocity], atten[right_velocity]);
+			cms_enable_voice(11, 0, 1, atten[left_velocity], atten[right_velocity]);
         }
        }
     else
        {
 	write_cms(1, 0x19, 0x0);
 	write_cms(1, 0x15, 0x0); // noise ch 11
-	cmsDisableVoice(11);
+	cms_disable_voice(11);
        }
   } else if (velocity != 0) {
 /*
@@ -671,7 +632,7 @@ void cms_noteon(unsigned char channel, unsigned char note, unsigned char velocit
 		}
 
 #ifndef DRUMS_ONLY
-		cmsSound(voice, CMSFreqMap[((notefreq-489)*128) / 489], octave, atten[left_velocity], atten[right_velocity]); 
+		cms_enable_voice(voice, CMSFreqMap[((notefreq-489)*128) / 489], octave, atten[left_velocity], atten[right_velocity]); 
 #endif
 
 		mch->note = note;
@@ -729,7 +690,7 @@ void cms_controller(unsigned char channel, unsigned char id, unsigned char val)
 			for (i=0; i<MAX_CMS_CHANNELS; i++) {
 				struct mid_channel *mch = cms_synth + i;
 				if (mch->note != 0) {
-					cmsDisableVoice(i);
+					cms_disable_voice(i);
 					mch->note = 0;
 					mch->priority = 0;
 					mch->ch = 0;
