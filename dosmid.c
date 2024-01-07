@@ -54,6 +54,7 @@
 #include <time.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <curses.h> /* KEY_* */
 #endif
 #if defined CMSLPT || defined OPLLPT
 #include "lpt.h"
@@ -1541,10 +1542,17 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
           case 'q':
             exitaction = ACTION_EXIT;
             break;
-          case 0x0D: /* return */
+          case '\n':
+          case '\r':
+#ifndef MSDOS
+          case KEY_ENTER:
+#endif
             exitaction = ACTION_NEXT;
             break;
-          case 0x08: /* bkspc */
+          case '\b':
+#ifndef MSDOS
+          case KEY_BACKSPACE:
+#endif
             exitaction = ACTION_PREV;
             break;
           case '+':  /* volume up */
