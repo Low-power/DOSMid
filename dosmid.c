@@ -28,18 +28,45 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if defined MSDOS || defined __i386__ || defined __amd64__ || defined __x86_64__ || defined _X86_ || defined __IA32__ || defined _M_IX86 || defined _M_AMD64
+#define HAVE_PORT_IO 1
+#endif
+
+#ifdef MSDOS
 #include <dos.h>    /* REGS */
+#else
+#include <sys/param.h>
+#if defined __FreeBSD__ && !defined __FreeBSD_kernel__
+#define __FreeBSD_kernel__
+#elif defined __LINUX__ && !defined __linux__
+#define __linux__
+#endif
+#ifdef HAVE_PORT_IO
+#include "unixpio.h"
+#endif
+#include <sys/stat.h>
+#include <unistd.h>
+#include <locale.h>
+#ifdef WCHAR
+#include <langinfo.h>
+#endif
+#include <time.h>
+#include <fcntl.h>
+#include <errno.h>
+#endif
 #include <stdio.h>  /* printf() */
 #include <limits.h> /* ULONG_MAX */
 #include <stdlib.h> /* rand() */
 #include <string.h> /* memset(), strcpy(), strncat(), memcpy() */
-#if defined __WATCOMC__ && __WATCOMC__ >= 1240
+#if !defined MSDOS || (defined __WATCOMC__ && __WATCOMC__ >= 1240)
 #define HAVE_STRCASECMP
 #include <strings.h>
 #endif
 #include "bitfield.h"
 #include "fio.h"
+#ifdef MSDOS
 #include "gus.h"
+#endif
 #include "mem.h"
 #include "midi.h"
 #include "mus.h"
@@ -49,6 +76,11 @@
 #include "timer.h"
 #include "ui.h"
 #include "version.h"
+#include <assert.h>
+
+#if !defined MSDOS && !defined CLOCK_MONOTONIC_FAST
+#define CLOCK_MONOTONIC_FAST CLOCK_MONOTONIC
+#endif
 
 #define MAXTRACKS 64
 #define EVENTSCACHESIZE 64 /* *must* be a power of 2 !!! */
@@ -74,13 +106,17 @@ enum playaction {
 
 struct clioptions {
   int memmode;          /* type of memory to use: MEM_XMS or MEM_MALLOC */
+#ifndef MSDOS
+  int devfd;
+  char *devname;
+#endif
   unsigned short devport;
   unsigned short port_mpu;
   unsigned short port_awe;
   unsigned short port_sb;
   enum outdev_type device;
   int devicesubtype;
-  char *devname;    /* the human name of the out device (MPU, AWE..) */
+  char *devtypename;/* the human name of the out device (MPU, AWE..) */
   char *midifile;   /* MIDI filename to play */
   char *syxrst;     /* syx file to use for MIDI resets */
   int delay;        /* additional delay to apply before playing a file */
@@ -102,7 +138,7 @@ struct clioptions {
   unsigned char gmgspreset;   /* PRESET_GM, PRESET_GS, PRESET_XG, PRESET_NONE */
 };
 
-
+#ifdef MSDOS
 /* fetch directory where the program resides, and return its length. result
  * string is never longer than 128 (incl. the null terminator), and it is
  * always terminated with a backslash separator, unless it is an empty string */
@@ -151,7 +187,7 @@ static int exepath(char *result) {
   return(lastsep + 1);
 }
 
-
+#if 0
 static void dos_puts(char *s) {
   /* DOS 1+ - WRITE STRING TO STANDARD OUTPUT
      AH = 09h
@@ -177,9 +213,12 @@ static void dos_puts(char *s) {
     int 21h
   }
 }
+#endif
+#endif
 
 /* returns a pseudo-random number, based on the DOS system timer */
 static unsigned long int clock_rnd(void) {
+#ifdef MSDOS
   unsigned long res;
   union REGS regs;
   regs.h.ah = 0;
@@ -188,6 +227,11 @@ static unsigned long int clock_rnd(void) {
   res <<= 16;
   res |= regs.x.dx; /* number of clock ticks since midnight (low word) */
   return(res);
+#else
+  struct timespec ts;
+  if(clock_gettime(CLOCK_MONOTONIC_FAST, &ts) < 0) return time(NULL);
+  return ts.tv_sec ^ ts.tv_nsec;
+#endif
 }
 
 /* copies the base name of a file (ie without directory path) into a string */
@@ -197,8 +241,10 @@ static int filename2basename(const char *fromname, char *tobasename, char *todir
   for (x = 0; fromname[x] != 0; x++) {
     switch (fromname[x]) {
       case '/':
+#ifdef MSDOS
       case '\\':
       case ':':
+#endif
         firstchar = x + 1;
         break;
     }
@@ -224,12 +270,12 @@ static int filename2basename(const char *fromname, char *tobasename, char *todir
   return firstchar;
 }
 
-
+#ifdef MSDOS
 /* switch a string to upper case */
 static void ucasestr(char *s) {
   for (; *s != 0; s++) if ((*s >= 'a') && (*s <= 'z')) *s -= 32;
 }
-
+#endif
 
 /* returns the lower-case version of c char, if applicable */
 static int lcase(char c) {
@@ -299,13 +345,17 @@ static char *devtoname(enum outdev_type device, int devicesubtype) {
     case DEV_OPL3:   return("OPL3");
 #endif
     case DEV_RS232:
+#ifdef MSDOS
       if (devicesubtype == 1) return("COM1");
       if (devicesubtype == 2) return("COM2");
       if (devicesubtype == 3) return("COM3");
       if (devicesubtype == 4) return("COM4");
+#endif
       return("COM");
     case DEV_SBMIDI: return("SB");
+#ifdef MSDOS
     case DEV_GUS:    return("GUS");
+#endif
 #ifdef CMS
     case DEV_CMS:    return("CMS");
 #endif
@@ -333,9 +383,83 @@ static enum fileformat header2fileformat(unsigned char *hdr) {
   return(FORMAT_UNKNOWN);
 }
 
-#if defined CMSLPT || defined OPLLPT
-static unsigned short int get_lpt_port(unsigned int i) {
-  return *(unsigned short int __far *)MK_FP(0x40, 6 + 2*i);
+#ifndef MSDOS
+static void close_device(struct clioptions *config) {
+  if(config->devfd == -1) return;
+  close(config->devfd);
+  config->devfd = -1;
+  free(config->devname);
+  config->devname = NULL;
+}
+
+static void open_device(struct clioptions *config, const char *name, int is_serial) {
+  assert(config->devfd == -1);
+  if(*name != '/') {
+    size_t len = strlen(name) + 1;
+    char path[5 + len];
+    memcpy(path, "/dev/", 5);
+    memcpy(path + 5, name, len);
+    config->devfd = open(path, O_WRONLY | O_NOCTTY);
+  }
+  if(config->devfd == -1) {
+    config->devfd = open(name, O_WRONLY | O_NOCTTY);
+    if(config->devfd == -1) return;
+  }
+  struct stat st;
+  errno = ENOTTY;
+  if(fstat(config->devfd, &st) < 0 || (!S_ISCHR(st.st_mode) && ((!S_ISFIFO(st.st_mode) && !S_ISSOCK(st.st_mode)) || !is_serial)) || (is_serial && !isatty(config->devfd))) {
+    close_device(config);
+    return;
+  }
+  config->devname = strdup(strncmp(name, "/dev/", 5) == 0 ? name + 5 : name);
+}
+#endif
+
+#if defined HAVE_PORT_IO && (defined CMSLPT || defined OPLLPT)
+static int try_parse_lpt_name(struct clioptions *config, const char *s) {
+  config->onlpt = 0;
+  if(stringstartswith(s, "lpt")) {
+    char unit = s[3];
+    if(unit < '1' || unit > '4' || s[4]) return 0;
+    return config->devicesubtype = config->onlpt = unit - '0';
+  }
+#ifndef MSDOS
+#if defined __FreeBSD_kernel__ || defined __linux__
+  const char *devname = s;
+  if(stringstartswith(devname, "/dev/")) devname += 5;
+#ifdef __FreeBSD_kernel__
+  if(stringstartswith(devname, "ppi")) {
+#else
+  if(stringstartswith(devname, "parport")) {
+#endif
+    open_device(config, s, 0);
+    if(config->devfd != -1) config->devicesubtype = config->onlpt = 255;
+    return config->onlpt;
+  }
+#endif
+#endif
+  return -1;
+}
+
+static uint16_t get_lpt_port(unsigned int i) {
+#ifdef MSDOS
+  return *(uint16_t __far *)MK_FP(0x40, 6 + 2*i);
+#else
+#ifdef __linux__
+  // TODO: Try /proc/parport
+#endif
+  // Fallback to hardcoded ports
+  switch(i) {
+    case 1:
+      return 0x378;
+    case 2:
+      return 0x278;
+    case 3:
+      return 0x3bc;
+    default:
+      return 0;
+  }
+#endif
 }
 #endif
 
@@ -386,6 +510,9 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
     } else if (strcasecmp(o, "random") == 0) {
       params->random = 1;
     } else if (strcasecmp(o, "nosound") == 0) {
+#ifndef MSDOS
+      close_device(params);
+#endif
       params->device = DEV_NONE;
       params->devport = 0;
 #ifdef SBAWE
@@ -397,13 +524,23 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
     } else if (stringstartswith(o, "awe=")) {
       params->device = DEV_AWE;
       params->devport = hexstr2uint(o + 4);
-    if (params->devport < 1) return("Invalid AWE port provided. Example: /awe=620$");
+    if (params->devport < 1) return("Invalid AWE port provided. Example: /awe=620");
 #endif
     } else if (strcasecmp(o, "mpu") == 0) {
+#ifndef MSDOS
+      close_device(params);
+#endif
       params->device = DEV_MPU401;
       params->devport = params->port_mpu;
       /* if MPU port not found in BLASTER, use the default 0x330 */
       if (params->devport == 0) params->devport = 0x330;
+    } else if (stringstartswith(o, "mpu=")) {
+#ifndef MSDOS
+      close_device(params);
+#endif
+      params->device = DEV_MPU401;
+      params->devport = hexstr2uint(o + 4);
+      if (params->devport < 1) return("Invalid MPU port provided. Example: /mpu=330");
     } else if (strcasecmp(o, "preset=gm") == 0) {
       params->gmgspreset = PRESET_GM;
     } else if (strcasecmp(o, "preset=gs") == 0) {
@@ -412,34 +549,43 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       params->gmgspreset = PRESET_XG;
     } else if (strcasecmp(o, "preset=none") == 0) {
       params->gmgspreset = PRESET_NONE;
+#ifdef MSDOS
     } else if (strcasecmp(o, "gus") == 0) {
       params->device = DEV_GUS;
       params->devport = gus_find();
-      if (params->devport < 1) return("GUS error: No ULTRAMID driver found$");
+      if (params->devport < 1) return("GUS error: No ULTRAMID driver found");
+#endif
 #ifdef OPL
     } else if (strcasecmp(o, "opl") == 0) {
+#ifndef MSDOS
+      close_device(params);
+#endif
       params->device = DEV_OPL;
       params->devport = 0x388;
     } else if (stringstartswith(o, "opl=")) {
+#ifndef MSDOS
+      close_device(params);
+#endif
       params->device = DEV_OPL;
       params->devport = hexstr2uint(o + 4);
-      if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388$");
+      if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388");
     } else if (stringstartswith(o, "opl") && (o[3] == '2' || o[3] == '3') && (!o[4] || o[4] == '=')) {
+#ifndef MSDOS
+      close_device(params);
+#endif
       params->device = o[3] == '3' ? DEV_OPL3 : DEV_OPL2;
       if(o[4]) {
 #ifdef OPLLPT
-        if(stringstartswith(o + 5, "lpt")) {
-          char i = o[8];
-          if(i < '1' || i > '4' || o[9]) return "Invalid LPT index provided. Example: /opl3=lpt2$";
-          params->devicesubtype = params->onlpt = i - '0';
+        if(try_parse_lpt_name(params, o + 5) >= 0) {
+          if(!params->onlpt) return "Invalid LPT index provided. Example: /opl3=lpt2";
         } else
 #endif
         {
           params->devport = hexstr2uint(o + 5);
           if (params->devport < 1) {
             return params->device == DEV_OPL3 ?
-              "Invalid OPL3 port provided. Example: /opl3=388$" :
-              "Invalid OPL2 port provided. Example: /opl2=388$";
+              "Invalid OPL3 port provided. Example: /opl3=388" :
+              "Invalid OPL2 port provided. Example: /opl2=388";
           }
         }
         params->nockdev = 1;
@@ -449,64 +595,85 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
 #endif
 #ifdef CMS
     } else if (strcasecmp(o, "cms") == 0) {
+#ifndef MSDOS
+      close_device(params);
+#endif
       params->device = DEV_CMS;
       params->devport = 0x220;
     } else if (stringstartswith(o, "cms=")) {
+#ifndef MSDOS
+      close_device(params);
+#endif
       params->device = DEV_CMS;
 #ifdef CMSLPT
-      if(stringstartswith(o + 4, "lpt")) {
-        char i = o[7];
-        if(i < '1' || i > '4' || o[8]) return "Invalid LPT index provided. Example: /cms=lpt2$";
-        params->devicesubtype = params->onlpt = i - '0';
+      if(try_parse_lpt_name(params, o + 4) >= 0) {
+        if(!params->onlpt) return "Invalid LPT index provided. Example: /cms=lpt2";
       } else
 #endif
       {
         params->devport = hexstr2uint(o + 4);
-        if (params->devport < 1) return("Invalid CMS port provided. Example: /cms=220$");
+        if (params->devport < 1) return("Invalid CMS port provided. Example: /cms=220");
       }
 #endif
     } else if (stringstartswith(o, "sbnk=")) {
       if (params->sbnk != NULL) free(params->sbnk); /* drop last sbnk if already present, so a CLI sbnk would take precedence over a config-file sbnk */
       params->sbnk = strdup(o + 5);
-    } else if (stringstartswith(o, "mpu=")) {
-      params->device = DEV_MPU401;
-      params->devport = hexstr2uint(o + 4);
-      if (params->devport < 1) return("Invalid MPU port provided. Example: /mpu=330$");
     } else if (stringstartswith(o, "com=")) {
+#ifndef MSDOS
+      close_device(params);
+#endif
       params->device = DEV_RS232;
       params->devport = hexstr2uint(o + 4);
-      if (params->devport < 10) return("Invalid COM port provided. Example: /com=3f8$");
+      if (params->devport < 10) {
+#ifdef MSDOS
+        return("Invalid COM port provided. Example: /com=3f8");
+#else
+        open_device(params, o + 4, 1);
+        if(params->devfd == -1) {
+          int e = errno;
+          return e == ENOENT ? "Invalid COM port provided. Example: -com=ttyu1" : strerror(e);
+        }
+#endif
+      }
+#ifdef MSDOS
     } else if (stringstartswith(o, "com")) { /* must be compared AFTER "com=" */
       params->device = DEV_RS232;
       params->devicesubtype = o[3] - '0';
-      if ((params->devicesubtype < 1) || (params->devicesubtype > 4)) return("Invalid COM port provided. Example: /com1$");
+      if ((params->devicesubtype < 1) || (params->devicesubtype > 4)) return("Invalid COM port provided. Example: /com1");
       params->devport = rs232_getport(params->devicesubtype);
-      if (params->devport < 1) return("Failed to autodetect the I/O address of this COM port. Try using the /com=XXX option.$");
+      if (params->devport < 1) return("Failed to autodetect the I/O address of this COM port. Try using the /com=XXX option.");
+#endif
     } else if (strcasecmp(o, "sbmidi") == 0) {
+#ifndef MSDOS
+      close_device(params);
+#endif
       params->device = DEV_SBMIDI;
       params->devport = params->port_sb;
       /* if SB port not found in BLASTER, use the default 0x220 */
       if (params->devport == 0) params->devport = 0x220;
     } else if (stringstartswith(o, "sbmidi=")) {
+#ifndef MSDOS
+      close_device(params);
+#endif
       params->device = DEV_SBMIDI;
       params->devport = hexstr2uint(o + 7);
-      if (params->devport < 1) return("Invalid SBMIDI port provided. Example: /sbmidi=220$");
+      if (params->devport < 1) return("Invalid SBMIDI port provided. Example: /sbmidi=220");
 #ifdef DBGFILE
     } else if (stringstartswith(o, "log=")) {
       if (params->logfile) fclose(params->logfile);
       params->logfile = fopen(o + 4, "wb");
-      if (params->logfile == NULL) return("Failed to open the debug log file.$");
+      if (params->logfile == NULL) return("Failed to open the debug log file.");
 #endif
     } else if (stringstartswith(o, "syx=")) {
       params->syxrst = strdup(o + 4);
     } else if (stringstartswith(o, "delay=")) {
       params->delay = atoi(o + 6);
       if ((params->delay < 1) || (params->delay > 9000)) {
-        return("Invalid delay value: must be in the range 1..9000$");
+        return("Invalid delay value: must be in the range 1..9000");
       }
     } else if (stringstartswith(o, "volume=")) {
       int v = atoi(o + 7);
-      if(v < 1) return "Invalid volume setting.$";
+      if(v < 1) return "Invalid volume setting.";
       if(v > 100) v = 100;
       params->volume = v;
     } else if (strcasecmp(o, "nocolor") == 0) {
@@ -518,14 +685,14 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
         comma = strchr(o, ',');
         if(comma) *comma++ = 0;
         if(strcmp(o, "norstctrl") == 0) params->dev_clear_flags |= DOSMID_DEV_NORSTCTRL;
-        else return "Unrecognized quirk name.$";
+        else return "Unrecognized quirk name.";
       } while(comma && *(o = comma));
     } else if (strcmp(o, "?") == 0 || strcasecmp(o, "h") == 0 || strcasecmp(o, "help") == 0) {
       return REQUEST_HELP;
     } else if (strcasecmp(o, "version") == 0) {
       return REQUEST_VERSION;
     } else {
-      return("Unknown option.$");
+      return("Unknown option.");
     }
   } else if (file_allowed && !params->midifile && !params->playlist) {
     char ext[4];
@@ -561,30 +728,39 @@ static void rtrim(char *s) {
 
 static char *loadconfigfile(struct clioptions *params) {
   char buff[128 + 12]; /* 128 for exepath plus 8+3 for the config file */
-  int r;
-  char *res = NULL;
+  int len;
+  char *errmsg = NULL;
   struct fiofile f;
+#ifdef MSDOS
   /* prepare config file's full path */
-  r = exepath(buff);
-  if (r < 1) return(NULL);
+  len = exepath(buff);
+  if (len < 1) return(NULL);
   /* append the config file itself */
-  sprintf(buff + r, "dosmid.cfg");
+  sprintf(buff + len, "dosmid.cfg");
   /* open file */
   if (fio_open(buff, FIO_OPEN_RD, &f) != 0) return(NULL);
-  for (;;) {
+#else
+  const char *home = getenv("HOME");
+  if(!home) return NULL;
+  len = strlen(home);
+  char cfg_path[len + sizeof "/.dosmid.cfg"];
+  memcpy(cfg_path, home, len);
+  strcpy(cfg_path + len, "/.dosmid.cfg");
+  if(fio_open(cfg_path, FIO_OPEN_RD, &f) < 0) return NULL;
+#endif
+  do {
     /* read line & trim */
-    r = fio_getline(&f, buff, sizeof(buff));
-    if (r < 0) break; /* stop on EOF */
+    len = fio_getline(&f, buff, sizeof(buff));
+    if (len < 0) break; /* stop on EOF */
     if (*buff == '#') continue; /* skip comments */
     rtrim(buff);
     if (*buff == 0) continue; /* skip empty lines */
     /* push arg to feedarg() (files not allowed because filename not allocated in persistent memory) */
-    res = feedarg(buff, params, 1, 0);
-    if (res != NULL) break;
-  }
+    errmsg = feedarg(buff, params, 1, 0);
+  } while(!errmsg);
   /* close file */
   fio_close(&f);
-  return(res);
+  return(errmsg);
 }
 
 
@@ -607,7 +783,7 @@ static char *parseargv(int argc, char **argv, struct clioptions *params) {
   }
   /* check if at least a MIDI filename have been provided */
   if ((params->midifile == NULL) && (params->playlist == NULL)) {
-    return("You have to provide the path to a MIDI file or a playlist to play.$");
+    return("You have to provide the path to a MIDI file or a playlist to play.");
   }
   /* all good */
   return(NULL);
@@ -766,6 +942,7 @@ static void preload_outdev(struct clioptions *params) {
     params->devport = params->port_mpu;
   }
 
+#ifdef MSDOS
   /* if a GUS seems to be installed, let's try it */
   if (getenv("ULTRADIR") != 0) {
     int gusp = gus_find();
@@ -774,6 +951,7 @@ static void preload_outdev(struct clioptions *params) {
       params->devport = gusp;
     }
   }
+#endif
 
   /* AWE is the most desirable, if present (and compiled in) */
 #ifdef SBAWE
@@ -849,7 +1027,11 @@ static char *getnextm3uitem(int loop, const char *playlist, long int *playlist_o
   /* if empty, something went wrong */
   if (fnamebuf[0] == 0) return(NULL);
   /* if the file is a relative path, then prepend it with the path of the playlist */
+#ifdef MSDOS
   if (fnamebuf[0] != '/' && fnamebuf[0] != '\\' && fnamebuf[1] != ':') {
+#else
+  if (fnamebuf[0] != '/') {
+#endif
     int dirnamelen;
     size_t fnamelen = strlen(fnamebuf) + 1;
     memcpy(tempstr, fnamebuf, fnamelen);
@@ -1095,7 +1277,9 @@ static void init_trackinfo(struct trackinfodata *trackinfo, const struct cliopti
   } else if (params->playlist != NULL) {
     filename2basename(params->playlist, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
   }
+#ifdef MSDOS
   ucasestr(trackinfo->filename);
+#endif
 }
 
 static int load_playlist_offsets(const char *playlist_path, int should_randomize, long int **offsets, unsigned int *nitems) {
@@ -1171,7 +1355,11 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
 
   /* update screen with the next operation */
   sprintf(trackinfo->title[0], "Loading file...");
-  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, params->onlpt, params->volume);
+  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devtypename,
+#ifndef MSDOS
+    params->devname,
+#endif
+    params->devport, params->onlpt, params->volume);
   refreshflags = UI_REFRESH_ALL;
 
   /* if running on a playlist, load next song */
@@ -1264,8 +1452,14 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
   /* load the file into memory */
   sprintf(trackinfo->title[0], "Loading...");
   filename2basename(params->midifile, trackinfo->filename, NULL, UI_FILENAMEMAXLEN);
+#ifdef MSDOS
   ucasestr(trackinfo->filename);
-  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, params->onlpt, params->volume);
+#endif
+  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devtypename,
+#ifndef MSDOS
+    params->devname,
+#endif
+    params->devport, params->onlpt, params->volume);
   memset(trackinfo->title[0], 0, 16);
   refreshflags = UI_REFRESH_ALL;
 
@@ -1273,6 +1467,7 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
   nexteventtime += params->delay * 1000L; /* add the extra custom delay */
   exitaction = loadfile(params, trackinfo, &trackpos);
   if (exitaction != ACTION_NONE) return(exitaction);
+#ifdef MSDOS
   /* if driving a GUS, preload needed MIDI patches up front */
   if (params->device == DEV_GUS) {
     int i;
@@ -1286,8 +1481,13 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
       }
     }
   }
+#endif
   /* draw the gui with track's data */
-  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, params->onlpt, params->volume);
+  ui_draw(trackinfo, &refreshflags, &refreshchans, params->devtypename,
+#ifndef MSDOS
+    params->devname,
+#endif
+    params->devport, params->onlpt, params->volume);
   for (;;) {
     timer_read(&midiplaybackstart); /* save start time so we can compute elapsed time later */
     if (midiplaybackstart >= nexteventtime) break; /* wait until the scheduled start time is met */
@@ -1352,11 +1552,21 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
         }
         /* do I need to refresh the screen now? if not, just call INT28h */
         if (refreshflags != 0) {
-          ui_draw(trackinfo, &refreshflags, &refreshchans, params->devname, params->devport, params->onlpt, params->volume);
-        } else if (params->nopowersave == 0) { /* if no screen refresh is     */
-          union REGS regs;                     /* needed, and power saver not */
-          int86(0x28, &regs, &regs);           /* disabled, then call INT 28h */
-        }                                      /* for some power saving       */
+          ui_draw(trackinfo, &refreshflags, &refreshchans, params->devtypename,
+#ifndef MSDOS
+            params->devname,
+#endif
+            params->devport, params->onlpt, params->volume);
+        } else if (params->nopowersave == 0) {
+#ifdef MSDOS
+          /* if no screen refresh is needed, and power saver not disabled,
+           * call INT 28h for some power saving */
+          union REGS regs;
+          int86(0x28, &regs, &regs);
+#else
+          sleep(0);
+#endif
+        }
       }
       if (exitaction != ACTION_NONE) break;
     }
@@ -1441,7 +1651,7 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
         break;
       case EVENT_SYSEX:
       {
-        unsigned short sysexlen;
+        uint16_t sysexlen;
         /* read two bytes from sysexptr so I know how long the thing is */
         mem_pull(curevent->data.sysex.sysexptr, &sysexlen, 2);
 #ifdef DBGFILE
@@ -1500,7 +1710,7 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
 
 
 int main(int argc, char **argv) {
-  char *errstr;
+  const char *errstr;
   enum playaction action = ACTION_NEXT;
   /* below objects are declared static so they land in the data segment and not in stack */
   static struct trackinfodata trackinfo;
@@ -1510,7 +1720,17 @@ int main(int argc, char **argv) {
   unsigned int playlist_len = 0;
   enum order playlistdir;
 
+#ifndef MSDOS
+  params.devfd = -1;
+#endif
   params.volume = 100;
+
+#ifndef MSDOS
+  setlocale(LC_CTYPE, "");
+#ifdef WCHAR
+  if(strcmp(nl_langinfo(CODESET), "UTF-8") == 0) params.ui_init_flags = UI_WCHAR;
+#endif
+#endif
 
   /* preload the mpu port to be used (might be forced later via **argv) */
   preload_outdev(&params);
@@ -1519,13 +1739,13 @@ int main(int argc, char **argv) {
   if (errstr == NULL) errstr = parseargv(argc, argv, &params);
   //switch(errstr) {
   if(errstr == REQUEST_HELP) {
-      dos_puts("Usage: dosmid [<options>] <file>\r\n"
+      puts(    "Usage: dosmid [<options>] <file>\r\n"
                "File can be m3u playlist.\r\n"
                "Options:\r\n"
                " /noxms     use conventional memory instead of XMS (loads small files only)\r\n"
                " /xmsdelay  wait 2ms before accessing XMS memory (AWEUTIL compatibility)\r\n"
-               " /mpu[=<X>] use MPU-401 on I/O port <X>; will read BLASTER for port if omitted$");
-      dos_puts(
+               " /mpu[=<X>] use MPU-401 on I/O port <X>; will read BLASTER for port if omitted");
+      puts(
 #ifdef SBAWE
                " /awe[=<X>] use the EMU8K on SB AWE card; will read BLASTER for port if omitted\r\n"
 #endif
@@ -1537,14 +1757,16 @@ int main(int argc, char **argv) {
 #ifdef CMS
                " /cms[=<X>] use Creative Music System / Game Blaster for sound output\r\n"
 #endif
-               " /sbmidi[=<X>] outputs MIDI to the SoundBlaster MIDI port at I/O port <X>$"
+               " /sbmidi[=<X>] outputs MIDI to the SoundBlaster MIDI port at I/O port <X>"
       );
-      dos_puts(" /com=<X>   output MIDI messages to the RS-232 port at I/O port <X>\r\n"
+      puts(    " /com=<X>   output MIDI messages to the RS-232 port at I/O port <X>\r\n"
                " /comX      same as /com=<X>, but takes a COM port instead (example: /com1)\r\n"
+#ifdef MSDOS
                " /gus       use the Gravis UltraSound card (requires ULTRAMID)\r\n"
+#endif
                " /syx=<FILE> use SYSEX instructions from FILE for MIDI initialization\r\n"
-               " /sbnk=<FILE> load a custom sound bank file(s) (IBK on OPL, SBK on AWE)$");
-      dos_puts(
+               " /sbnk=<FILE> load a custom sound bank file(s) (IBK on OPL, SBK on AWE)");
+      puts(
 #ifdef DBGFILE
                " /log=<FILE> write highly verbose logs about DOSMid's activity to FILE\r\n"
 #endif
@@ -1554,42 +1776,50 @@ int main(int argc, char **argv) {
                " /random    randomize playlist order\r\n"
                " /nosound   disable sound output\r\n"
                " /version   print version and optional features of this build\r\n"
-               "Options can begin with either '-' or '/'.$"
+               "Options can begin with either '-' or '/'."
       );
       return 0;
   }
   if(errstr == REQUEST_VERSION) {
-      dos_puts("DOSMid " PVER "\r\n"
-               "Copyright (C) " PDATE " Mateusz Viste\r\n"
-               "$");
-      dos_puts("Enabled optional features:"
+      puts(
+        "DOSMid " PVER "\r\n"
+        "Copyright (C) 2015-2024 Mateusz Viste\r\n"
+        "Copyright 2015-2024 Rivoreo\r\n"
+      );
+      puts("Enabled optional features:"
 #ifdef OPL
-               "\r\n  OPL"
+           "\r\n  OPL"
 #ifdef OPLLPT
-               "\r\n  OPLLPT"
+           "\r\n  OPLLPT"
 #endif
 #endif
 #ifdef CMS
-               "\r\n  CMS"
+           "\r\n  CMS"
 #ifdef CMSLPT
-               "\r\n  CMSLPT"
+           "\r\n  CMSLPT"
 #endif
 #endif
 #ifdef SBAWE
-               "\r\n  AWE"
+           "\r\n  AWE"
 #endif
-               "$");
+#if !defined MSDOS && defined WCHAR
+           "\r\n  WCHAR"
+#endif
+           );
       return 0;
   }
   if(errstr) {
     //default:
-      dos_puts(errstr);
-      dos_puts("Run DOSMID /? for additional help.$");
+      fprintf(stderr, "%s\nRun DOSMID /? for additional help.\n", errstr);
       return(1);
   }
 
-#if defined CMSLPT || defined OPLLPT
-  if(params.onlpt) {
+#if defined HAVE_PORT_IO && (defined CMSLPT || defined OPLLPT)
+  if(
+#ifndef MSDOS
+  params.devfd == -1 &&
+#endif
+  params.onlpt) {
     params.devport = get_lpt_port(params.onlpt);
     if(!params.devport) {
       fprintf(stderr, "LPT%c not found\r\n", params.onlpt + '0');
@@ -1597,13 +1827,15 @@ int main(int argc, char **argv) {
     }
   }
 #endif
-  params.devname = devtoname(params.device, params.devicesubtype);
+  params.devtypename = devtoname(params.device, params.devicesubtype);
 
   /* Seed C library RNG */
   if(params.random) srand(clock_rnd());
 
   /* populate trackinfo with initial data */
   init_trackinfo(&trackinfo, &params);
+
+  midi_init_static_ident();
 
   /* initialize the high resolution timer */
   timer_init();
@@ -1616,12 +1848,23 @@ int main(int argc, char **argv) {
   sprintf(trackinfo.title[0], "Sound hardware initialization...");
   {
     unsigned short rflags = 0xffffu, rchans = 0xffffu;
-    ui_draw(&trackinfo, &rflags, &rchans, params.devname, params.devport, params.onlpt, params.volume);
+    ui_draw(&trackinfo, &rflags, &rchans, params.devtypename,
+#ifndef MSDOS
+      params.devname,
+#endif
+      params.devport, params.onlpt, params.volume);
   }
 #ifdef DBGFILE
   if (params.logfile) fprintf(params.logfile, "INIT SOUND HARDWARE\n");
 #endif
-  errstr = dev_init(params.device, params.devport, params.onlpt, params.nockdev, params.sbnk);
+#ifndef MSDOS
+  if(params.devport) open_port_io_device();
+#endif
+  errstr = dev_init(params.device, params.devport,
+#ifndef MSDOS
+    params.devfd,
+#endif
+    params.onlpt, params.nockdev, params.sbnk);
   if (errstr != NULL) {
     ui_puterrmsg("Hardware initialization failure", errstr);
     getkey();
@@ -1629,7 +1872,7 @@ int main(int argc, char **argv) {
   }
   /* refresh outdev and its name (might have been changed due to OPL autodetection) */
   params.device = dev_getcurdev();
-  params.devname = devtoname(params.device, params.devicesubtype);
+  params.devtypename = devtoname(params.device, params.devicesubtype);
 
   /* allocate the work memory */
   if (mem_init(params.memmode) == 0) {
@@ -1645,7 +1888,11 @@ int main(int argc, char **argv) {
   if(params.playlist) {
     unsigned short int rflags = UI_REFRESH_TITLECOPYR, rchans = 0;
     sprintf(trackinfo.title[0], "Loading playlist...");
-    ui_draw(&trackinfo, &rflags, &rchans, params.devname, params.devport, params.onlpt, params.volume);
+    ui_draw(&trackinfo, &rflags, &rchans, params.devtypename,
+#ifndef MSDOS
+      params.devname,
+#endif
+      params.devport, params.onlpt, params.volume);
     action = load_playlist_offsets(params.playlist, params.random, &playlist_offsets, &playlist_len);
   }
 
@@ -1693,7 +1940,10 @@ int main(int argc, char **argv) {
   /* close sound hardware */
   dev_close();
 
-  hardwarefailure: /* this label I jump to when sound hardware init fails */
+hardwarefailure: /* this label I jump to when sound hardware init fails */
+#ifndef MSDOS
+  close_device(&params);
+#endif
 
   /* reset screen (clears the screen and makes the cursor visible again) */
   ui_close();
@@ -1710,8 +1960,10 @@ int main(int argc, char **argv) {
   }
 #endif
 
-  dos_puts("Exiting...\r\n$");
-  dos_puts("DOSMid " PVER "\r\nCopyright (C) " PDATE " Mateusz Viste$");
+  puts("Exiting...\n");
+  puts("DOSMid " PVER);
+  puts("Copyright (C) 2014-2023 Mateusz Viste");
+  puts("Copyright 2015-2024 Rivoreo");
 
   return(0);
 }

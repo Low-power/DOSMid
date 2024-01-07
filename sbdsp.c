@@ -4,7 +4,11 @@
  * Copyright (C) Mateusz Viste 2015
  */
 
+#ifdef MSDOS
 #include <conio.h>  /* inp() and outp() */
+#else
+#include "unixpio.h"
+#endif
 
 #include "timer.h"
 

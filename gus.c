@@ -28,6 +28,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef MSDOS
 
 #include <dos.h>   /* _dos_getvect(), MK_FP, FP_SEG */
 #include <stdint.h>
@@ -94,3 +95,5 @@ void gus_close(void) {
   __asm mov ax, 27
   ultramidfn();
 }
+
+#endif

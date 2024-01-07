@@ -4,4 +4,3 @@
  */
 
 #define PVER "0.9.7-rivoreo"
-#define PDATE "2014-2023"

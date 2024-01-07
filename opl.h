@@ -39,6 +39,7 @@ struct timbre {
 
 #define OPL_SKIP_CHECKING (1 << 0)
 #define OPL_ON_LPT (1 << 1)
+#define OPL_PORT_IS_FD (1 << 2)
 
 /* Initialize hardware upon startup
  * Possible values for '*gen':
@@ -50,6 +51,9 @@ struct timbre {
  * OPL_ON_LPT		Specify the device is an OPL2LPT or OPL3LPT; because
  *			this kind of device is write-only, the exact chip type
  *			must be specified via '*gen'
+ * OPL_PORT_IS_FD	Specify 'port' is actually a file descriptor to a
+ *			high-level device node for writing LPT; requires
+ *			OPL_ON_LPT; this flag is valid for UNIX only
  * Possible return values:
  * 0	Success
  * -1	Device presence check failed (possible only if OPL_SKIP_CHECKING isn't
@@ -58,31 +62,32 @@ struct timbre {
  * -3	Out of memory
  * -4	Invalid value in '*gen'
  * -5	Already initialized
+ * -6	Invalid 'flags'
  */
-int opl_init(unsigned short int port, int *gen, int flags);
+int opl_init(unsigned int port, int *gen, int flags);
 
 /* close OPL device */
-void opl_close(unsigned short port);
+void opl_close(void);
 
 /* turns off all notes */
-void opl_clear(unsigned short port);
+void opl_clear(void);
 
 /* turn note 'on', on emulated MIDI channel */
-void opl_midi_noteon(unsigned short port, int channel, int note, int velocity);
+void opl_midi_noteon(int channel, int note, int velocity);
 
 /* turn note 'off', on emulated MIDI channel */
-void opl_midi_noteoff(unsigned short port, int channel, int note);
+void opl_midi_noteoff(int channel, int note);
 
 /* adjust the pitch wheel on emulated MIDI channel */
-void opl_midi_pitchwheel(unsigned short outport, int channel, int wheelvalue);
+void opl_midi_pitchwheel(int channel, int wheelvalue);
 
 /* emulate MIDI 'controller' messages on the OPL */
-void opl_midi_controller(unsigned short oplport, int channel, int id, int value);
+void opl_midi_controller(int channel, int id, int value);
 
 /* assign a new instrument to emulated MIDI channel */
 void opl_midi_changeprog(int channel, int program);
 
-void opl_loadinstrument(unsigned short int port, unsigned short int voice, const struct timbre *timbre);
+void opl_loadinstrument(unsigned short int voice, const struct timbre *timbre);
 
 /* loads an IBK bank from file into an array of 128 'struct timbre' objects.
  * returns 0 on success, non-zero otherwise */
@@ -94,9 +99,9 @@ int opl_loadbank(char *file);
  * emulation functions (opl_midi_*) with any of the functions below! */
 
 /* turn off note on selected voice */
-void opl_noteoff(unsigned short port, unsigned short voice);
+void opl_noteoff(unsigned short int voice);
 
 /* turn on note on selected voice */
-void opl_noteon(unsigned short port, unsigned short voice, unsigned int note, int pitch);
+void opl_noteon(unsigned short int voice, unsigned int note, int pitch);
 
 #endif

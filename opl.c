@@ -29,7 +29,12 @@
 
 #ifdef OPL
 
+#ifdef MSDOS
 #include <conio.h> /* inp(), out() */
+#else
+#include "unixpio.h"
+#endif
+#include <stdint.h>
 #include <stdlib.h> /* calloc() */
 #include <string.h> /* strdup() */
 #include "opl.h"
@@ -53,6 +58,10 @@ struct oplstate {
   unsigned short channelvol[16];        /* per-channel pitch level */
   struct voicealloc voices2notes[18]; /* keeps the map of what voice is playing what note/channel currently */
   unsigned char channelprog[16];        /* programs (patches) assigned to channels */
+#if !defined MSDOS && defined OPLLPT
+  int fd;
+#endif
+  uint16_t port;
   char opl3; /* flag indicating whether or not the sound module is OPL3-compatible or only OPL2 */
 #ifdef OPLLPT
   char opllpt;
@@ -138,16 +147,29 @@ static int voicescount = 9;
  * to write into the secondary address of an OPL3, just OR your register with
  * the 0x100 value (the 0x100 flag will be removed then, and the data will be
  * written into port+3). */
-static void write_opl(unsigned short int port, int is_opl3,
+static void write_opl(
+#if !defined MSDOS && defined OPLLPT
+ int fd,
+#endif
+ unsigned short int port, int is_opl3,
 #ifdef OPLLPT
  int is_opllpt,
 #endif
  unsigned short int reg, unsigned char data) {
 #ifdef OPLLPT
   if(is_opllpt) {
-    write_lpt(port, reg & 0xff, (reg & 0x100) ? 0x5 : 0xd);
-    pdelay(port, 6);
-    write_lpt(port, data, 0xc);
+#ifndef MSDOS
+    if(fd != 1) {
+      write_lpt_fd(fd, reg & 0xff, (reg & 0x100) ? 0x5 : 0xd);
+      udelay(4);
+      write_lpt_fd(fd, data, 0xc);
+    } else
+#endif
+    {
+      write_lpt(port, reg & 0xff, (reg & 0x100) ? 0x5 : 0xd);
+      pdelay(port, 6);
+      write_lpt(port, data, 0xc);
+    }
   } else
 #endif
   {
@@ -166,13 +188,22 @@ static void write_opl(unsigned short int port, int is_opl3,
   }
   /* OPL2 requires 23us to pass before writing to the data port. AdLib
    * recommends reading 35 times from the index register to make time pass. */
+#ifndef MSDOS
+  if(fd != 1) udelay(is_opl3 ? 4 : 23);
+  else
+#endif
   pdelay(port, is_opl3 ? 6 : 35);
 }
 #ifdef OPLLPT
-#define WRITE_OPL(PORT,REG,VALUE) write_opl((PORT), oplmem->opl3, oplmem->opllpt, (REG), (VALUE))
+#ifdef MSDOS
+#define WRITE_OPL(H,REG,VALUE) write_opl((H)->port, (H)->opl3, (H)->opllpt, (REG), (VALUE))
 #define WRITE_OPL_PROBE(PORT,REG,VALUE) write_opl((PORT), 0, 0, (REG), (VALUE))
 #else
-#define WRITE_OPL(PORT,REG,VALUE) write_opl((PORT), oplmem->opl3, (REG), (VALUE))
+#define WRITE_OPL(H,REG,VALUE) write_opl((H)->fd, (H)->port, (H)->opl3, (H)->opllpt, (REG), (VALUE))
+#define WRITE_OPL_PROBE(PORT,REG,VALUE) write_opl(-1, (PORT), 0, 0, (REG), (VALUE))
+#endif
+#else
+#define WRITE_OPL(H,REG,VALUE) write_opl((H)->port, (H)->opl3, (REG), (VALUE))
 #define WRITE_OPL_PROBE(PORT,REG,VALUE) write_opl((PORT), 0, (REG), (VALUE))
 #endif
 
@@ -211,6 +242,9 @@ static void calc_vol(unsigned char *regbyte, int volume) {
  * OPL_ON_LPT		Specify the device is an OPL2LPT or OPL3LPT; because
  *			this kind of device is write-only, the exact chip type
  *			must be specified via '*gen'
+ * OPL_PORT_IS_FD	Specify 'port' is actually a file descriptor to a
+ *			high-level device node for writing LPT; requires
+ *			OPL_ON_LPT; this flag is valid for UNIX only
  * Possible return values:
  * 0	Success
  * -1	Device presence check failed (possible only if OPL_SKIP_CHECKING isn't
@@ -219,12 +253,18 @@ static void calc_vol(unsigned char *regbyte, int volume) {
  * -3	Out of memory
  * -4	Invalid value in '*gen'
  * -5	Already initialized
+ * -6	Invalid 'flags'
  */
-int opl_init(unsigned short int port, int *gen, int flags) {
+int opl_init(unsigned int port, int *gen, int flags) {
   int x;
 
   /* make sure we're not inited yet */
   if (oplmem != NULL) return(-5);
+
+  //if(flags >> 3) return -6;
+#if !defined MSDOS && defined OPLLPT
+  if((flags & OPL_PORT_IS_FD) && !(flags & OPL_ON_LPT)) return -6;
+#endif
 
   if(!(flags & OPL_SKIP_CHECKING) && !(flags & OPL_ON_LPT)) {
     int y;
@@ -271,6 +311,17 @@ int opl_init(unsigned short int port, int *gen, int flags) {
   oplmem = calloc(1, sizeof(struct oplstate));
   if (oplmem == NULL) return(-3);
 
+#if !defined MSDOS && defined OPLLPT
+  if(flags & OPL_ON_LPT) {
+    oplmem->fd = port;
+    oplmem->port = 0;
+  } else {
+    oplmem->fd = -1;
+    oplmem->port = port;
+  }
+#else
+  oplmem->port = port;
+#endif
   oplmem->opl3 = *gen == 3;
 #ifdef OPLLPT
   oplmem->opllpt = flags & OPL_ON_LPT;
@@ -281,30 +332,30 @@ int opl_init(unsigned short int port, int *gen, int flags) {
 
   /* enable OPL3 (if detected) and put it into 36 operators mode */
   if (oplmem->opl3 != 0) {
-    WRITE_OPL(port, 0x105, 1);  /* enable OPL3 mode (36 operators) */
-    WRITE_OPL(port, 0x104, 0);  /* disable four-operator voices */
+    WRITE_OPL(oplmem, 0x105, 1);  /* enable OPL3 mode (36 operators) */
+    WRITE_OPL(oplmem, 0x104, 0);  /* disable four-operator voices */
     voicescount = 18;          /* OPL3 provides 18 melodic channels */
 
     /* Init the secondary OPL chip
      * NOTE: this I don't do anymore, it turns my Aztech Waverider mute! */
-    /* WRITE_OPL(port, 0x101, 0x20); */ /* enable Waveform Select */
-    /* WRITE_OPL(port, 0x108, 0x40); */ /* turn off CSW mode and activate FM synth mode */
-    /* WRITE_OPL(port, 0x1BD, 0x00); */ /* set vibrato/tremolo depth to low, set melodic mode */
+    /* WRITE_OPL(oplmem, 0x101, 0x20); */ /* enable Waveform Select */
+    /* WRITE_OPL(oplmem, 0x108, 0x40); */ /* turn off CSW mode and activate FM synth mode */
+    /* WRITE_OPL(oplmem, 0x1BD, 0x00); */ /* set vibrato/tremolo depth to low, set melodic mode */
   }
 
-  WRITE_OPL(port, 0x01, 0x20);  /* enable Waveform Select */
-  WRITE_OPL(port, 0x04, 0x00);  /* turn off timers IRQs */
-  WRITE_OPL(port, 0x08, 0x40);  /* turn off CSW mode and activate FM synth mode */
-  WRITE_OPL(port, 0xBD, 0x00);  /* set vibrato/tremolo depth to low, set melodic mode */
+  WRITE_OPL(oplmem, 0x01, 0x20);  /* enable Waveform Select */
+  WRITE_OPL(oplmem, 0x04, 0x00);  /* turn off timers IRQs */
+  WRITE_OPL(oplmem, 0x08, 0x40);  /* turn off CSW mode and activate FM synth mode */
+  WRITE_OPL(oplmem, 0xBD, 0x00);  /* set vibrato/tremolo depth to low, set melodic mode */
 
   for (x = 0; x < voicescount; x++) {
-    WRITE_OPL(port, 0x20 + op1offsets[x], 0x1);     /* set the modulator's multiple to 1 */
-    WRITE_OPL(port, 0x20 + op2offsets[x], 0x1);     /* set the modulator's multiple to 1 */
-    WRITE_OPL(port, 0x40 + op1offsets[x], 0x10);    /* set volume of all channels to about 40 dB */
-    WRITE_OPL(port, 0x40 + op2offsets[x], 0x10);    /* set volume of all channels to about 40 dB */
+    WRITE_OPL(oplmem, 0x20 + op1offsets[x], 0x1);     /* set the modulator's multiple to 1 */
+    WRITE_OPL(oplmem, 0x20 + op2offsets[x], 0x1);     /* set the modulator's multiple to 1 */
+    WRITE_OPL(oplmem, 0x40 + op1offsets[x], 0x10);    /* set volume of all channels to about 40 dB */
+    WRITE_OPL(oplmem, 0x40 + op2offsets[x], 0x10);    /* set volume of all channels to about 40 dB */
   }
 
-  opl_clear(port);
+  opl_clear();
 
   /* all done */
   return 0;
@@ -312,20 +363,20 @@ int opl_init(unsigned short int port, int *gen, int flags) {
 
 
 /* close OPL device */
-void opl_close(unsigned short port) {
+void opl_close() {
   int x;
 
   /* turns all notes 'off' */
-  opl_clear(port);
+  opl_clear();
 
   /* set volume to lowest level on all voices */
   for (x = 0; x < voicescount; x++) {
-    WRITE_OPL(port, 0x40 + op1offsets[x], 0x1f);
-    WRITE_OPL(port, 0x40 + op2offsets[x], 0x1f);
+    WRITE_OPL(oplmem, 0x40 + op1offsets[x], 0x1f);
+    WRITE_OPL(oplmem, 0x40 + op2offsets[x], 0x1f);
   }
 
   /* if OPL3, switch the chip back into its default OPL2 mode */
-  if (oplmem->opl3 != 0) WRITE_OPL(port, 0x105, 0);
+  if (oplmem->opl3 != 0) WRITE_OPL(oplmem, 0x105, 0);
 
   /* free state memory */
   free(oplmem);
@@ -334,12 +385,12 @@ void opl_close(unsigned short port) {
 
 
 /* turns off all notes */
-void opl_clear(unsigned short port) {
+void opl_clear() {
   int x, y;
-  for (x = 0; x < voicescount; x++) opl_noteoff(port, x);
+  for (x = 0; x < voicescount; x++) opl_noteoff(x);
 
   /* reset the percussion bits at the 0xBD register */
-  WRITE_OPL(port, 0xBD, 0);
+  WRITE_OPL(oplmem, 0xBD, 0);
 
   /* mark all voices as unused */
   for (x = 0; x < voicescount; x++) {
@@ -362,17 +413,17 @@ void opl_clear(unsigned short port) {
 }
 
 
-void opl_noteoff(unsigned short port, unsigned short voice) {
+void opl_noteoff(unsigned short int voice) {
   /* if voice is one of the OPL3 set, adjust it and route over secondary OPL port */
   if (voice >= 9) {
-    WRITE_OPL(port, 0x1B0 + voice - 9, 0);
+    WRITE_OPL(oplmem, 0x1B0 + voice - 9, 0);
   } else {
-    WRITE_OPL(port, 0xB0 + voice, 0);
+    WRITE_OPL(oplmem, 0xB0 + voice, 0);
   }
 }
 
 
-void opl_noteon(unsigned short port, unsigned short voice, unsigned int note, int pitch) {
+void opl_noteon(unsigned short int voice, unsigned int note, int pitch) {
   unsigned int freq = freqtable[note];
   unsigned int octave = octavetable[note];
 
@@ -396,12 +447,12 @@ void opl_noteon(unsigned short port, unsigned short voice, unsigned int note, in
     voice |= 0x100;
   }
 
-  WRITE_OPL(port, 0xA0 + voice, freq & 0xff); /* set lowfreq */
-  WRITE_OPL(port, 0xB0 + voice, (freq >> 8) | (octave << 2) | 32); /* KEY ON + hifreq + octave */
+  WRITE_OPL(oplmem, 0xA0 + voice, freq & 0xff); /* set lowfreq */
+  WRITE_OPL(oplmem, 0xB0 + voice, (freq >> 8) | (octave << 2) | 32); /* KEY ON + hifreq + octave */
 }
 
 
-void opl_midi_pitchwheel(unsigned short oplport, int channel, int pitchwheel) {
+void opl_midi_pitchwheel(int channel, int pitchwheel) {
   /*int x;*/
   /* update the new pitch value for channel (used by newly played notes) */
   oplmem->channelpitch[channel] = pitchwheel;
@@ -409,12 +460,12 @@ void opl_midi_pitchwheel(unsigned short oplport, int channel, int pitchwheel) {
    * recompute all playing notes for this channel with the new pitch TODO */
   /*for (x = 0; x < voicescount; x++) {
     if (oplmem->voices2notes[x].channel != channel) continue;
-    opl_noteon(oplport, x, oplmem->voices2notes[x].note, pitchwheel + gmtimbres[oplmem->voices2notes[x].timbreid].finetune);
+    opl_noteon(x, oplmem->voices2notes[x].note, pitchwheel + gmtimbres[oplmem->voices2notes[x].timbreid].finetune);
   }*/
 }
 
 
-void opl_midi_controller(unsigned short oplport, int channel, int id, int value) {
+void opl_midi_controller(int channel, int id, int value) {
   int x;
   switch (id) {
     case 7:
@@ -425,7 +476,7 @@ void opl_midi_controller(unsigned short oplport, int channel, int id, int value)
     case 120: /* 'all sound off' - I map it to 'all notes off' for now, not perfect but better than not handling it at all */
       for (x = 0; x < voicescount; x++) {
         if (oplmem->voices2notes[x].channel != channel) continue;
-        opl_midi_noteoff(oplport, channel, oplmem->voices2notes[x].note);
+        opl_midi_noteoff(x, oplmem->voices2notes[x].note);
       }
       break;
   }
@@ -439,26 +490,26 @@ void opl_midi_changeprog(int channel, int program) {
 }
 
 
-void opl_loadinstrument(unsigned short int oplport, unsigned short int voice, const struct timbre *timbre) {
+void opl_loadinstrument(unsigned short int voice, const struct timbre *timbre) {
   /* KSL (key level scaling) / attenuation */
-  WRITE_OPL(oplport, 0x40 + op1offsets[voice], timbre->modulator_40);
-  WRITE_OPL(oplport, 0x40 + op2offsets[voice], timbre->carrier_40 | 0x3f); /* force volume to 0, it will be reajusted during 'note on' */
+  WRITE_OPL(oplmem, 0x40 + op1offsets[voice], timbre->modulator_40);
+  WRITE_OPL(oplmem, 0x40 + op2offsets[voice], timbre->carrier_40 | 0x3f); /* force volume to 0, it will be reajusted during 'note on' */
 
   /* select waveform on both operators */
-  WRITE_OPL(oplport, 0xE0 + op1offsets[voice], timbre->modulator_E862 >> 24);
-  WRITE_OPL(oplport, 0xE0 + op2offsets[voice], timbre->carrier_E862 >> 24);
+  WRITE_OPL(oplmem, 0xE0 + op1offsets[voice], timbre->modulator_E862 >> 24);
+  WRITE_OPL(oplmem, 0xE0 + op2offsets[voice], timbre->carrier_E862 >> 24);
 
   /* sustain / release */
-  WRITE_OPL(oplport, 0x80 + op1offsets[voice], (timbre->modulator_E862 >> 16) & 0xff);
-  WRITE_OPL(oplport, 0x80 + op2offsets[voice], (timbre->carrier_E862 >> 16) & 0xff);
+  WRITE_OPL(oplmem, 0x80 + op1offsets[voice], (timbre->modulator_E862 >> 16) & 0xff);
+  WRITE_OPL(oplmem, 0x80 + op2offsets[voice], (timbre->carrier_E862 >> 16) & 0xff);
 
   /* attack rate / decay */
-  WRITE_OPL(oplport, 0x60 + op1offsets[voice], (timbre->modulator_E862 >> 8) & 0xff);
-  WRITE_OPL(oplport, 0x60 + op2offsets[voice], (timbre->carrier_E862 >> 8) & 0xff);
+  WRITE_OPL(oplmem, 0x60 + op1offsets[voice], (timbre->modulator_E862 >> 8) & 0xff);
+  WRITE_OPL(oplmem, 0x60 + op2offsets[voice], (timbre->carrier_E862 >> 8) & 0xff);
 
   /* AM / vibrato / envelope */
-  WRITE_OPL(oplport, 0x20 + op1offsets[voice], timbre->modulator_E862 & 0xff);
-  WRITE_OPL(oplport, 0x20 + op2offsets[voice], timbre->carrier_E862 & 0xff);
+  WRITE_OPL(oplmem, 0x20 + op1offsets[voice], timbre->modulator_E862 & 0xff);
+  WRITE_OPL(oplmem, 0x20 + op2offsets[voice], timbre->carrier_E862 & 0xff);
 
   /* feedback / connection */
   if (voice >= 9) {
@@ -466,23 +517,23 @@ void opl_loadinstrument(unsigned short int oplport, unsigned short int voice, co
     voice |= 0x100;
   }
   if (oplmem->opl3 != 0) { /* on OPL3 make sure to enable LEFT/RIGHT unmute bits */
-    WRITE_OPL(oplport, 0xC0 + voice, timbre->feedconn | 0x30);
+    WRITE_OPL(oplmem, 0xC0 + voice, timbre->feedconn | 0x30);
   } else {
-    WRITE_OPL(oplport, 0xC0 + voice, timbre->feedconn);
+    WRITE_OPL(oplmem, 0xC0 + voice, timbre->feedconn);
   }
 
 }
 
 
 /* adjust the volume of the voice (in the usual MIDI range of 0..127) */
-static void voicevolume(unsigned short port, unsigned short voice, int program, int volume) {
+static void voicevolume(unsigned short voice, int program, int volume) {
   unsigned char carrierval = gmtimbres[program].carrier_40;
   if (volume == 0) {
     carrierval |= 0x3f;
   } else {
     calc_vol(&carrierval, volume);
   }
-  WRITE_OPL(port, 0x40 + op2offsets[voice], carrierval);
+  WRITE_OPL(oplmem, 0x40 + op2offsets[voice], carrierval);
 }
 
 
@@ -496,7 +547,7 @@ static int getinstrument(int channel, int note) {
 }
 
 
-void opl_midi_noteon(unsigned short port, int channel, int note, int velocity) {
+void opl_midi_noteon(int channel, int note, int velocity) {
   int x, voice = -1;
   int lowestpriorityvoice = 0;
   int instrument;
@@ -523,14 +574,14 @@ void opl_midi_noteon(unsigned short port, int channel, int note, int velocity) {
     /* if no free voice available, then abort the oldest one */
     if (voice < 0) {
       voice = lowestpriorityvoice;
-      opl_midi_noteoff(port, oplmem->voices2notes[voice].channel, oplmem->voices2notes[voice].note);
+      opl_midi_noteoff(oplmem->voices2notes[voice].channel, oplmem->voices2notes[voice].note);
     }
   }
 
   /* load the proper instrument, if not already good */
   if (oplmem->voices2notes[voice].timbreid != instrument) {
     oplmem->voices2notes[voice].timbreid = instrument;
-    opl_loadinstrument(port, voice, &(gmtimbres[instrument]));
+    opl_loadinstrument(voice, &(gmtimbres[instrument]));
   }
 
   /* update states */
@@ -540,14 +591,14 @@ void opl_midi_noteon(unsigned short port, int channel, int note, int velocity) {
   oplmem->notes2voices[channel][note] = voice;
 
   /* set the requested velocity on the voice */
-  voicevolume(port, voice, oplmem->voices2notes[voice].timbreid, velocity * oplmem->channelvol[channel] / 127);
+  voicevolume(voice, oplmem->voices2notes[voice].timbreid, velocity * oplmem->channelvol[channel] / 127);
 
   /* trigger NOTE_ON on the OPL, take care to apply the 'finetune' pitch correction, too */
   if (channel == 9) { /* percussion channel doesn't provide a real note, so I */
                       /* use a static one (MUSPLAYER uses C-5 (60), why not.  */
-    opl_noteon(port, voice, 60, oplmem->channelpitch[channel] + gmtimbres[instrument].finetune);
+    opl_noteon(voice, 60, oplmem->channelpitch[channel] + gmtimbres[instrument].finetune);
   } else {
-    opl_noteon(port, voice, note, oplmem->channelpitch[channel] + gmtimbres[instrument].finetune);
+    opl_noteon(voice, note, oplmem->channelpitch[channel] + gmtimbres[instrument].finetune);
   }
 
   /* reajust all priorities */
@@ -557,11 +608,11 @@ void opl_midi_noteon(unsigned short port, int channel, int note, int velocity) {
 }
 
 
-void opl_midi_noteoff(unsigned short port, int channel, int note) {
+void opl_midi_noteoff(int channel, int note) {
   int voice = oplmem->notes2voices[channel][note];
 
   if (voice >= 0) {
-    opl_noteoff(port, voice);
+    opl_noteoff(voice);
     oplmem->voices2notes[voice].channel = -1;
     oplmem->voices2notes[voice].note = -1;
     oplmem->voices2notes[voice].priority = -1;

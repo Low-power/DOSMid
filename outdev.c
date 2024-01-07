@@ -27,9 +27,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef MSDOS
 #include <conio.h>  /* outp(), inp() */
 #include <dos.h>    /* _disable(), _enable() */
 #include <malloc.h> /* _fmalloc(), _ffree() */
+#else
+#include "unixpio.h"
+#include <unistd.h>
+#include <string.h>
+#include <stdlib.h>
+#include <errno.h>
+#endif
 
 #ifdef OPL
 #include "opl.h"
@@ -42,7 +50,9 @@
 #include "fio.h"
 #include "gus.h"
 #include "mpu401.h"
+#ifdef MSDOS
 #include "rs232.h"
+#endif
 #include "sbdsp.h"
 
 #ifdef SBAWE
@@ -53,16 +63,21 @@ static char far *presetbuf = NULL; /* used to allocate presets for custom sound 
 #include "outdev.h" /* include self for control */
 #include <assert.h>
 
+#ifdef MSDOS
 /* force the compiler to load valid DS segment value before calling
  * the AWE32 API functions (in far data models, where DS is floating) */
 #pragma aux __pascal "^" parm loadds reverse routine [] \
                          value struct float struct caller [] \
                          modify [ax bx cx dx es];
+#endif
 
 
 static enum outdev_type outdev = DEV_NONE;
 static unsigned short int outport = 0;
 static int outport_is_lpt = 0;
+#ifndef MSDOS
+static int out_fd = -1;
+#endif
 
 /* loads a SBK sound font to AWE hardware */
 #ifdef SBAWE
@@ -132,12 +147,21 @@ static int awe_loadfont(char *filename) {
  *
  * This should be called only ONCE, when program starts.
  * Returns NULL on success, or a pointer to an error string otherwise. */
-char *dev_init(enum outdev_type dev, unsigned short int port, int is_on_lpt, int skip_checking, char *sbank) {
+const char *dev_init(enum outdev_type dev, unsigned short int port,
+#ifndef MSDOS
+int fd,
+#endif
+int is_on_lpt, int skip_checking, char *sbank) {
   outdev = dev;
+#ifdef MSDOS
   outport = port;
+#else
+  if(fd == -1) outport = port; else out_fd = fd;
+#endif
   outport_is_lpt = is_on_lpt;
   switch (outdev) {
 #ifdef OPL
+      unsigned int port_or_fd;
       int gen;
       int flags;
 #endif
@@ -174,7 +198,11 @@ char *dev_init(enum outdev_type dev, unsigned short int port, int is_on_lpt, int
 #endif
 #ifdef CMS
     case DEV_CMS:
-      cms_reset(outport, is_on_lpt);
+      cms_reset(
+#ifndef MSDOS
+        out_fd,
+#endif
+        outport, is_on_lpt);
       break;
 #endif
 #ifdef OPL
@@ -191,7 +219,16 @@ char *dev_init(enum outdev_type dev, unsigned short int port, int is_on_lpt, int
       flags = 0;
       if(skip_checking) flags |= OPL_SKIP_CHECKING;
       if(is_on_lpt) flags |= OPL_ON_LPT;
-      switch(opl_init(outport, &gen, flags)) {
+#ifndef MSDOS
+      if(out_fd != -1) {
+        port_or_fd = out_fd;
+        flags |= OPL_PORT_IS_FD;
+      } else
+#endif
+      {
+        port_or_fd = outport;
+      }
+      switch(opl_init(port_or_fd, &gen, flags)) {
         case 0:
           break;
         case -1:
@@ -213,7 +250,11 @@ char *dev_init(enum outdev_type dev, unsigned short int port, int is_on_lpt, int
       break;
 #endif
     case DEV_RS232:
+#ifdef MSDOS
       if (rs232_check(outport) != 0) return("RS232 failure");
+#else
+      if(!isatty(out_fd)) return strerror(errno);
+#endif
       break;
     case DEV_SBMIDI:
       /* The DSP has to be reset before it is first programmed. The reset
@@ -222,9 +263,11 @@ char *dev_init(enum outdev_type dev, unsigned short int port, int is_on_lpt, int
       if (dsp_reset(outport) != 0) return("SB DSP initialization failure");
       dsp_write(outport, 0x30); /* switch the MIDI I/O into polling mode */
       break;
+#ifdef MSDOS
     case DEV_GUS:
       gus_open(port);
       break;
+#endif
     case DEV_NONE:
       break;
   }
@@ -251,9 +294,11 @@ void dev_preloadpatch(enum outdev_type dev, int p) {
     case DEV_CMS:
 #endif
       break;
+#ifdef MSDOS
     case DEV_GUS:
       gus_loadpatch(p);
       break;
+#endif
     case DEV_NONE:
       break;
   }
@@ -289,12 +334,16 @@ void dev_close(void) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
-      opl_close(outport);
+      opl_close();
       break;
 #endif
 #ifdef CMS
     case DEV_CMS:
-      cms_reset(outport, outport_is_lpt);
+      cms_reset(
+#ifndef MSDOS
+        out_fd,
+#endif
+        outport, outport_is_lpt);
       break;
 #endif
     case DEV_RS232:
@@ -309,12 +358,18 @@ void dev_close(void) {
       dsp_reset(outport); /* I don't use MIDI UART mode because it requires */
                           /* DSP v2.x, but reseting the chip seems like a   */
       break;              /* good thing to do anyway                        */
+#ifdef MSDOS
     case DEV_GUS:
       gus_close();
       break;
+#endif
     case DEV_NONE:
       break;
   }
+#ifndef MSDOS
+  out_fd = -1;
+#endif
+  outport = 0;
 }
 
 
@@ -341,18 +396,24 @@ void dev_clear(int flags) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
-      opl_clear(outport);
+      opl_clear();
       break;
 #endif
 #ifdef CMS
     case DEV_CMS:
-      cms_reset(outport, outport_is_lpt);
+      cms_reset(
+#ifndef MSDOS
+        out_fd,
+#endif
+        outport, outport_is_lpt);
       break;
 #endif
+#ifdef MSDOS
     case DEV_GUS:
       gus_allnotesoff();
       gus_unloadpatches();
       break;
+#endif
     case DEV_NONE:
       break;
   }
@@ -362,6 +423,9 @@ void dev_clear(int flags) {
 /* activate note on channel */
 void dev_noteon(int channel, int note, int velocity) {
   switch (outdev) {
+#ifndef MSDOS
+      unsigned char buffer[3];
+#endif
     case DEV_MPU401:
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, 0x90 | channel);  /* Send note ON to selected channel */
@@ -374,7 +438,7 @@ void dev_noteon(int channel, int note, int velocity) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
-      opl_midi_noteon(outport, channel, note, velocity);
+      opl_midi_noteon(channel, note, velocity);
       break;
 #endif
 #ifdef SBAWE
@@ -388,9 +452,16 @@ void dev_noteon(int channel, int note, int velocity) {
       break;
 #endif
     case DEV_RS232:
+#ifdef MSDOS
       rs232_write(outport, 0x90 | channel); /* Send note ON to selected channel */
       rs232_write(outport, note);           /* Send note number to turn ON */
       rs232_write(outport, velocity);       /* Send velocity */
+#else
+      buffer[0] = 0x90 | channel;
+      buffer[1] = note;
+      buffer[2] = velocity;
+      write(out_fd, buffer, 3);
+#endif
       break;
     case DEV_SBMIDI:
       dsp_write(outport, 0x38);             /* MIDI output */
@@ -400,11 +471,13 @@ void dev_noteon(int channel, int note, int velocity) {
       dsp_write(outport, 0x38);             /* MIDI output */
       dsp_write(outport, velocity);         /* Send velocity */
       break;
+#ifdef MSDOS
     case DEV_GUS:
       gus_write(0x90 | channel);            /* Send note ON to selected channel */
       gus_write(note);                      /* Send note number to turn ON */
       gus_write(velocity);                  /* Send velocity */
       break;
+#endif
     case DEV_NONE:
       break;
   }
@@ -414,6 +487,9 @@ void dev_noteon(int channel, int note, int velocity) {
 /* disable note on channel */
 void dev_noteoff(int channel, int note) {
   switch (outdev) {
+#ifndef MSDOS
+      unsigned char buffer[3];
+#endif
     case DEV_MPU401:
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, 0x80 | channel);  /* Send note OFF code on selected channel */
@@ -426,7 +502,7 @@ void dev_noteoff(int channel, int note) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
-      opl_midi_noteoff(outport, channel, note);
+      opl_midi_noteoff(channel, note);
       break;
 #endif
 #ifdef SBAWE
@@ -440,9 +516,16 @@ void dev_noteoff(int channel, int note) {
       break;
 #endif
     case DEV_RS232:
+#ifdef MSDOS
       rs232_write(outport, 0x80 | channel); /* 'note off' + channel selector */
       rs232_write(outport, note);           /* note number */
       rs232_write(outport, 64);             /* velocity */
+#else
+      buffer[0] = 0x80 | channel;
+      buffer[1] = note;
+      buffer[2] = 64;
+      write(out_fd, buffer, 3);
+#endif
       break;
     case DEV_SBMIDI:
       dsp_write(outport, 0x38);           /* MIDI output */
@@ -452,11 +535,13 @@ void dev_noteoff(int channel, int note) {
       dsp_write(outport, 0x38);           /* MIDI output */
       dsp_write(outport, 64);             /* Send velocity */
       break;
+#ifdef MSDOS
     case DEV_GUS:
       gus_write(0x80 | channel);   /* 'note off' + channel selector */
       gus_write(note);             /* note number */
       gus_write(64);               /* velocity */
       break;
+#endif
     case DEV_NONE:
       break;
   }
@@ -466,6 +551,9 @@ void dev_noteoff(int channel, int note) {
 /* adjust the pitch wheel of a channel */
 void dev_pitchwheel(int channel, int wheelvalue) {
   switch (outdev) {
+#ifndef MSDOS
+      unsigned char buffer[3];
+#endif
     case DEV_MPU401:
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, 0xE0 | channel);  /* Send selected channel */
@@ -478,7 +566,7 @@ void dev_pitchwheel(int channel, int wheelvalue) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
-      opl_midi_pitchwheel(outport, channel, wheelvalue);
+      opl_midi_pitchwheel(channel, wheelvalue);
       break;
 #endif
 #ifdef CMS
@@ -492,9 +580,16 @@ void dev_pitchwheel(int channel, int wheelvalue) {
       break;
 #endif
     case DEV_RS232:
+#ifdef MSDOS
       rs232_write(outport, 0xE0 | channel);   /* Send selected channel */
       rs232_write(outport, wheelvalue & 127); /* Send the lowest (least significant) 7 bits of the wheel value */
       rs232_write(outport, wheelvalue >> 7);  /* Send the highest (most significant) 7 bits of the wheel value */
+#else
+      buffer[0] = 0xE0 | channel;
+      buffer[1] = wheelvalue & 127;
+      buffer[2] = wheelvalue >> 7;
+      write(out_fd, buffer, 3);
+#endif
       break;
     case DEV_SBMIDI:
       dsp_write(outport, 0x38);             /* MIDI output */
@@ -504,11 +599,13 @@ void dev_pitchwheel(int channel, int wheelvalue) {
       dsp_write(outport, 0x38);             /* MIDI output */
       dsp_write(outport, wheelvalue >> 7);  /* Send the highest (most significant) 7 bits of the wheel value */
       break;
+#ifdef MSDOS
     case DEV_GUS:
       gus_write(0xE0 | channel);   /* Send selected channel */
       gus_write(wheelvalue & 127); /* Send the lowest (least significant) 7 bits of the wheel value */
       gus_write(wheelvalue >> 7);  /* Send the highest (most significant) 7 bits of the wheel value */
       break;
+#endif
     case DEV_NONE:
       break;
   }
@@ -518,6 +615,9 @@ void dev_pitchwheel(int channel, int wheelvalue) {
 /* send a 'controller' message */
 void dev_controller(int channel, int id, int val) {
   switch (outdev) {
+#ifndef MSDOS
+      unsigned char buffer[3];
+#endif
     case DEV_MPU401:
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, 0xB0 | channel);  /* Send selected channel */
@@ -530,7 +630,7 @@ void dev_controller(int channel, int id, int val) {
     case DEV_OPL:
     case DEV_OPL2:
     case DEV_OPL3:
-      opl_midi_controller(outport, channel, id, val);
+      opl_midi_controller(channel, id, val);
       break;
 #endif
 #ifdef CMS
@@ -544,9 +644,16 @@ void dev_controller(int channel, int id, int val) {
       break;
 #endif
     case DEV_RS232:
+#ifdef MSDOS
       rs232_write(outport, 0xB0 | channel);  /* Send selected channel */
       rs232_write(outport, id);              /* Send the controller's id */
       rs232_write(outport, val);             /* Send controller's value */
+#else
+      buffer[0] = 0xB0 | channel;
+      buffer[1] = id;
+      buffer[2] = val;
+      write(out_fd, buffer, 3);
+#endif
       break;
     case DEV_SBMIDI:
       dsp_write(outport, 0x38);            /* MIDI output */
@@ -556,11 +663,13 @@ void dev_controller(int channel, int id, int val) {
       dsp_write(outport, 0x38);            /* MIDI output */
       dsp_write(outport, val);             /* Send controller's value */
       break;
+#ifdef MSDOS
     case DEV_GUS:
       gus_write(0xB0 | channel);           /* Send selected channel */
       gus_write(id);                       /* Send the controller's id */
       gus_write(val);                      /* Send controller's value */
       break;
+#endif
     case DEV_NONE:
       break;
   }
@@ -569,6 +678,9 @@ void dev_controller(int channel, int id, int val) {
 
 void dev_chanpressure(int channel, int pressure) {
   switch (outdev) {
+#ifndef MSDOS
+      unsigned char buffer[2];
+#endif
     case DEV_MPU401:
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, 0xD0 | channel);  /* Send selected channel */
@@ -588,8 +700,14 @@ void dev_chanpressure(int channel, int pressure) {
       break;
 #endif
     case DEV_RS232:
+#ifdef MSDOS
       rs232_write(outport, 0xD0 | channel);  /* Send selected channel */
       rs232_write(outport, pressure);        /* Send the pressure value */
+#else
+      buffer[0] = 0xD0 | channel;
+      buffer[1] = pressure;
+      write(out_fd, buffer, 2);
+#endif
       break;
     case DEV_SBMIDI:
       dsp_write(outport, 0x38);            /* MIDI output */
@@ -597,10 +715,12 @@ void dev_chanpressure(int channel, int pressure) {
       dsp_write(outport, 0x38);            /* MIDI output */
       dsp_write(outport, pressure);        /* Send the pressure value */
       break;
+#ifdef MSDOS
     case DEV_GUS:
       gus_write(0xD0 | channel);           /* Send selected channel */
       gus_write(pressure);                 /* Send the pressure value */
       break;
+#endif
     case DEV_NONE:
       break;
   }
@@ -609,6 +729,9 @@ void dev_chanpressure(int channel, int pressure) {
 
 void dev_keypressure(int channel, int note, int pressure) {
   switch (outdev) {
+#ifndef MSDOS
+      unsigned char buffer[3];
+#endif
     case DEV_MPU401:
       mpu401_waitwrite(outport);      /* Wait for port ready */
       outp(outport, 0xA0 | channel);  /* Send selected channel */
@@ -630,9 +753,16 @@ void dev_keypressure(int channel, int note, int pressure) {
       break;
 #endif
     case DEV_RS232:
+#ifdef MSDOS
       rs232_write(outport, 0xA0 | channel);  /* Send selected channel */
       rs232_write(outport, note);            /* Send the note we target */
       rs232_write(outport, pressure);        /* Send the pressure value */
+#else
+      buffer[0] = 0xA0 | channel;
+      buffer[1] = note;
+      buffer[2] = pressure;
+      write(out_fd, buffer, 3);
+#endif
       break;
     case DEV_SBMIDI:
       dsp_write(outport, 0x38);            /* MIDI output */
@@ -642,11 +772,13 @@ void dev_keypressure(int channel, int note, int pressure) {
       dsp_write(outport, 0x38);            /* MIDI output */
       dsp_write(outport, pressure);        /* Send the pressure value */
       break;
+#ifdef MSDOS
     case DEV_GUS:
       gus_write(0xA0 | channel);           /* Send selected channel */
       gus_write(note);                     /* Send the note we target */
       gus_write(pressure);                 /* Send the pressure value */
       break;
+#endif
     case DEV_NONE:
       break;
   }
@@ -684,8 +816,10 @@ void dev_tick(void) {
       break;
     case DEV_SBMIDI:
       break;
+#ifdef MSDOS
     case DEV_GUS:
       break;
+#endif
     case DEV_NONE:
       break;
   }
@@ -695,6 +829,9 @@ void dev_tick(void) {
 /* sets a "program" (meaning an instrument) on a channel */
 void dev_setprog(int channel, int program) {
   switch (outdev) {
+#ifndef MSDOS
+      unsigned char buffer[2];
+#endif
     case DEV_MPU401:
       mpu401_waitwrite(outport);     /* Wait for port ready */
       outp(outport, 0xC0 | channel); /* Send channel */
@@ -714,8 +851,14 @@ void dev_setprog(int channel, int program) {
       break;
 #endif
     case DEV_RS232:
+#ifdef MSDOS
       rs232_write(outport, 0xC0 | channel); /* Send channel */
       rs232_write(outport, program);        /* Send patch id */
+#else
+      buffer[0] = 0xC0 | channel;
+      buffer[1] = program;
+      write(out_fd, buffer, 2);
+#endif
       break;
     case DEV_SBMIDI:
       dsp_write(outport, 0x38);           /* MIDI output */
@@ -723,6 +866,7 @@ void dev_setprog(int channel, int program) {
       dsp_write(outport, 0x38);           /* MIDI output */
       dsp_write(outport, program);        /* Send patch id */
       break;
+#ifdef MSDOS
     case DEV_GUS:
       /* NOTE I might (?) want to call gus_loadpatch() here */
       /*if (channel == 9) program |= 128;
@@ -730,6 +874,7 @@ void dev_setprog(int channel, int program) {
       gus_write(0xC0 | channel);          /* Send channel */
       gus_write(program);                 /* Send patch id */
       break;
+#endif
     case DEV_NONE:
       break;
   }
@@ -759,9 +904,13 @@ void dev_sysex(int channel, unsigned char *buff, int bufflen) {
       break;
 #endif
     case DEV_RS232:
+#ifdef MSDOS
       for (x = 0; x < bufflen; x++) {
         rs232_write(outport, buff[x]);      /* Send sysex data byte */
       }
+#else
+      write(out_fd, buff, bufflen);
+#endif
       break;
     case DEV_SBMIDI:
       for (x = 0; x < bufflen; x++) {
@@ -769,10 +918,12 @@ void dev_sysex(int channel, unsigned char *buff, int bufflen) {
         dsp_write(outport, buff[x]);        /* Send sysex data byte */
       }
       break;
+#ifdef MSDOS
     case DEV_GUS:
       for (x = 0; x < bufflen; x++) {
         gus_write(buff[x]);                 /* Send sysex data byte */
       }
+#endif
       break;
     case DEV_NONE:
       break;

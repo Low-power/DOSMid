@@ -136,6 +136,8 @@ struct midi_event {
   enum midi_midievent type;
 };
 
+void midi_init_static_ident(void);
+
 /* returns number of tracks in midi file on success, neg val otherwise */
 int midi_readhdr(struct fiofile *f, int *format, unsigned short int *timeunitdiv, unsigned long int *tracklist, int maxtracks);
 

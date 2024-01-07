@@ -2,16 +2,43 @@
  * File I/O, based on DOS int 21h calls
  * This file is part of the DOSMid project
  * http://dosmid.sourceforge.net
- *
+ * Modified by Rivoreo
+ * https://sourceforge.net/p/rivoreo/dosmid-code/
  * Copyright (C) 2018 Mateusz Viste
+ * Copyright 2015-2024 Rivoreo
  */
 
+#ifdef MSDOS
 #include <dos.h>    /* REGS */
+#else
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#define _fmemcpy memcpy
+#endif
 #include <string.h> /* _fmemcpy() */
-
 #include "fio.h" /* include self for control */
 
+#ifndef MSDOS
+static int sync_read(int fd, void *buffer, size_t count) {
+  char *p = buffer;
+  do {
+    int s = read(fd, p, count);
+    if(s < 0) {
+      if(errno == EINTR) continue;
+      if(p == (char *)buffer) return -1;
+      break;
+    }
+    if(!s) break;
+    count -= s;
+    p += s;
+  } while(count > 0);
+  return p - (char *)buffer;
+}
+#endif
+
 static void fio_seek_sync(struct fiofile *f) {
+#ifdef MSDOS
 /* DOS 2+ - LSEEK - SET CURRENT FILE POSITION
    AH = 42h
    AL = origin of move
@@ -29,7 +56,9 @@ static void fio_seek_sync(struct fiofile *f) {
   union REGS regs;
   unsigned short *off;
   long offset;
+#endif
   if ((f->flags & FIO_FLAG_SEEKSYNC) == 0) return;
+#ifdef MSDOS
   offset = f->curpos;
   off = (unsigned short *)(&offset);
   regs.x.ax = 0x4200u;
@@ -40,6 +69,9 @@ static void fio_seek_sync(struct fiofile *f) {
   f->flags &= ~FIO_FLAG_SEEKSYNC;
   /* if (regs.x.cflag != 0) return(0 - regs.x.ax);
   return(((long)regs.x.dx << 16) | regs.x.ax); */
+#else
+  lseek(f->fh, f->curpos, SEEK_SET);
+#endif
 }
 
 /* seek to offset position of file pointed at by fhandle. returns current file position on success, a negative error otherwise */
@@ -86,21 +118,28 @@ int fio_getline(struct fiofile *f, void far *buff, short int buflen) {
 }
 
 static void loadcache(struct fiofile *f) {
+#ifdef MSDOS
   union REGS regs;
   struct SREGS sregs;
+#endif
   fio_seek_sync(f);
   f->flags |= FIO_FLAG_SEEKSYNC;
   f->bufoffs = f->curpos;
+#ifdef MSDOS
   regs.h.ah = 0x3f;
   regs.x.bx = f->fh;
   regs.x.cx = FIO_CACHE;
   sregs.ds = FP_SEG(f->buff);
   regs.x.dx = FP_OFF(f->buff);
   int86x(0x21, &regs, &regs, &sregs);
+#else
+  sync_read(f->fh, f->buff, FIO_CACHE);
+#endif
 }
 
 /* open file fname and set fhandle with the associated file handle. returns 0 on success, non-zero otherwise */
 int fio_open(const char far *fname, int mode, struct fiofile *f) {
+#ifdef MSDOS
   /* DOS 2+ - OPEN - OPEN EXISTING FILE
      AH = 3Dh
      AL = access and sharing modes
@@ -120,10 +159,29 @@ int fio_open(const char far *fname, int mode, struct fiofile *f) {
   int86x(0x21, &regs, &regs, &sregs);
   f->fh = regs.x.ax;
   if (regs.x.cflag != 0) return(-1);
-  /* */
+#else
+  int flags;
+  switch(mode) {
+    case FIO_OPEN_RD:
+      flags = O_RDONLY;
+      break;
+    case FIO_OPEN_WR:
+      flags = O_WRONLY;
+      break;
+    case FIO_OPEN_RW:
+      flags = O_RDWR;
+      break;
+    default:
+      return -1;
+  }
+  int fd = open(fname, flags);
+  if(fd == -1) return -1;
+  f->fh = fd;
+#endif
   f->curpos = 0;
   loadcache(f);
   /* fseek to end so I know the file length */
+#ifdef MSDOS
   regs.x.ax = 0x4202u;
   regs.x.bx = f->fh;
   regs.x.cx = 0;
@@ -136,13 +194,18 @@ int fio_open(const char far *fname, int mode, struct fiofile *f) {
   regs.x.cx = 0;
   regs.x.dx = 0;
   int86(0x21, &regs, &regs);
-  /* */
+#else
+  off_t len = lseek(fd, 0, SEEK_END);
+  if(len != (off_t)-1) f->flen = len;
+  lseek(fd, 0, SEEK_SET);
+#endif
   f->flags = FIO_FLAG_SEEKSYNC;
   return(0);
 }
 
 /* reads count bytes from file pointed at by fhandle, and writes the data into buff. returns the number of bytes actually read, or a negative number on error */
 int fio_read(struct fiofile *f, void far *buff, int count) {
+#ifdef MSDOS
 /* DOS 2+ - READ - READ FROM FILE OR DEVICE
  * AH = 3Fh
  * BX = file handle
@@ -155,6 +218,7 @@ int fio_read(struct fiofile *f, void far *buff, int count) {
  * AX = error code (05h,06h) (see #01680 at AH=59h/BX=0000h) */
   union REGS regs;
   struct SREGS sregs;
+#endif
   if (f->curpos + count > f->flen) count = f->flen - f->curpos;
   if (count == 0) return(0);
   if (count <= FIO_CACHE) {
@@ -166,6 +230,7 @@ int fio_read(struct fiofile *f, void far *buff, int count) {
     return(count);
   }
   fio_seek_sync(f);
+#ifdef MSDOS
   regs.h.ah = 0x3f;
   regs.x.bx = f->fh;
   regs.x.cx = count;
@@ -175,10 +240,14 @@ int fio_read(struct fiofile *f, void far *buff, int count) {
   if (regs.x.cflag != 0) return(0 - regs.x.ax);
   f->curpos += regs.x.ax;
   return(regs.x.ax);
+#else
+  return sync_read(f->fh, buff, count);
+#endif
 }
 
 /* close file handle. returns 0 on success, non-zero otherwise */
 int fio_close(struct fiofile *f) {
+#ifdef MSDOS
   /* DOS 2+ - CLOSE - CLOSE FILE
      AH = 3Eh
      BX = file handle
@@ -194,4 +263,7 @@ int fio_close(struct fiofile *f) {
   int86(0x21, &regs, &regs);
   if (regs.x.cflag != 0) return(0 - regs.x.ax);
   return(0);
+#else
+  return close(f->fh);
+#endif
 }

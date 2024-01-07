@@ -1,7 +1,6 @@
 /*
- * Common code for writing data to LPT
- *
- * Copyright 2015-2023 Rivoreo
+ * x86 port I/O for UNIX
+ * Copyright 2015-2024 Rivoreo
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -26,10 +25,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef lpt_h_sentinel
-#define lpt_h_sentinel
+#if !defined MSDOS && (defined __i386__ || defined __amd64__ || defined __x86_64__ || defined _X86_ || defined __IA32__ || defined _M_IX86 || defined _M_AMD64)
 
-void write_lpt(unsigned int port, unsigned int byte, unsigned int ctrl);
-void write_lpt_fd(int fd, unsigned int data, unsigned int ctrl);
+#ifndef unixpio_h_sentinel
+#define unixpio_h_sentinel
+
+void open_port_io_device(void);
+unsigned int inp(unsigned int);
+unsigned int outp(unsigned int, unsigned int);
+
+#endif
 
 #endif

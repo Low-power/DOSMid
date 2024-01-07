@@ -27,7 +27,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef MSDOS
 #include <conio.h>  /* inp() and outp() */
+#else
+#include "unixpio.h"
+#endif
 
 #include "timer.h"
 #include "mpu401.h"  /* include self for control */

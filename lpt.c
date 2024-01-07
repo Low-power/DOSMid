@@ -1,7 +1,7 @@
 /*
  * Common code for writing data to LPT
  *
- * Copyright 2015-2023 Rivoreo
+ * Copyright 2015-2024 Rivoreo
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,7 +28,17 @@
 
 #if defined CMSLPT || defined OPLLPT
 
+#ifdef MSDOS
 #include <conio.h>
+#else
+#include "unixpio.h"
+#include <sys/param.h>
+#if defined __FreeBSD__ && !defined __FreeBSD_kernel__
+#define __FreeBSD_kernel__
+#elif defined __LINUX__ && !defined __linux__
+#define __linux__
+#endif
+#endif
 
 // Copied from CMSLPT project
 void write_lpt(unsigned int port, unsigned int byte, unsigned int ctrl) {
@@ -46,5 +56,48 @@ void write_lpt(unsigned int port, unsigned int byte, unsigned int ctrl) {
   }
   outp(port, ctrl);
 }
+
+#ifdef __FreeBSD_kernel__
+#include <dev/ppbus/ppi.h>
+#include <dev/ppbus/ppbconf.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+#include <stdint.h>
+#include "timer.h"
+
+void write_lpt_fd(int fd, unsigned int data, unsigned int ctrl) {
+  uint8_t value = data;
+  ioctl(fd, PPISDATA, &value);
+  value = ctrl;
+  ioctl(fd, PPISCTRL, &value);
+  value = ctrl ^ 4;
+  ioctl(fd, PPISCTRL, &value);
+  udelay((ctrl & 1) ? 4 : 1);
+  value = data;
+  ioctl(fd, PPISDATA, &value);
+}
+#elif defined __linux__
+#include <sys/ioctl.h>
+#include <linux/ppdev.h>
+#include "timer.h"
+
+void write_lpt_fd(int fd, unsigned int data, unsigned int ctrl) {
+  unsigned char value = data;
+  ioctl(fd, PPWDATA, &value);
+  value = ctrl;
+  ioctl(fd, PPWCONTROL, &value);
+  value = ctrl ^ 4;
+  ioctl(fd, PPWCONTROL, &value);
+  udelay((ctrl & 1) ? 4 : 1);
+  value = data;
+  ioctl(fd, PPWDATA, &value);
+}
+#elif !defined MSDOS
+#include <stdlib.h>
+
+void write_lpt_fd(int fd, unsigned int data, unsigned int ctrl) {
+  abort();
+}
+#endif
 
 #endif

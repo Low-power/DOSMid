@@ -30,6 +30,8 @@
 #ifndef outdev_h_sentinel
 #define outdev_h_sentinel
 
+#include <stdint.h>
+
 enum outdev_type {
   DEV_NONE,
   DEV_MPU401,
@@ -43,7 +45,9 @@ enum outdev_type {
 #endif
   DEV_RS232,
   DEV_SBMIDI,
+#ifdef MSDOS
   DEV_GUS,
+#endif
 #ifdef CMS
   DEV_CMS,
 #endif
@@ -60,7 +64,11 @@ enum outdev_type {
  * This should be called only ONCE, when program starts.
  * Returns NULL on success, or a pointer to an error message otherwise.
  */
-char *dev_init(enum outdev_type dev, unsigned short int port, int is_on_lpt, int skip_checking, char *sbank);
+#ifdef MSDOS
+const char *dev_init(enum outdev_type dev, uint16_t port, int is_on_lpt, int skip_checking, char *sbank);
+#else
+const char *dev_init(enum outdev_type dev, uint16_t port, int fd, int is_on_lpt, int skip_checking, char *sbank);
+#endif
 
 /* pre-load a patch (so far needed only for GUS) */
 void dev_preloadpatch(enum outdev_type dev, int p);

@@ -35,7 +35,11 @@
 #ifdef CMSLPT
 #include "lpt.h"
 #endif
+#ifdef MSDOS
 #include <conio.h>
+#else
+#include "unixpio.h"
+#endif
 #include <stddef.h>
 #include <assert.h>
 #ifdef CMS_DEBUG
@@ -134,6 +138,9 @@ static const unsigned char CMSFreqMap[128] = {
 		247,249,250,251,252,253,254,255
 	};
 
+#ifndef MSDOS
+static int cms_fd = -1;
+#endif
 // CMS I/O port address
 static unsigned short int cms_port;
 #ifdef CMSLPT
@@ -178,8 +185,16 @@ static void write_cms(unsigned char chip_i, unsigned char reg, unsigned char val
 #ifdef CMSLPT
 	if(is_cmslpt) {
 		unsigned int ctrl = chip_i ? 6 : 12;
-		write_lpt(cms_port, reg, ctrl);
-		write_lpt(cms_port, value, ctrl | 1);
+#ifndef MSDOS
+		if(cms_fd != -1) {
+			write_lpt_fd(cms_fd, reg, ctrl);
+			write_lpt_fd(cms_fd, value, ctrl | 1);
+		} else
+#endif
+		{
+			write_lpt(cms_port, reg, ctrl);
+			write_lpt(cms_port, value, ctrl | 1);
+		}
 	} else
 #endif
 	{
@@ -189,7 +204,7 @@ static void write_cms(unsigned char chip_i, unsigned char reg, unsigned char val
 	}
 }
 
-#if 1
+#ifdef MSDOS
 static void __declspec(naked) asm_write_cms() {
 	__asm {
 		push	ax
@@ -213,12 +228,19 @@ static void __declspec(naked) asm_write_cms() {
 }
 #endif
 
-void cms_reset(unsigned short int port, int is_on_lpt)
-{
-   int i;
-   cms_port = port;
+void cms_reset(
+#ifndef MSDOS
+int fd,
+#endif
+unsigned short int port, int is_on_lpt) {
+	int i;
+#ifndef MSDOS
+	assert(fd == -1 || is_on_lpt);
+	cms_fd = fd;
+#endif
+	cms_port = port;
 #ifdef CMSLPT
-   is_cmslpt = is_on_lpt;
+	is_cmslpt = is_on_lpt;
 #endif
 	for(i = 0; i < 2; i++) {
 		int j;
@@ -258,7 +280,7 @@ static void cms_disable_voice(unsigned char voice)
 
 static void cms_enable_voice(unsigned char voice, unsigned char freq, unsigned char octave, unsigned char left_amplitude, unsigned char right_amplitude)
 {
-#if 1
+#ifdef MSDOS
   __asm {
 		xor   bh,bh
 		mov   bl,voice
@@ -358,6 +380,7 @@ first:
 }
 
 static void cms_set_volume(unsigned char voice, unsigned char left_amplitude, unsigned char right_amplitude) {
+#ifdef MSDOS
 	__asm {
 		xor	bh,bh
 		mov	bl, voice
@@ -375,6 +398,9 @@ static void cms_set_volume(unsigned char voice, unsigned char left_amplitude, un
 		mov	ah, bl
 		call	asm_write_cms
 	}
+#else
+	write_cms(voice > 5, ChanReg[voice], (right_amplitude << 4) | (left_amplitude & 0xf));
+#endif
 }
 
 static int scale_velocity(int velocity, unsigned char volume, signed char pan) {

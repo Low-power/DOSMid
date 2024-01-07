@@ -28,6 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef MSDOS
+
 #include <conio.h> /* inp() */
 #include <dos.h>   /* MK_FP() */
 
@@ -72,3 +74,5 @@ int rs232_read(unsigned short port) {
   /* otherwise read from port and return the result */
   return(inp(port));
 }
+
+#endif

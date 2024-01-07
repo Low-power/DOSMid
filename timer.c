@@ -12,11 +12,17 @@
  * program exit.
  */
 
+#include "timer.h" /* include self for control */
 #include <stdlib.h> /* atexit() */
+#ifdef MSDOS
 #include <dos.h>   /* _chain_intr(), _disable(), _enable(), _dos_setvect() */
 #include <conio.h> /* outp() */
-#include "timer.h" /* include self for control */
+#else
+#include <unistd.h>
+#include <time.h>
+#endif
 
+#ifdef MSDOS
 /* selects timer's resolution */
 #define TIMER_1165_HZ
 /*#define TIMER_582_HZ*/
@@ -86,20 +92,33 @@ static void interrupt handle_clock(void) {
     outp(0x20, 0x20);  /* end of interrupt */
   }
 }
+#else
+
+#ifndef CLOCK_MONOTONIC_FAST
+#define CLOCK_MONOTONIC_FAST CLOCK_MONOTONIC
+#endif
+
+static struct timespec reference;
+#endif
 
 
 /* reset the timer value, this can be used by the application to make sure
  * no timer wrap occurs during critical parts of the code flow */
 void timer_reset(void) {
+#ifdef MSDOS
   disable();
   nowtime = 0;
   enable();
+#else
+  clock_gettime(CLOCK_MONOTONIC_FAST, &reference);
+#endif
 }
 
 
 /* This routine will stop the timer. It has void return value so that it
  * can be an exit procedure. */
 void timer_stop(void) {
+#ifdef MSDOS
   /* Disable interrupts */
   disable();
 
@@ -113,6 +132,7 @@ void timer_stop(void) {
 
   /* Enable interrupts */
   enable();
+#endif
 }
 
 
@@ -121,6 +141,7 @@ void timer_stop(void) {
  * setting the interrupt rate up to its higher speed by programming the 8253
  * timer chip. */
 void timer_init(void) {
+#ifdef MSDOS
   /* Store the old interrupt handler */
   oldfunc = getvect(CLOCK_INT);
 
@@ -143,34 +164,48 @@ void timer_init(void) {
 
   /* Install the timer_stop() routine to be called at exit */
   atexit(timer_stop);
+#else
+  timer_reset();
+#endif
 }
 
 
 /* This routine will return the present value of the time, as a number of
  * microseconds. Interrupts are disabled during this time to prevent the
  * clock from changing while it is being read. */
-void timer_read(unsigned long *res) {
+void timer_read(unsigned long int *value) {
+#ifdef MSDOS
   /* Disable interrupts */
   disable();
 
   /* Read the time */
-  *res = nowtime;
+  *value = nowtime;
 
   /* Enable interrupts */
   enable();
+#else
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC_FAST, &now);
+  *value = (now.tv_sec - reference.tv_sec) * 1000000;
+  *value += (now.tv_nsec - reference.tv_nsec) / 1000;
+#endif
 }
 
-
 /* high resolution sleeping routine, waits n microseconds */
-void udelay(unsigned long us) {
-  unsigned long t1, t2;
-  timer_read(&t1);
-  for (;;) {
-    timer_read(&t2);
-    if (t2 < t1) { /* detect timer wraparound */
-      break;
-    } else if (t2 - t1 >= us) {
-      break;
+void udelay(unsigned long int usec) {
+#ifndef MSDOS
+  if(usec > 100) {
+    while(usec > 1000000) {
+      usleep(1000000);
+      usec -= 1000000;
     }
+    usleep(usec);
+    return;
   }
+#endif
+  unsigned long int t1, t2;
+  timer_read(&t1);
+  do {
+    timer_read(&t2);
+  } while(t2 >= t1 && t2 - t1 < usec);
 }

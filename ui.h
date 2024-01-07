@@ -46,6 +46,7 @@ struct trackinfodata {
 
 /* inits ui, sets colorflag (0=mono ; non-zero=color) */
 #define UI_NOCOLOR (1 << 0)
+#define UI_WCHAR (1 << 1)
 void ui_init(int flags);
 
 /* cleanup and restores initial video mode */
@@ -55,10 +56,14 @@ void ui_close(void);
 void ui_hidecursor(void);
 
 /* outputs an error message onscreen (title can be NULL) */
-void ui_puterrmsg(char *title, char *errmsg);
+void ui_puterrmsg(const char *title, const char *errmsg);
 
 /* draws the UI screen */
-void ui_draw(struct trackinfodata *trackinfo, unsigned short *refreshflags, unsigned short *refreshchans, char *devname, unsigned int mpuport, int onlpt, int volume);
+#ifdef MSDOS
+void ui_draw(const struct trackinfodata *trackinfo, unsigned short int *refreshflags, unsigned short int *refreshchans, const char *devtypename, unsigned int port, int onlpt, int volume);
+#else
+void ui_draw(const struct trackinfodata *trackinfo, unsigned short int *refreshflags, unsigned short int *refreshchans, const char *devtypename, const char *devname, unsigned int port, int onlpt, int volume);
+#endif
 
 /* waits for a keypress and return it. Returns 0 for extended keystroke, then
    function must be called again to return scan code. */

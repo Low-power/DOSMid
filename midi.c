@@ -27,16 +27,25 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdint.h>
 #include <string.h>  /* memcpy() */
-
 #include "bitfield.h"
 #include "fio.h"
 #include "mem.h"
 #include "midi.h"   /* include self for control */
 
-#define BSWAPL(x) ((((unsigned long)(x) & 0x000000FFul) << 24) | (((unsigned long)(x) & 0x0000FF00ul) << 8) | (((unsigned long)(x) & 0x00FF0000ul) >> 8) | (((unsigned long)(x) & 0xFF000000ul) >> 24))
+//#define BSWAP32(x) ((uint32_t)((((uint32_t)(x) & 0x000000FFul) << 24) | (((uint32_t)(x) & 0x0000FF00ul) << 8) | (((uint32_t)(x) & 0x00FF0000ul) >> 8) | (((uint32_t)(x) & 0xFF000000ul) >> 24)))
 
 extern unsigned char wbuff[];
+
+static uint32_t riff_ident, rmid_ident, mthd_ident, mtrk_ident;
+
+void midi_init_static_ident() {
+  memcpy(&riff_ident, "RIFF", 4);
+  memcpy(&rmid_ident, "RMID", 4);
+  memcpy(&mthd_ident, "MThd", 4);
+  memcpy(&mtrk_ident, "MTrk", 4);
+}
 
 /* PRIVATE ROUTINES USED FOR INTERNAL PROCESSING ONLY */
 
@@ -57,19 +66,25 @@ static int midi_fetch_variablelen_fromfile(struct fiofile *f, unsigned long int 
 
 /* reads a MIDI file and computes a map of chunks (ie a list of offsets) */
 static int midi_gettrackmap(struct fiofile *f, unsigned long int *tracklist, int maxchunks) {
-  short i;
-  unsigned long ulvar;
+  int i;
+  union {
+    uint32_t ui32;
+    uint8_t ba[4];
+  } buffer;
+  long int offset;
   for (i = 0; i < maxchunks; i++) {
     /* read and validate chunk's id */
-    if (fio_read(f, &ulvar, 4) != 4) break;
-    if (ulvar != 0x6b72544dL) return(-1); /* if header != "MTrk" */
+    if (fio_read(f, &buffer, 4) != 4) break;
+    if (buffer.ui32 != mtrk_ident) return(-1); /* if header != "MTrk" */
     /* compute the track's byte length */
-    if (fio_read(f, &ulvar, 4) != 4) break;
-    ulvar = BSWAPL(ulvar);
+    if (fio_read(f, &buffer, 4) != 4) break;
+    offset =
+      ((long int)buffer.ba[0] << 24) | ((long int)buffer.ba[1] << 16) |
+        ((long int)buffer.ba[2] << 8) | buffer.ba[3];
     /* remember chunk data offset */
     tracklist[i] = fio_seek(f, FIO_SEEK_CUR, 0);
     /* skip to next chunk */
-    fio_seek(f, FIO_SEEK_CUR, ulvar);
+    fio_seek(f, FIO_SEEK_CUR, offset);
   }
   return(i);
 }
@@ -79,6 +94,7 @@ static int midi_gettrackmap(struct fiofile *f, unsigned long int *tracklist, int
 
 
 int midi_readhdr(struct fiofile *f, int *format, unsigned short int *timeunitdiv, unsigned long int *tracklist, int maxtracks) {
+  const uint32_t *uint32_p = (const uint32_t *)wbuff;
   unsigned short tracks;
   /*
    * Here's an example of a complete MThd chunk:
@@ -95,15 +111,14 @@ int midi_readhdr(struct fiofile *f, int *format, unsigned short int *timeunitdiv
   /* read first 14 bytes - if unable, return an error */
   if (fio_read(f, wbuff, 14) != 14) return(-8);
   /* if no RMID header, then assume it's normal MIDI */
-  if ((wbuff[0] == 'R') && (wbuff[1] == 'I')  && (wbuff[2] == 'F') && (wbuff[3] == 'F')
-   && (wbuff[8] == 'R') && (wbuff[9] == 'M') && (wbuff[10] == 'I') && (wbuff[11] == 'D')) {
+  if (uint32_p[0] == riff_ident && uint32_p[1] == rmid_ident) {
     /* skip 6 bytes and there we should have our MThd MIDI header */
     fio_seek(f, FIO_SEEK_CUR, 6);
     if (fio_read(f, wbuff, 14) != 14) return(-7);
   }
 
   /* check id (MThd) and len (must be exactly 6 bytes) */
-  if ((((unsigned long *)wbuff)[0] != 0x6468544dL) || (wbuff[4] != 0) || (wbuff[5] != 0) || (wbuff[6] != 0) || (wbuff[7] != 6)) { /* 0x6468544dL == "MThd" */
+  if (uint32_p[0] != mthd_ident || wbuff[4] || wbuff[5] || wbuff[6] || wbuff[7] != 6) {
     return(-6);
   }
 
@@ -314,7 +329,7 @@ static int ld_sysex(struct midi_event *event, struct fiofile *f, unsigned char s
   sysexbuff = wbuff;
   event->type = EVENT_SYSEX;
 
-  ((unsigned short *)sysexbuff)[0] = sysexlen;
+  ((uint16_t *)sysexbuff)[0] = sysexlen;
   sysexbuff[2] = statusbyte; /* I store the entire sysex string in memory */
   fio_read(f, sysexbuff + 3, sysexlen - 1); /* read sysexlen-1 because I have already read the status byte */
   event->data.sysex.sysexptr = mem_alloc(sysexleneven);

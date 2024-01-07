@@ -27,63 +27,87 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <malloc.h>  /* _ffree(), _fmalloc() */
-#include <string.h>  /* memcpy() */
-
+#ifdef MSDOS
 #include "xms.h"
+#include <malloc.h>  /* _ffree(), _fmalloc() */
+#else
+#include <stdlib.h>
+#endif
 #include "midi.h"
 #include "mem.h" /* include self for control */
+#include <string.h>  /* memcpy() */
 
+#ifndef MSDOS
+#define _fmemcpy memcpy
+#define _fmalloc malloc
+#define _ffree free
+#endif
 
 #define LOWMEMBUFCOUNT 64    /* how many memory pools I can try using for 'noxms' allocations */
 #define LOWMEMBUFSIZE  8192  /* how big each memory pool is, in bytes */
 
 static unsigned char far *mempool[LOWMEMBUFCOUNT];
-unsigned short MEM_MODE = 0;
+#ifdef MSDOS
 static struct xms xms;
+#endif
 static long nexteventid = 0;
-unsigned long MEM_TOTALLOC = 0; /* total allocated memory counter (bytes) */
+#ifdef MSDOS
+unsigned short int mem_mode = 0;
+#endif
+size_t mem_allocated_size = 0; /* total allocated memory counter (bytes) */
 
 
 /* initializes the memory module using 'mode' method, returns the number of
  * memory kilobytes allocated */
 unsigned int mem_init(int mode) {
-  MEM_MODE = mode;
   nexteventid = 0;
-  MEM_TOTALLOC = 0;
-  if (MEM_MODE == MEM_XMS) {
+  mem_allocated_size = 0;
+#ifdef MSDOS
+  mem_mode = mode;
+  if (mem_mode == MEM_XMS) {
     return(xms_init(&xms, 16384));
   } else {
+#endif
     /* try to allocate one mem pool so we have anything to start */
     mempool[0] = _fmalloc(LOWMEMBUFSIZE);
     if (mempool[0] == NULL) { /* if malloc() failed, then abort */
       return(0);
     }
-    MEM_TOTALLOC = LOWMEMBUFSIZE;
+    mem_allocated_size = LOWMEMBUFSIZE;
     return(LOWMEMBUFSIZE >> 10);
+#ifdef MSDOS
   }
+#endif
 }
 
 
 /* pull an xms memory block into *ptr */
 int mem_pull(long addr, void far *ptr, int sz) {
-  if (MEM_MODE == MEM_XMS) {
+#ifdef MSDOS
+  if (mem_mode == MEM_XMS) {
     return(xms_pull(&xms, addr, ptr, sz));
   } else {
+#endif
     _fmemcpy(ptr, mempool[addr >> 16] + (addr & 0xffffl), sz);
     return(0);
+#ifdef MSDOS
   }
+#endif
 }
 
 
 /* push the memory block pointed by *ptr into xms */
 int mem_push(void far *ptr, long addr, int sz) {
-  if (MEM_MODE == MEM_XMS) {
+#ifdef MSDOS
+  if (mem_mode == MEM_XMS) {
     return(xms_push(&xms, ptr, sz, addr));
   } else {
+#endif
     _fmemcpy(mempool[addr >> 16] + (addr & 0xffffl), ptr, sz);
     return(0);
+#ifdef MSDOS
   }
+#endif
 }
 
 
@@ -123,13 +147,15 @@ int pusheventqueue(const struct midi_event *event, long int *root) {
 /* returns a free eventid for a new event of sz bytes */
 long mem_alloc(int sz) {
   long res;
-  if (MEM_MODE == MEM_XMS) {
+#ifdef MSDOS
+  if (mem_mode == MEM_XMS) {
     res = nexteventid;
     if ((nexteventid + sz) > xms.memsize) return(-1);
     nexteventid += sz;
-    MEM_TOTALLOC += sz;
+    mem_allocated_size += sz;
     return(res);
   } else {
+#endif
     long seg, offset;
     seg = nexteventid >> 16;
     offset = nexteventid & 0xffffl;
@@ -142,43 +168,53 @@ long mem_alloc(int sz) {
       if (seg >= LOWMEMBUFCOUNT) return(-1);
       mempool[seg] = _fmalloc(LOWMEMBUFSIZE); /* try to alloc the extra mem pool */
       if (mempool[seg] == NULL) return(-1); /* abort if alloc failed */
-      MEM_TOTALLOC += LOWMEMBUFSIZE;
+      mem_allocated_size += LOWMEMBUFSIZE;
     }
     res = (seg << 16) | offset;
     /* */
     nexteventid = (seg << 16) | (offset + sz);
     return(res);
+#ifdef MSDOS
   }
+#endif
 }
 
 
 void mem_clear(void) {
   nexteventid = 0;
-  MEM_TOTALLOC = 0;
+  mem_allocated_size = 0;
   /* if using low mem, then leave only one buffer */
-  if (MEM_MODE != MEM_XMS) {
+#ifdef MSDOS
+  if (mem_mode != MEM_XMS) {
+#endif
     int i;
     for (i = 1; i < LOWMEMBUFCOUNT; i++) {
       if (mempool[i] == NULL) break;
       _ffree(mempool[i]);
       mempool[i] = NULL;
     }
-    MEM_TOTALLOC = LOWMEMBUFSIZE;
+    mem_allocated_size = LOWMEMBUFSIZE;
+#ifdef MSDOS
   }
+#endif
 }
 
 
 /* closes / deallocates the memory module */
 void mem_close(void) {
+#ifdef MSDOS
   xms.memsize = 0;
-  if (MEM_MODE == MEM_XMS) {
+  if (mem_mode == MEM_XMS) {
     xms_close(&xms);
   } else {
+#endif
     int i;
     for (i = 0; i < LOWMEMBUFCOUNT; i++) {
       if (mempool[i] == NULL) break; /* stop at first NULL mempool */
       _ffree(mempool[i]);
       mempool[i] = NULL;
     }
+#ifdef MSDOS
   }
+#endif
 }
