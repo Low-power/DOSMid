@@ -44,6 +44,7 @@
 #ifdef HAVE_PORT_IO
 #include "unixpio.h"
 #endif
+#include <sys/select.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <locale.h>
@@ -1525,12 +1526,13 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
       elticks += curevent->deltatime;
 #endif
       while (exitaction == ACTION_NONE) {
-        unsigned long t;
+        unsigned long int t;
         /* is time for next event yet? */
         timer_read(&t);
         if (t >= nexteventtime) break;
+        t = nexteventtime - t;
         /* detect wraparound of the timer counter */
-        if (nexteventtime - t > ULONG_MAX / 2) break;
+        if (t > ULONG_MAX / 2) break;
         /* if next event not due yet, do some keyboard/screen processing */
         if (compute_elapsed_time(midiplaybackstart, &(trackinfo->elapsedsec)) != 0) refreshflags |= UI_REFRESH_TIME;
         /* read keypresses */
@@ -1575,7 +1577,11 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
           union REGS regs;
           int86(0x28, &regs, &regs);
 #else
-          sleep(0);
+          fd_set rfds;
+          FD_ZERO(&rfds);
+          FD_SET(STDIN_FILENO, &rfds);
+          struct timeval timeout = { .tv_sec = t / 1000000, .tv_usec = t % 1000000 };
+          select(STDIN_FILENO + 1, &rfds, NULL, NULL, &timeout);
 #endif
         }
       }
