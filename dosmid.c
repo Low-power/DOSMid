@@ -512,16 +512,18 @@ static void getfileext(char *ext, char *filename, int limit) {
 static char *feedarg(char *arg, struct clioptions *params, int option_allowed, int file_allowed) {
   if(option_allowed && (arg[0] == '/' || arg[0] == '-')) {
     char *o = arg + 1;
-    if (strcasecmp(o, "noxms") == 0) {
-      params->memmode = MEM_MALLOC;
-    } else if (strcasecmp(o, "xmsdelay") == 0) {
-      params->xmsdelay = 1;
-    } else if (strcasecmp(o, "fullcpu") == 0) {
+    if (strcasecmp(o, "fullcpu") == 0) {
       params->nopowersave = 1;
     } else if (strcasecmp(o, "dontstop") == 0) {
       params->dontstop = 1;
     } else if (strcasecmp(o, "random") == 0) {
       params->random = 1;
+#ifdef MSDOS
+    } else if (strcasecmp(o, "noxms") == 0) {
+      params->memmode = MEM_MALLOC;
+    } else if (strcasecmp(o, "xmsdelay") == 0) {
+      params->xmsdelay = 1;
+#endif
     } else if (strcasecmp(o, "nosound") == 0) {
 #ifndef MSDOS
       close_device(params);
@@ -1764,78 +1766,78 @@ int main(int argc, char **argv) {
   if (errstr == NULL) errstr = parseargv(argc, argv, &params);
   //switch(errstr) {
   if(errstr == REQUEST_HELP) {
-      puts(    "Usage: dosmid [<options>] <file>\r\n"
-               "File can be m3u playlist.\r\n"
-               "Options:\r\n"
-               " /noxms     use conventional memory instead of XMS (loads small files only)\r\n"
-               " /xmsdelay  wait 2ms before accessing XMS memory (AWEUTIL compatibility)\r\n"
-               " /mpu[=<X>] use MPU-401 on I/O port <X>; will read BLASTER for port if omitted");
+      printf("Usage: %s [<options>] <file>\n"
+             "File can be m3u playlist.\n", argv[0]);
       puts(
+              "Options:\n"
+#ifdef MSDOS
+               " /noxms     use conventional memory instead of XMS (loads small files only)\n"
+               " /xmsdelay  wait 2ms before accessing XMS memory (AWEUTIL compatibility)\n"
+#endif
+               " /mpu[=<X>] use MPU-401 on I/O port <X>; will read BLASTER for port if omitted\n"
 #ifdef SBAWE
-               " /awe[=<X>] use the EMU8K on SB AWE card; will read BLASTER for port if omitted\r\n"
+               " /awe[=<X>] use the EMU8K on SB AWE card; will read BLASTER for port if omitted\n"
 #endif
 #ifdef OPL
-               " /opl[=<X>] use an FM synthesis OPL2/OPL3 chip for sound output\r\n"
-               " /opl2[=<X>] use an OPL2-compatible chip for output even it is OPL3-compatible\r\n"
-               " /opl3[=<X>] use an OPL3-compatible chip for output without fallback\r\n"
+               " /opl[=<X>] use an FM synthesis OPL2/OPL3 chip for sound output\n"
+               " /opl2[=<X>] use an OPL2-compatible chip for output even it is OPL3-compatible\n"
+               " /opl3[=<X>] use an OPL3-compatible chip for output without fallback\n"
 #endif
 #ifdef CMS
-               " /cms[=<X>] use Creative Music System / Game Blaster for sound output\r\n"
+               " /cms[=<X>] use Creative Music System / Game Blaster for sound output\n"
 #endif
-               " /sbmidi[=<X>] outputs MIDI to the SoundBlaster MIDI port at I/O port <X>"
-      );
-      puts(    " /com=<X>   output MIDI messages to the RS-232 port at I/O port <X>\r\n"
-               " /comX      same as /com=<X>, but takes a COM port instead (example: /com1)\r\n"
+               " /sbmidi[=<X>] outputs MIDI to the SoundBlaster MIDI port at I/O port <X>\n"
+               " /com=<X>   output MIDI messages to the RS-232 port at I/O port <X>\n"
+               " /comX      same as /com=<X>, but takes a COM port instead (example: /com1)\n"
 #ifdef MSDOS
-               " /gus       use the Gravis UltraSound card (requires ULTRAMID)\r\n"
+               " /gus       use the Gravis UltraSound card (requires ULTRAMID)\n"
 #endif
-               " /syx=<FILE> use SYSEX instructions from FILE for MIDI initialization\r\n"
-               " /sbnk=<FILE> load a custom sound bank file(s) (IBK on OPL, SBK on AWE)");
-      puts(
+               " /syx=<FILE> use SYSEX instructions from <FILE> for MIDI initialization\n"
+               " /sbnk=<FILE> load custom sound bank file (IBK on OPL, SBK on AWE)\n"
 #ifdef DBGFILE
-               " /log=<FILE> write highly verbose logs about DOSMid's activity to FILE\r\n"
+               " /log=<FILE> write highly verbose logs about DOSMid's activity to <FILE>\n"
 #endif
-               " /preset={GM|GS|XG|NONE} preset midi device to specified mode (default GM)\r\n"
-               " /fullcpu   do not let DOSMid try to be CPU-friendly\r\n"
-               " /dontstop  never wait for a keypress on error and continue the playlist\r\n"
-               " /random    randomize playlist order\r\n"
-               " /nosound   disable sound output\r\n"
-               " /version   print version and optional features of this build\r\n"
+               " /preset={GM|GS|XG|NONE} preset midi device to specified mode (default GM)\n"
+               " /fullcpu   do not let DOSMid try to be CPU-friendly\n"
+               " /dontstop  never wait for a keypress on error and continue the playlist\n"
+               " /random    randomize playlist order\n"
+               " /nosound   disable sound output\n"
+               " /version   print version and optional features of this build\n"
                "Options can begin with either '-' or '/'."
       );
       return 0;
   }
   if(errstr == REQUEST_VERSION) {
       puts(
-        "DOSMid " PVER "\r\n"
-        "Copyright (C) 2015-2024 Mateusz Viste\r\n"
-        "Copyright 2015-2024 Rivoreo\r\n"
+        "DOSMid " PVER "\n"
+        "Copyright (C) 2015-2023 Mateusz Viste\n"
+        "Copyright 2015-2024 Rivoreo\n"
       );
       puts("Enabled optional features:"
 #ifdef OPL
-           "\r\n  OPL"
+           "\n  OPL"
 #ifdef OPLLPT
-           "\r\n  OPLLPT"
+           "\n  OPLLPT"
 #endif
 #endif
 #ifdef CMS
-           "\r\n  CMS"
+           "\n  CMS"
 #ifdef CMSLPT
-           "\r\n  CMSLPT"
+           "\n  CMSLPT"
 #endif
 #endif
 #ifdef SBAWE
-           "\r\n  AWE"
+           "\n  AWE"
 #endif
 #if !defined MSDOS && defined WCHAR
-           "\r\n  WCHAR"
+           "\n  WCHAR"
 #endif
            );
       return 0;
   }
   if(errstr) {
     //default:
-      fprintf(stderr, "%s\nRun DOSMID /? for additional help.\n", errstr);
+      fprintf(stderr, "%s\nRun '%s /?' for additional help.\n", errstr, argv[0]);
       return(1);
   }
 
@@ -1847,7 +1849,7 @@ int main(int argc, char **argv) {
   params.onlpt) {
     params.devport = get_lpt_port(params.onlpt);
     if(!params.devport) {
-      fprintf(stderr, "LPT%c not found\r\n", params.onlpt + '0');
+      fprintf(stderr, "LPT%c not found\n", params.onlpt + '0');
       return 1;
     }
   }
