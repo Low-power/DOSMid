@@ -503,6 +503,27 @@ static void getfileext(char *ext, char *filename, int limit) {
   ext[x] = 0; /* terminate the ext string */
 }
 
+static inline int is_option(const char *s) {
+#ifdef MSDOS
+  return *s == '/' || *s == '-';
+#else
+  switch(*s) {
+      const char *p;
+    case '/':
+      p = s + 1;
+      while(*p) {
+        if(*p == '/') return 0;
+        if(*p == '=') return 1;
+        p++;
+      }
+      return 1;
+    case '-':
+      return 1;
+    default:
+      return 0;
+  }
+#endif
+}
 
 #define REQUEST_HELP ((char *)-1)
 #define REQUEST_VERSION ((char *)-2)
@@ -510,7 +531,7 @@ static void getfileext(char *ext, char *filename, int limit) {
 /* interpret a single config argument, returns NULL on succes, or a pointer to
  * an error string otherwise */
 static char *feedarg(char *arg, struct clioptions *params, int option_allowed, int file_allowed) {
-  if(option_allowed && (arg[0] == '/' || arg[0] == '-')) {
+  if(option_allowed && is_option(arg)) {
     char *o = arg + 1;
     if (strcasecmp(o, "fullcpu") == 0) {
       params->nopowersave = 1;
