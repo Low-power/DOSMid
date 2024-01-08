@@ -4,8 +4,8 @@
  * Copyright 2015-2024 Rivoreo
  */
 
-#if !defined MSDOS && defined WCHAR
-#define _XOPEN_SOURCE
+#if !defined MSDOS && defined WCHAR && !defined _XOPEN_SOURCE
+#define _XOPEN_SOURCE 600
 #endif
 #include <stdint.h>
 #ifdef MSDOS

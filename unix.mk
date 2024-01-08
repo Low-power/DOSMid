@@ -18,6 +18,12 @@ DEFAULT_DEVICE := \
 	-D DOSMID_DEFAULT_DEVICE_TYPE=DEV_OPL \
 	-D DOSMID_DEFAULT_DEVICE_PORT=0x388
 
+# May need for some versions of GNU C Library
+#CFLAGS += -D _XOPEN_SOURCE=600
+
+# May need for some old versions of Ncursesw
+#CFLAGS += -D _XOPEN_SOURCE_EXTENDED=1
+
 #CFLAGS += -I /usr/include/ncursesw
 CFLAGS += -Wall -Wno-switch -Os -fno-common
 CFLAGS += -D __far= -D __near= -D far= -D near= $(CPPFLAGS) $(FEATURES) $(DEFAULT_DEVICE)
