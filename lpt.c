@@ -73,8 +73,8 @@ void write_lpt_fd(int fd, unsigned int data, unsigned int ctrl) {
   value = ctrl ^ 4;
   ioctl(fd, PPISCTRL, &value);
   udelay((ctrl & 1) ? 4 : 1);
-  value = data;
-  ioctl(fd, PPISDATA, &value);
+  value = ctrl;
+  ioctl(fd, PPISCTRL, &value);
 }
 
 int claim_lpt(int fd) {
@@ -93,8 +93,8 @@ void write_lpt_fd(int fd, unsigned int data, unsigned int ctrl) {
   value = ctrl ^ 4;
   ioctl(fd, PPWCONTROL, &value);
   udelay((ctrl & 1) ? 4 : 1);
-  value = data;
-  ioctl(fd, PPWDATA, &value);
+  value = ctrl;
+  ioctl(fd, PPWCONTROL, &value);
 }
 
 int claim_lpt(int fd) {
