@@ -532,6 +532,9 @@ static inline int is_option(const char *s) {
  * an error string otherwise */
 static char *feedarg(char *arg, struct clioptions *params, int option_allowed, int file_allowed) {
   if(option_allowed && is_option(arg)) {
+#ifndef MSDOS
+    static char errmsg[128];
+#endif
     char *o = arg + 1;
     if (strcasecmp(o, "fullcpu") == 0) {
       params->nopowersave = 1;
@@ -577,14 +580,13 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       params->device = DEV_MPU401;
       params->devport = hexstr2uint(o + 4);
       if (params->devport < 1) return("Invalid MPU port provided. Example: /mpu=330");
-    } else if (strcasecmp(o, "preset=gm") == 0) {
-      params->gmgspreset = PRESET_GM;
-    } else if (strcasecmp(o, "preset=gs") == 0) {
-      params->gmgspreset = PRESET_GS;
-    } else if (strcasecmp(o, "preset=xg") == 0) {
-      params->gmgspreset = PRESET_XG;
-    } else if (strcasecmp(o, "preset=none") == 0) {
-      params->gmgspreset = PRESET_NONE;
+    } else if (stringstartswith(o, "preset=")) {
+      o += 7;
+      if(strcasecmp(o, "gm") == 0) params->gmgspreset = PRESET_GM;
+      else if(strcasecmp(o, "gs") == 0) params->gmgspreset = PRESET_GS;
+      else if(strcasecmp(o, "xg") == 0) params->gmgspreset = PRESET_XG;
+      else if(strcasecmp(o, "none") == 0) params->gmgspreset = PRESET_NONE;
+      else return "Invalid preset setting";
 #ifdef MSDOS
     } else if (strcasecmp(o, "gus") == 0) {
       params->device = DEV_GUS;
@@ -612,8 +614,20 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       params->device = o[3] == '3' ? DEV_OPL3 : DEV_OPL2;
       if(o[4]) {
 #ifdef OPLLPT
+#ifndef MSDOS
+        errno = 0;
+#endif
         if(try_parse_lpt_name(params, o + 5) >= 0) {
-          if(!params->onlpt) return "Invalid LPT index provided. Example: /opl3=lpt2";
+          if(!params->onlpt) {
+#ifndef MSDOS
+            int e = errno;
+            if(e) {
+              snprintf(errmsg, sizeof errmsg, "Failed to open '%s', %s", o + 5, strerror(e));
+              return errmsg;
+            }
+#endif
+            return "Invalid LPT unit name provided. Example: /opl3=lpt2";
+          }
         } else
 #endif
         {
@@ -643,7 +657,16 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       params->device = DEV_CMS;
 #ifdef CMSLPT
       if(try_parse_lpt_name(params, o + 4) >= 0) {
-        if(!params->onlpt) return "Invalid LPT index provided. Example: /cms=lpt2";
+        if(!params->onlpt) {
+#ifndef MSDOS
+          int e = errno;
+          if(e) {
+            snprintf(errmsg, sizeof errmsg, "Failed to open '%s', %s", o + 5, strerror(e));
+            return errmsg;
+          }
+#endif
+          return "Invalid LPT unit name provided. Example: /cms=lpt2";
+        }
       } else
 #endif
       {
@@ -667,7 +690,16 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
         open_device(params, o + 4, 1);
         if(params->devfd == -1) {
           int e = errno;
-          return e == ENOENT ? "Invalid COM port provided. Example: -com=ttyu1" : strerror(e);
+          if(e == ENOENT) {
+            return "Invalid COM device provided. Example: -com="
+#ifdef __linux__
+              "ttyS1";
+#else
+              "ttyu1";
+#endif
+          }
+          snprintf(errmsg, sizeof errmsg, "Failed to open device '%s', %s", o + 4, strerror(e));
+          return errmsg;
         }
 #endif
       }
