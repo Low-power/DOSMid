@@ -137,7 +137,9 @@ struct clioptions {
   /* 'flags' */
   unsigned char xmsdelay;
   char nockdev;
+#ifdef MSDOS
   unsigned char nopowersave;
+#endif
   unsigned char dontstop;
   unsigned char random;       /* randomize playlist order */
   unsigned char gmgspreset;   /* PRESET_GM, PRESET_GS, PRESET_XG, PRESET_NONE */
@@ -536,36 +538,7 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
     static char errmsg[128];
 #endif
     char *o = arg + 1;
-    if (strcasecmp(o, "fullcpu") == 0) {
-      params->nopowersave = 1;
-    } else if (strcasecmp(o, "dontstop") == 0) {
-      params->dontstop = 1;
-    } else if (strcasecmp(o, "random") == 0) {
-      params->random = 1;
-#ifdef MSDOS
-    } else if (strcasecmp(o, "noxms") == 0) {
-      params->memmode = MEM_MALLOC;
-    } else if (strcasecmp(o, "xmsdelay") == 0) {
-      params->xmsdelay = 1;
-#endif
-    } else if (strcasecmp(o, "nosound") == 0) {
-#ifndef MSDOS
-      close_device(params);
-#endif
-      params->device = DEV_NONE;
-      params->devport = 0;
-#ifdef SBAWE
-    } else if (strcasecmp(o, "awe") == 0) {
-      params->device = DEV_AWE;
-      params->devport = params->port_awe;
-      /* if AWE port not found in BLASTER, use the default 0x620 */
-      if (params->devport == 0) params->devport = 0x620;
-    } else if (stringstartswith(o, "awe=")) {
-      params->device = DEV_AWE;
-      params->devport = hexstr2uint(o + 4);
-    if (params->devport < 1) return("Invalid AWE port provided. Example: /awe=620");
-#endif
-    } else if (strcasecmp(o, "mpu") == 0) {
+    if (strcasecmp(o, "mpu") == 0) {
 #ifndef MSDOS
       close_device(params);
 #endif
@@ -580,6 +553,17 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       params->device = DEV_MPU401;
       params->devport = hexstr2uint(o + 4);
       if (params->devport < 1) return("Invalid MPU port provided. Example: /mpu=330");
+#ifdef SBAWE
+    } else if (strcasecmp(o, "awe") == 0) {
+      params->device = DEV_AWE;
+      params->devport = params->port_awe;
+      /* if AWE port not found in BLASTER, use the default 0x620 */
+      if (params->devport == 0) params->devport = 0x620;
+    } else if (stringstartswith(o, "awe=")) {
+      params->device = DEV_AWE;
+      params->devport = hexstr2uint(o + 4);
+      if (params->devport < 1) return("Invalid AWE port provided. Example: /awe=620");
+#endif
     } else if (stringstartswith(o, "preset=")) {
       o += 7;
       if(strcasecmp(o, "gm") == 0) params->gmgspreset = PRESET_GM;
@@ -739,6 +723,26 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       if ((params->delay < 1) || (params->delay > 9000)) {
         return("Invalid delay value: must be in the range 1..9000");
       }
+#ifdef MSDOS
+    } else if (strcasecmp(o, "fullcpu") == 0) {
+      params->nopowersave = 1;
+#endif
+    } else if (strcasecmp(o, "dontstop") == 0) {
+      params->dontstop = 1;
+    } else if (strcasecmp(o, "random") == 0) {
+      params->random = 1;
+#ifdef MSDOS
+    } else if (strcasecmp(o, "noxms") == 0) {
+      params->memmode = MEM_MALLOC;
+    } else if (strcasecmp(o, "xmsdelay") == 0) {
+      params->xmsdelay = 1;
+#endif
+    } else if (strcasecmp(o, "nosound") == 0) {
+#ifndef MSDOS
+      close_device(params);
+#endif
+      params->device = DEV_NONE;
+      params->devport = 0;
     } else if (stringstartswith(o, "volume=")) {
       int v = atoi(o + 7);
       if(v < 1) return "Invalid volume setting.";
@@ -1633,7 +1637,11 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
             params->devname,
 #endif
             params->devport, params->onlpt, params->volume);
-        } else if (params->nopowersave == 0) {
+        } else
+#ifdef MSDOS
+        if (!params->nopowersave)
+#endif
+        {
 #ifdef MSDOS
           /* if no screen refresh is needed, and power saver not disabled,
            * call INT 28h for some power saving */
@@ -1851,7 +1859,9 @@ int main(int argc, char **argv) {
                " /log=<FILE> write highly verbose logs about DOSMid's activity to <FILE>\n"
 #endif
                " /preset={GM|GS|XG|NONE} preset midi device to specified mode (default GM)\n"
+#ifdef MSDOS
                " /fullcpu   do not let DOSMid try to be CPU-friendly\n"
+#endif
                " /dontstop  never wait for a keypress on error and continue the playlist\n"
                " /random    randomize playlist order\n"
                " /nosound   disable sound output\n"
