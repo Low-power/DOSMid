@@ -679,7 +679,7 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
 #ifdef __linux__
               "ttyS1";
 #else
-              "ttyu1";
+              "cuau1";
 #endif
           }
           snprintf(errmsg, sizeof errmsg, "Failed to open device '%s', %s", o + 4, strerror(e));
