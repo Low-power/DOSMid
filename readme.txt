@@ -18,39 +18,15 @@ Used piece of software codes from third-party peoples, eg:
 - SAATunes v 1.04 lib by Bobcatmodder Jacob Field
 - Arduino YM2149 MIDI Synth by yukimizake
 
-New DOSMid options:
-
- /cms[=XXX] Use Creative Music System / Game Blaster on I/O port XXX in
-            hexadecimal number as output device. The default port 220 will be
-            used if omitted.
- /cms=lpt#  Use CMSLPT card on LPT port #. The actual I/O port number is
-            retrieved from BIOS automatically.
- /opl2[=XXX]
-            Use an OPL2-compatible chip on I/O port XXX in hexadecimal number
-            as output device. The default port 388 will be used if omitted.
-            It will be used in OPL2 mode, even the chip is OPL3-compatible.
- /opl2=lpt# Use OPL2LPT card on LPT port #.
- /opl3[=XXX]
-            Use an OPL3-compatible chip on I/O port XXX in hexadecimal number 
-            as output device. The default port 388 will be used if omitted.
- /opl3=lpt# Use OPL3LPT card on LPT port #.
- /volume=#  Set default volume in percentage #.
- /quirk=<name>[,<name>[,...]]
-            Activate one or more workarounds for the specified quirks.
-            Recognized quirk names:
-             norstctrl  Don't reset controllers on end of each file.
-
-In addition to '/', this version of DOSMid also recognizes options begin with
-'-'. To play files that named with a leading '-', use the end-of-option marker
-'--', for example:
- dosmid -cms=lpt1 -random -- -.m3u
-
 Another feature in this fork is support for corss-building DOSMid from source
 on a Linux-based operating system; the required software in this case are Open
 Watcom C/C++ 1.8 or later for Linux, basic Unix utilities, sh(1)-compatible
 Unix shell, and GNU Make. The makefile is 'GNUmakefile', while the configuring
 steps are similar to native building using Open Watcom C/C++ for DOS; see the
 BUILDING section below for details.
+
+Please see the man page file 'dosmid.1' for complete descriptions of the new
+features.
 
 
 ============================= ORIGINAL DOSMID.TXT

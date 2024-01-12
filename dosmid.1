@@ -1,0 +1,341 @@
+.TH DOSMID 1 2024
+
+.SH NAME
+DOSMid - a low-requirements MIDI and MUS player for DOS and UNIX
+.SH SYNOPSIS
+.nf
+dosmid [\fI<options>\fR] [--] \fI<midi-or-m3u-file>\fR
+.fi
+.SH DESCRIPTION
+DOSMid is a MIDI, MUS and RMID player, originally made for DOS.
+
+The DOS version is a real mode application designed to run on very modest
+hardware configurations.
+
+The UNIX version supports kFreeBSD-based and Linux-based operating systems on
+i386 and amd64 architectures.
+
+DOSMid plays standard MIDI files (both format 0 and format 1), as well as MIDI
+in RIFF (ie. RMID), and even MUS tunes (as used by Id Software in numerous
+games like Doom, Heretic, Hexen, etc).
+
+DOSMid requires MIDI-capable hardware of some sort. Note, that some sound
+cards have an MPU-401 interface, although many need an additional 'wavetable'
+daughterboard to produce actual MIDI sound.
+
+DOSMid can also emulate MIDI through FM synthesis using an OPL chip (that is
+one of the Yamaha YM3812 or YMF262 chips, found on most sound cards from the
+nineties), or using dual SAA1099 chips (the Creative Music System / Game
+Blaster). Be warned however that, most of the time, the MIDI-over-OPL
+emulation will yield less than desirable results, unless the MIDI file was
+specifically crafted for OPL; and using SAA1099 chips will only produce square
+waves, which can be dramatically different from the intended instruments.
+
+.SH OPTIONS
+Options are case-insensitive. In addition to '-', any option may also begin
+with '/'. To specify a file that named with a leading '-', or an absolute path
+on UNIX (with a leading '/'), use the end-of-option marker '--', for example:
+.sp
+.in +2
+.nf
+dosmid -cms=lpt1 -random -- -.m3u
+dosmid -cms=ppi0 -volume=25 -- /test.mid
+.fi
+.in -2
+.sp
+
+For options with a \fI<hex-number>\fR argument, the argument should be written
+without \fI0x\fR prefix. For example:
+.sp
+.in +2
+.nf
+dosmid -cms=230 \fI...\fR
+.fi
+.in -2
+.sp
+Will set output device to Creative Music System on I/O port 0x230 (560, 230h).
+
+.B
+.IP -mpu[=\fI<hex-number>\fB]
+Use MPU-401 on port \fI<hex-number>\fR. If port is omitted, DOSMid scans the
+\fBBLASTER\fR environment variable for the MPU port, and if not found, it
+fallback to port 330.
+
+.B
+.IP -awe[=\fI<hex-number>\fB]
+(DOS only)
+Use the EMU8000 synth chip found on SoundBlaster AWE32/AWE64 cards on port
+\fI<hex-number>\fR. KNOWN BUG: On some AWE cards, the FM music module becomes
+muted or noisy after using the EMU8000 chip. This is not a bug in DOSMid, and
+happens with other applications using AWE as well. If you have this problem,
+execute \fIAWEUTIL /S\fR after using DOSMid to reinit FM. I observed this
+problem on an AWE64 CT4390 ("Gold"), but not on an AWE32 CT2760.
+
+.B
+.IP -opl[=\fI<hex-number>\fB]
+Use an OPL2-compatible or OPL3-compatible chip on port \fI<hex-number>\fR.
+This should be a last resort option if you don't have any wavetable device. Do
+NOT expect pleasing results. The default port is 388 if not specified.
+
+.B
+.IP -opl2[=\fI<hex-number>\fB]
+Use an OPL2-compatible chip on I/O port \fI<hex-number>\fR as output device.
+The default port 388 will be used if omitted. It will be used in OPL2 mode,
+even the chip is OPL3-compatible.
+
+.B
+.IP -opl3[=\fI<hex-number>\fB]
+Use an OPL3-compatible chip on I/O port \fI<hex-number>\fR as output device.
+The default port 388 will be used if omitted.
+
+.B
+.IP -opl{2|3}=lpt{1|2|3|4}
+Use an OPL2-compatible or OPL3-compatible chip on a LPT port specified by an
+PC BIOS unit name. This is for OPL2LPT and OPL3LPT device.
+
+.B
+.IP -opl{2|3}=\fI<ppi-device>
+(kFreeBSD only)
+Use an OPL2-compatible or OPL3-compatible chip via a kFreeBSD \fBppi(4)\fR
+device. This is a recommended alternative to \fB-opl{2|3}=lpt{1|2|3|4}\fR,
+because it dosen't require low-level port I/O privilege.
+
+.B
+.IP -opl{2|3}=\fI<parport-device>
+(Linux only)
+Use an OPL2-compatible or OPL3-compatible chip via a Linux \fBppdev(4)\fR
+device. This is a recommended alternative to \fB-opl{2|3}=lpt{1|2|3|4}\fR,
+because it dosen't require low-level port I/O privilege.
+
+.B
+.IP -cms[=\fI<hex-number>\fB]
+Use Creative Music System / Game Blaster on I/O port \fI<hex-number>\fR as
+output device. The default port 220 will be used if omitted.
+
+.B
+.IP -cms=lpt{1|2|3|4}
+Use CMSLPT card on the LPT port specified by an PC BIOS unit name.
+
+.B
+.IP -cms=\fI<ppi-device>
+(kFreeBSD only)
+Use CMSLPT card via a kFreeBSD \fBppi(4)\fR device. This is a recommended
+alternative to \fB-cms=lpt{1|2|3|4}\fR, because it dosen't require low-level
+port I/O privilege.
+
+.B
+.IP -cms=\fI<parport-device>
+(Linux only)
+Use CMSLPT card via a Linux \fBppdev(4)\fR device. This is a recommended
+alternative to \fB-cms=lpt{1|2|3|4}\fR, because it dosen't require low-level
+port I/O privilege.
+
+.B
+.IP -sbmidi=\fI<hex-number>
+Drives an external synth connected to the gameport of your Sound Blaster card.
+Will read environment variable \fBBLASTER\fR for port if it is not specified.
+
+.B
+.IP -com=\fI<hex-number>
+Send MIDI messages out via the RS232 port at I/O port \fI<hex-number>\fR. This
+can be used to hook a hardware synth to a computer with no MIDI interface,
+only a standard serial port. DOSMid does NOT reconfigure the serial port, so
+you should take care of setting it correctly, for example using
+\fI'MODE COM1: ...'\fR command on DOS, or \fBstty(1)\fR on UNIX.
+
+.B
+.IP -com{1|2|3|4}
+(DOS only)
+Use an unit name of a COM device queried from PC BIOS.
+
+.B
+.IP -com=\fI<tty-device>
+(UNIX only)
+Send MIDI messages to the specified terminal device.
+
+.B
+.IP -gus
+(DOS only)
+Use the Gravis UltraSound card, relying on its ULTRAMID API.
+
+.B
+.IP -nosound
+Disable sound (not very useful for a music player!)
+
+.B
+.IP -syx=\fI<file>
+Uses SYSEX instructions stored in \fI<file>\fR for initializing the MIDI
+device. \fI<file>\fR must be in "SYX" format, and can contain one or more
+SYSEX messages.
+.B
+.IP -delay=\fI<n>
+Insert an extra delay of \fI<n>\fR msec in range 1...9000, before playing the
+MIDI file. Setting this to 100 or 200 might help in some cases where the sound
+hardware needs more time to initialize completely, or when complex sysex data
+is fed via the \fB-syx\fR option. You can also use this simply to make the
+silence longer between the files of your playlist.
+.B
+.IP -sbnk=\fI<file>
+Makes DOSMid load a custom sound bank. This is supported only on OPL and AWE
+hardware. The sound bank file must be in the IBK format when used with OPL,
+and SBK format for AWE. OPL accepts one or two IBK files (eg.
+\fIsbnk=file1.ibk,file2.ibk\fR). If two are provided, the first one will be
+used for the standard 128-instrument GM set, and the second one for defining
+percussion instruments.
+.B
+.IP -preset={GM|GS|XG|NONE}
+Preset the MIDI device into a specific mode before playing (default is
+\fBGM\fR).
+
+.B
+.IP -volume=\fI<n>
+Set default volume in percentage of \fI<n>\fR.
+
+.B
+.IP -nocolor
+Don't colorize TUI even if the system appear to support it.
+
+.B
+.IP -noxms
+(DOS only)
+Use conventional memory instead of XMS. This is obviously useful only if you
+don't have XMS. Don't use this option otherwise, since without XMS you won't
+be able to load big MIDI files.
+
+.B
+.IP -xmsdelay
+(DOS only)
+Wait 2ms before each XMS access. Such waiting is required sometimes when the
+MPU controller is emulated by a TSR driver (specifically, the AWEUTIL driver
+used with SoundBlaster AWE 32n64 cards happens to crash if XMS accesses are
+not slightly delayed).
+
+.B
+.IP -log=\fI<file>
+Logs all DOSMid activity to \fI<file>\fR. This is a debugging feature that you
+shouldn't be interested in. Beware, the log file can get pretty big (MUCH
+bigger than the MIDI file you are playing).
+
+.B
+.IP -fullcpu
+(DOS only)
+Do not let DOSMid being CPU-friendly. By default DOSMid issues an INT 28h when
+idle, to let the system be gentler on the CPU, but on some hardware this might
+lead to degraded sound performance.
+
+.B
+.IP -dontstop
+Never ask the user to press a key after an error occurs. This is useful if you
+want to play a long playlist and don't care about bad MIDI files, simply
+skipping them (or if you play a single file and wish that DOSMid exit
+immediately if the file is unplayable).
+
+.B
+.IP -random
+Randomize playlist order.
+
+.B
+.IP -quirk=\fI<name>\fB[,\fI<name>\fB[,\fI...\fB]]
+Activate one or more workarounds for the specified quirks.
+.sp
+Recognized quirk names:
+.RS
+.TP
+.B norstctrl
+Don't reset controllers on end of each file.
+.RE
+
+.B
+.IP -version
+Print version and copyright information, as well as optional features of this
+DOSMid build. DOSMid will exit afterward.
+
+.B
+.IP "-?, -h, -help"
+Print a brief usage message and an incomplete list of available opitons.
+DOSMid will exit afterward.
+
+.SH INTERACTIVE CONTROLS
+
+.B
+.IP "ESC, q"
+Quit.
+
+.B
+.IP "+, -"
+Increase or decrease volume by 5%.
+
+.B
+.IP SPACE
+Pause the song (press any key to resume).
+
+.B
+.IP ENTER
+Skip to next song in the playlist.
+
+.B
+.IP BACKSPACE
+Jump to previous song of the playlist.
+
+.SH ENVIORNMENT VARIABLES
+.B
+.IP BLASTER
+When not forced into a specific configuration via command-line switches,
+DOSMid scans the \fBBLASTER\fR environment variable to find out the most
+desirable settings. This environment variable usually looks similar to this:
+.sp
+.in +2
+.nf
+BLASTER=A220 I5 D1 T3 P330 H6 E620
+.fi
+.in -2
+.sp
+The bits DOSMid is interested in are "A220", "P330" and "E620". P330 provides
+the port address of the MPU-401 MIDI interface, while E620 tells the port
+address of the EMU8000 onboard synth (available only on 'AWE' models). A220,
+on the other hand, provides the base I/O address of the SoundBlaster card, so
+DOSMid can output directly to the card's MIDI port. If not instructed
+otherwise, DOSMid will always try to use the EMU8000 synth if found in the
+\fBBLASTER\fR string, and if not, it will use the MPU-401. If neither of them
+are found in the \fBBLASTER\fR string, or if there is no \fBBLASTER\fR
+variable at all, then DOSMid will try to fall back to FM synthesis on port
+388h, unless an \fBULTRADIR\fR environment variable is present, see below.
+.B
+.IP ULTRADIR
+(DOS only)
+If this variable is set, DOSMid will try to detect a Gravis UltraSound card
+through the ULTRAMID TSR API.
+.B
+.IP HOME
+(UNIX only)
+Instructs DOSMid where to find the configuration file. DOSMid will skip
+loading configuration file if this variable is not set.
+
+.SH CONFIGURATION FILE
+Depending on platform, DOSMid will try to read a configuration file from either
+.in +2
+$EXEC_PATH\\dosmid.cfg
+.in -2
+on DOS, where \fI$EXEC_PATH\fR is where the executable resides, or
+.in +2
+$HOME/.dosmid.cfg
+.in -2
+on UNIX, where \fI$HOME\fR is the content of \fBHOME\fR environment variable.
+.PP
+When reading the configuration file, DOSMid interprets each line as a command
+line option. A line may contain only 1 option, optionally with its argument if
+applicable; empty lines, lines containing only whitespace characters and lines
+starting with '#' are ignored.
+
+.SH AUTHORS
+DOSMid was initially written by Mateusz Viste.
+
+Creative Music System output support by Tronix.
+
+CMSLPT, OPL2LPT and OPL3LPT output support by WHR <whr@rivoreo.one>.
+
+Ported to UNIX by WHR <whr@rivoreo.one>.
+
+This man page was based on \fIdosmid.txt\fR file from original DOSMid 0.9.7
+release by Mateusz Viste. It was expanded by WHR to cover the added features
+in this fork.
