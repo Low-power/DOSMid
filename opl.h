@@ -87,7 +87,7 @@ void opl_midi_controller(int channel, int id, int value);
 /* assign a new instrument to emulated MIDI channel */
 void opl_midi_changeprog(int channel, int program);
 
-void opl_loadinstrument(unsigned short int voice, const struct timbre *timbre);
+//void opl_loadinstrument(unsigned short int voice, const struct timbre *timbre, unsigned char channelenable);
 
 /* loads an IBK bank from file into an array of 128 'struct timbre' objects.
  * returns 0 on success, non-zero otherwise */

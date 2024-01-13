@@ -58,6 +58,7 @@ struct oplstate {
   unsigned short channelvol[16];        /* per-channel pitch level */
   struct voicealloc voices2notes[18]; /* keeps the map of what voice is playing what note/channel currently */
   unsigned char channelprog[16];        /* programs (patches) assigned to channels */
+  unsigned char *channelenable;
 #if !defined MSDOS && defined OPLLPT
   int fd;
 #endif
@@ -232,6 +233,16 @@ static void calc_vol(unsigned char *regbyte, int volume) {
 }
 
 
+/* get the id of the instrument that relates to channel/note pair */
+static int getinstrument(int channel, int note) {
+  if ((note < 0) || (note > 127) || (channel > 15)) return(-1);
+  if (channel == 9) { /* the percussion channel requires special handling */
+    return(128 | note);
+  }
+  return(oplmem->channelprog[channel]);
+}
+
+
 /* Initialize hardware upon startup
  * Possible values for '*gen':
  * -1	Auto-detect OPL2 and OPL3, detection result will be stored back
@@ -341,6 +352,8 @@ int opl_init(unsigned int port, int *gen, int flags) {
     /* WRITE_OPL(oplmem, 0x101, 0x20); */ /* enable Waveform Select */
     /* WRITE_OPL(oplmem, 0x108, 0x40); */ /* turn off CSW mode and activate FM synth mode */
     /* WRITE_OPL(oplmem, 0x1BD, 0x00); */ /* set vibrato/tremolo depth to low, set melodic mode */
+
+    oplmem->channelenable = malloc(16);
   }
 
   WRITE_OPL(oplmem, 0x01, 0x20);  /* enable Waveform Select */
@@ -379,6 +392,7 @@ void opl_close() {
   if (oplmem->opl3 != 0) WRITE_OPL(oplmem, 0x105, 0);
 
   /* free state memory */
+  free(oplmem->channelenable);
   free(oplmem);
   oplmem = NULL;
 }
@@ -409,6 +423,7 @@ void opl_clear() {
   for (x = 0; x < 16; x++) {
     opl_midi_changeprog(x, x);
     oplmem->channelvol[x] = 127;
+    if(oplmem->channelenable) oplmem->channelenable[x] = 0x30;
   }
 }
 
@@ -468,9 +483,18 @@ void opl_midi_pitchwheel(int channel, int pitchwheel) {
 void opl_midi_controller(int channel, int id, int value) {
   int x;
   switch (id) {
+      unsigned char *enable;
     case 7:
     case 11: /* "Expression" (meaning "channel volume") */
       oplmem->channelvol[channel] = value;
+      break;
+    case 10: /* Pan */
+      if(!oplmem->opl3) break;
+      if(!oplmem->channelenable) break;
+      enable = oplmem->channelenable + channel;
+      if(value < 32) *enable = 0x20;
+      else if(value > 96) *enable = 0x10;
+      else *enable = 0x30;
       break;
     case 123: /* 'all notes off' */
     case 120: /* 'all sound off' - I map it to 'all notes off' for now, not perfect but better than not handling it at all */
@@ -490,7 +514,7 @@ void opl_midi_changeprog(int channel, int program) {
 }
 
 
-void opl_loadinstrument(unsigned short int voice, const struct timbre *timbre) {
+static void opl_loadinstrument(unsigned short int voice, const struct timbre *timbre, unsigned char channelenable) {
   /* KSL (key level scaling) / attenuation */
   WRITE_OPL(oplmem, 0x40 + op1offsets[voice], timbre->modulator_40);
   WRITE_OPL(oplmem, 0x40 + op2offsets[voice], timbre->carrier_40 | 0x3f); /* force volume to 0, it will be reajusted during 'note on' */
@@ -516,12 +540,7 @@ void opl_loadinstrument(unsigned short int voice, const struct timbre *timbre) {
     voice -= 9;
     voice |= 0x100;
   }
-  if (oplmem->opl3 != 0) { /* on OPL3 make sure to enable LEFT/RIGHT unmute bits */
-    WRITE_OPL(oplmem, 0xC0 + voice, timbre->feedconn | 0x30);
-  } else {
-    WRITE_OPL(oplmem, 0xC0 + voice, timbre->feedconn);
-  }
-
+  WRITE_OPL(oplmem, 0xC0 + voice, timbre->feedconn | channelenable);
 }
 
 
@@ -534,16 +553,6 @@ static void voicevolume(unsigned short voice, int program, int volume) {
     calc_vol(&carrierval, volume);
   }
   WRITE_OPL(oplmem, 0x40 + op2offsets[voice], carrierval);
-}
-
-
-/* get the id of the instrument that relates to channel/note pair */
-static int getinstrument(int channel, int note) {
-  if ((note < 0) || (note > 127) || (channel > 15)) return(-1);
-  if (channel == 9) { /* the percussion channel requires special handling */
-    return(128 | note);
-  }
-  return(oplmem->channelprog[channel]);
 }
 
 
@@ -580,8 +589,10 @@ void opl_midi_noteon(int channel, int note, int velocity) {
 
   /* load the proper instrument, if not already good */
   if (oplmem->voices2notes[voice].timbreid != instrument) {
+    unsigned char enable = oplmem->opl3 ?
+      (oplmem->channelenable ? oplmem->channelenable[channel] : 0x30) : 0;
     oplmem->voices2notes[voice].timbreid = instrument;
-    opl_loadinstrument(voice, &(gmtimbres[instrument]));
+    opl_loadinstrument(voice, gmtimbres + instrument, enable);
   }
 
   /* update states */
@@ -609,14 +620,15 @@ void opl_midi_noteon(int channel, int note, int velocity) {
 
 
 void opl_midi_noteoff(int channel, int note) {
-  int voice = oplmem->notes2voices[channel][note];
-
-  if (voice >= 0) {
-    opl_noteoff(voice);
-    oplmem->voices2notes[voice].channel = -1;
-    oplmem->voices2notes[voice].note = -1;
-    oplmem->voices2notes[voice].priority = -1;
-    oplmem->notes2voices[channel][note] = -1;
+  if(note >= 0) {
+    int voice = oplmem->notes2voices[channel][note];
+    if (voice >= 0) {
+      opl_noteoff(voice);
+      oplmem->voices2notes[voice].channel = -1;
+      oplmem->voices2notes[voice].note = -1;
+      oplmem->voices2notes[voice].priority = -1;
+      oplmem->notes2voices[channel][note] = -1;
+    }
   }
 }
 
