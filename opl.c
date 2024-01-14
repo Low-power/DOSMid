@@ -496,6 +496,12 @@ void opl_midi_controller(int channel, int id, int value) {
       else if(value > 96) *enable = 0x10;
       else *enable = 0x30;
       break;
+    case 121: /* Reset all controllers */
+      for(x = 0; x < 16; x++) {
+        oplmem->channelvol[x] = 127;
+        if(oplmem->channelenable) oplmem->channelenable[x] = 0x30;
+      }
+      break;
     case 123: /* 'all notes off' */
     case 120: /* 'all sound off' - I map it to 'all notes off' for now, not perfect but better than not handling it at all */
       for (x = 0; x < voicescount; x++) {
