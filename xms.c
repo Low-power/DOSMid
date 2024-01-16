@@ -32,7 +32,7 @@
 #include "xms.h" /* include self for control */
 
 /* a function pointer to save the XMS driver address */
-void far (*xmsdrv)(void);
+void (__far *xmsdrv)(void);
 
 /* descriptor for XMS moves */
 struct xms_move {
@@ -95,7 +95,7 @@ unsigned int xms_init(struct xms *xms, unsigned short int memsize) {
   /* fetch the driver's API address */
   regs.x.ax = 0x4310;
   int86x(0x2F, &regs, &regs, &sregs);
-  xmsdrv = (void far (*)()) MK_FP(sregs.es, regs.x.bx);
+  xmsdrv = (void (__far *)())MK_FP(sregs.es, regs.x.bx);
   xms->handle = 0;
   xms->memsize = 0;
   /* if memsize is 0, allocate as much as we can */

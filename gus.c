@@ -34,7 +34,7 @@
 #include <stdint.h>
 #include "gus.h"
 
-static void (far *ultramidfn)(void);
+static void (__interrupt __far *ultramidfn)(void);
 
 /* detect whether or not a GUS is present in the system (relying on the
  * ultramid API), returns ULTRAMID's vector, or 0 on error */

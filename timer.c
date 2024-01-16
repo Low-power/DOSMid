@@ -64,8 +64,8 @@
 #define disable _disable
 #define enable _enable
 
-static unsigned long nowtime = 0;        /* current time counter */
-static void interrupt (*oldfunc)(void);  /* interrupt function pointer */
+static unsigned long int nowtime;         /* current time counter */
+static void (__interrupt *oldfunc)(void); /* interrupt function pointer */
 
 
 /* This routine will handle the clock interrupt at its higher rate. It will
@@ -74,7 +74,7 @@ static void interrupt (*oldfunc)(void);  /* interrupt function pointer */
  * it adds to the nowtime value.
  * When it is not calling the DOS handler, this routine must reset the 8259A
  * interrupt controller before returning. */
-static void interrupt handle_clock(void) {
+static void __interrupt handle_clock(void) {
   static int callmod = 0;
 
   /* increment the time */
