@@ -1966,11 +1966,10 @@ int main(int argc, char **argv) {
 
   /* allocate the work memory */
   if (mem_init(params.memmode) == 0) {
-    if (params.memmode == MEM_XMS) {
-      ui_puterrmsg("ERROR: Memory init failed! No XMS maybe? Try /noxms.", NULL);
-    } else {
-      ui_puterrmsg("ERROR: Memory init failed!", NULL);
-    }
+    ui_puterrmsg("Error",
+      params.memmode == MEM_XMS ?
+        "Failed to allocate memory. No XMS maybe? Try '/noxms'." :
+        "Failed to allocate memory.");
     getkey();
     goto memallocfail;
   }
