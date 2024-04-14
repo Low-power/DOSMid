@@ -27,6 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "defines.h"
 #ifdef MSDOS
 #include <conio.h>  /* inp() and outp() */
 #else

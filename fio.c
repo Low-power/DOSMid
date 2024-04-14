@@ -8,6 +8,7 @@
  * Copyright 2015-2024 Rivoreo
  */
 
+#include "defines.h"
 #ifdef MSDOS
 #include <dos.h>    /* REGS */
 #else
@@ -129,8 +130,13 @@ static void loadcache(struct fiofile *f) {
   regs.h.ah = 0x3f;
   regs.x.bx = f->fh;
   regs.x.cx = FIO_CACHE;
+#ifdef _QC
+  segread(&sregs);
+  regs.x.dx = (unsigned int)f->buff;
+#else
   sregs.ds = FP_SEG(f->buff);
   regs.x.dx = FP_OFF(f->buff);
+#endif
   int86x(0x21, &regs, &regs, &sregs);
 #else
   sync_read(f->fh, f->buff, FIO_CACHE);

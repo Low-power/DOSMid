@@ -27,9 +27,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "defines.h"
+#include "xms.h" /* include self for control */
 #include <dos.h> /* REGS */
 
-#include "xms.h" /* include self for control */
+#ifndef MK_FP
+#define MK_FP(S,O) (void __far *)(((unsigned long int)(S) << 16) + (unsigned long int)(O))
+#endif
 
 /* a function pointer to save the XMS driver address */
 void (__far *xmsdrv)(void);

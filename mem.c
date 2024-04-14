@@ -27,6 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "defines.h"
+#include <stddef.h>
 #ifdef MSDOS
 #include "xms.h"
 #include <malloc.h>  /* _ffree(), _fmalloc() */

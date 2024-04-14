@@ -12,6 +12,7 @@
  * program exit.
  */
 
+#include "defines.h"
 #include "timer.h" /* include self for control */
 #include <stdlib.h> /* atexit() */
 #ifdef MSDOS

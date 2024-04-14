@@ -32,6 +32,7 @@
 #define HAVE_PORT_IO 1
 #endif
 
+#include "defines.h"
 #ifdef MSDOS
 #include <dos.h>    /* REGS */
 #else
@@ -82,6 +83,10 @@
 #include "ui.h"
 #include "version.h"
 #include <assert.h>
+
+#if defined MSDOS && !defined MK_FP
+#define MK_FP(S,O) (void __far *)(((unsigned long int)(S) << 16) + (unsigned long int)(O))
+#endif
 
 #if !defined MSDOS && !defined CLOCK_MONOTONIC_FAST
 #define CLOCK_MONOTONIC_FAST CLOCK_MONOTONIC
@@ -1283,7 +1288,11 @@ static enum playaction loadfile(const struct clioptions *params, struct trackinf
       } else if (*trackpos < 0) { /* detect any other problems */
         char msg[64];
         res = ACTION_ERR_SOFT;
+#ifdef _QC
+        sprintf(msg, "Error: Failed to load the MUS file (%ld)", *trackpos);
+#else
         snprintf(msg, 64, "Error: Failed to load the MUS file (%ld)", *trackpos);
+#endif
         ui_puterrmsg(params->midifile, msg);
       } else { /* all right, now we're talking */
         trackinfo->trackscount = 1;

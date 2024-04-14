@@ -7,6 +7,7 @@
 #if !defined MSDOS && defined WCHAR && !defined _XOPEN_SOURCE
 #define _XOPEN_SOURCE 600
 #endif
+#include "defines.h"
 #include <stdint.h>
 #ifdef MSDOS
 #include <dos.h>     /* REGS */
@@ -17,15 +18,19 @@
 #include <wchar.h>
 #include <curses.h>
 #endif
-#include <stdlib.h>  /* ultoa() */
+#include <stdlib.h>
 #include <stdio.h>   /* sprintf() */
-#include <string.h>  /* strlen() */
+#include <string.h>
 #ifdef MSDOS
 #include "mem.h" /* MEM_XMS */
 #endif
 #include "ui.h"  /* include self for control */
 #include "version.h"
 #include <assert.h>
+
+#if defined MSDOS && !defined MK_FP
+#define MK_FP(S,O) (void __far *)(((unsigned long int)(S) << 16) + (unsigned long int)(O))
+#endif
 
 /* color scheme 0xBF00 (Background/Foreground/0/0): mono, color */
 const unsigned short COLOR_TUI[2]       = {0x0700u, 0x1700u};
@@ -123,7 +128,7 @@ void ui_init(int flags) {
   oldmode = regs.h.al;
   regs.h.ah = 0x03; /* get cursor shape */
   int86(0x10, &regs, &regs);
-  oldcursor = regs.w.cx;
+  oldcursor = regs.x.cx;
   /* set text mode 80x25 */
   regs.h.ah = 0x00;  /* set video mode */
   screenptr = MK_FP(0xB800, 0);
@@ -181,7 +186,7 @@ void ui_close(void) {
   int86(0x10, &regs, &regs);
   if(oldcursor) {
     regs.h.ah = 0x01;
-    regs.w.cx = oldcursor;
+    regs.x.cx = oldcursor;
     int86(0x10, &regs, &regs);
   }
 #else
@@ -415,7 +420,11 @@ unsigned int port, int onlpt, int volume) {
       ui_printstr(18, 50, "", 12, COLOR_TEMPO[colorflag]);
     }
     /* total allocated memory */
+#ifdef _QC
+    sprintf(buffer, "%uK", (unsigned int)(mem_allocated_size >> 10));
+#else
     snprintf(buffer, sizeof buffer, "%zuK", mem_allocated_size >> 10);
+#endif  
     ui_printstr(22, 59, buffer, 6, COLOR_TEMPO[colorflag]);
 
     /* print format */
@@ -441,8 +450,10 @@ unsigned int port, int onlpt, int volume) {
     }
     ui_printstr(20, 75, sptr, 4, COLOR_TEMPO[colorflag]);
     /* print number of tracks */
-#ifdef MSDOS
+#ifdef __WATCOMC__
     utoa(trackinfo->trackscount, buffer, 10);
+#elif defined _QC
+    sprintf(buffer, "%hu", trackinfo->trackscount);
 #else
     snprintf(buffer, sizeof buffer, "%hu", trackinfo->trackscount);
 #endif
@@ -458,8 +469,10 @@ unsigned int port, int onlpt, int volume) {
     } else {
       miditempo = 0;
     }
-#ifdef MSDOS
+#ifdef __WATCOMC__
     ultoa(miditempo, tempstr, 10);
+#elif defined _QC
+    sprintf(tempstr, "%lu", miditempo);
 #else
     snprintf(tempstr, sizeof tempstr, "%lu", miditempo);
 #endif
@@ -482,8 +495,13 @@ unsigned int port, int onlpt, int volume) {
     } else {
       perc = 0;
     }
+#ifdef _QC
+    sprintf(tmpstr1, " %lu:%02lu (%lu%%)     ", trackinfo->elapsedsec / 60, trackinfo->elapsedsec % 60, perc);
+    rpos = 78 - sprintf(tmpstr2, "%lu:%02lu ", trackinfo->totlen / 60, trackinfo->totlen % 60);
+#else
     snprintf(tmpstr1, sizeof tmpstr1, " %lu:%02lu (%lu%%)     ", trackinfo->elapsedsec / 60, trackinfo->elapsedsec % 60, perc);
     rpos = 78 - snprintf(tmpstr2, sizeof tmpstr2, "%lu:%02lu ", trackinfo->totlen / 60, trackinfo->totlen % 60);
+#endif
     /* draw the progress bar */
     if (trackinfo->totlen > 0) {
       perc = (trackinfo->elapsedsec * 78) / trackinfo->totlen;

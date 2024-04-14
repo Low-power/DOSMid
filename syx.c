@@ -3,6 +3,7 @@
  * This file is part of the DOSMid project. Copyright (C) Mateusz Viste.
  */
 
+#include "defines.h"
 #include "fio.h"
 #include "syx.h" /* include self for control */
 

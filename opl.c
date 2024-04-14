@@ -29,6 +29,7 @@
 
 #ifdef OPL
 
+#include "defines.h"
 #ifdef MSDOS
 #include <conio.h> /* inp(), out() */
 #else

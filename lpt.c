@@ -28,6 +28,7 @@
 
 #if defined CMSLPT || defined OPLLPT
 
+#include "defines.h"
 #ifdef MSDOS
 #include <conio.h>
 #else

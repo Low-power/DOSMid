@@ -30,10 +30,14 @@
 
 #ifdef MSDOS
 
+#include "defines.h"
+#include "rs232.h"
 #include <conio.h> /* inp() */
 #include <dos.h>   /* MK_FP() */
 
-#include "rs232.h"
+#ifndef MK_FP
+#define MK_FP(S,O) (void __far *)(((unsigned long int)(S) << 16) + (unsigned long int)(O))
+#endif
 
 /* get the I/O port for COMx (1..4) */
 unsigned short rs232_getport(int x) {

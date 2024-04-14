@@ -31,6 +31,7 @@
 //#define CMS_DEBUG		// verbose to CMSLOG debug file
 //#define DRUMS_ONLY		// for percussion debug purpouses
 
+#include "defines.h"
 #include "cms.h"
 #ifdef CMSLPT
 #include "lpt.h"
@@ -204,7 +205,7 @@ static void write_cms(unsigned char chip_i, unsigned char reg, unsigned char val
 	}
 }
 
-#ifdef MSDOS
+#if defined MSDOS && !defined _QC
 static void __declspec(naked) asm_write_cms() {
 	__asm {
 		push	ax
@@ -280,7 +281,7 @@ static void cms_disable_voice(unsigned char voice)
 
 static void cms_enable_voice(unsigned char voice, unsigned char freq, unsigned char octave, unsigned char left_amplitude, unsigned char right_amplitude)
 {
-#ifdef MSDOS
+#if defined MSDOS && !defined _QC
   __asm {
 		xor   bh,bh
 		mov   bl,voice
@@ -380,7 +381,7 @@ first:
 }
 
 static void cms_set_volume(unsigned char voice, unsigned char left_amplitude, unsigned char right_amplitude) {
-#ifdef MSDOS
+#if defined MSDOS && !defined _QC
 	__asm {
 		xor	bh,bh
 		mov	bl, voice

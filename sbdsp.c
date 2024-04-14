@@ -4,6 +4,7 @@
  * Copyright (C) Mateusz Viste 2015
  */
 
+#include "defines.h"
 #ifdef MSDOS
 #include <conio.h>  /* inp() and outp() */
 #else

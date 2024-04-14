@@ -27,6 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "defines.h"
+#include <stddef.h> /* NULL */
 #include <string.h> /* memset() */
 
 #include "bitfield.h"

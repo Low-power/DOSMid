@@ -30,9 +30,14 @@
 
 #ifdef MSDOS
 
+#include "defines.h"
 #include <dos.h>   /* _dos_getvect(), MK_FP, FP_SEG */
 #include <stdint.h>
 #include "gus.h"
+
+#ifndef MK_FP
+#define MK_FP(S,O) (void __far *)(((unsigned long int)(S) << 16) + (unsigned long int)(O))
+#endif
 
 static void (__interrupt __far *ultramidfn)(void);
 
