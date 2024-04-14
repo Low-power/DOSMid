@@ -39,7 +39,7 @@ int main(void) {
 
   /* open the file */
   if (fio_open(FNAME, FIO_OPEN_RD, &ff) != 0) {
-    printf("ERR: opening " FNAME " should have failed (supposed not to exist)\n");
+    printf("ERR: opening " FNAME " failed\n");
     return(1);
   }
 
