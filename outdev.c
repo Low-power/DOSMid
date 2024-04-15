@@ -149,7 +149,7 @@ static int awe_loadfont(char *filename) {
  *
  * This should be called only ONCE, when program starts.
  * Returns NULL on success, or a pointer to an error string otherwise. */
-const char *dev_init(enum outdev_type dev, unsigned short int port,
+const char *dev_init(enum outdev_type dev, uint16_t port,
 #ifndef MSDOS
 int fd,
 #endif
