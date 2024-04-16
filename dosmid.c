@@ -1858,8 +1858,8 @@ int main(int argc, char **argv) {
 #endif
                " /sbmidi[=<X>] outputs MIDI to the SoundBlaster MIDI port at I/O port <X>\n"
                " /com=<X>   output MIDI messages to the RS-232 port at I/O port <X>\n"
-               " /comX      same as /com=<X>, but takes a COM port instead (example: /com1)\n"
 #ifdef MSDOS
+               " /com<N>    same as /com=<X>, but takes a COM port instead (example: /com1)\n"
                " /gus       use the Gravis UltraSound card (requires ULTRAMID)\n"
 #endif
                " /syx=<FILE> use SYSEX instructions from <FILE> for MIDI initialization\n"
