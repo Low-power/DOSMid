@@ -376,8 +376,8 @@ unsigned int port, int onlpt, int volume) {
   /* filename and props (format, tracks) */
   if (*refreshflags & UI_REFRESH_FNAME) {
     char buffer[8], *sptr;
-    /* print filename (unless NULL - might happen early at playlist load) */
-    if (trackinfo->filename && *trackinfo->filename) {
+    /* print filename (unless empty - might happen early at playlist load) */
+    if (*trackinfo->filename) {
 #if !defined MSDOS && defined WCHAR
       if(use_wchar) {
         size_t len = strlen(trackinfo->filename) + 1;
