@@ -142,7 +142,11 @@ const unsigned short op2offsets[18] = {0x03,0x04,0x05,0x0b,0x0c,0x0d,0x13,0x14,0
 /* number of melodic voices: 9 by default (OPL2), can go up to 18 (OPL3) */
 static int voicescount = 9;
 
+#ifdef HAVE_PORT_IO
 #define pdelay(port, ncycles) do { int i = (ncycles); while(i-- > 0) inp(port); } while(0)
+#else
+#define pdelay(port, ncycles) abort()
+#endif
 
 /* function used to write into a register 'reg' of the OPL chip located at
  * port 'port', writing byte 'data' into it. this function supports also OPL3.
@@ -168,13 +172,16 @@ static void write_opl(
     } else
 #endif
     {
+#ifdef HAVE_PORT_IO
       write_lpt(port, reg & 0xff, (reg & 0x100) ? 0x5 : 0xd);
       pdelay(port, 6);
       write_lpt(port, data, 0xc);
+#endif
     }
   } else
 #endif
   {
+#ifdef HAVE_PORT_IO
     /* remap 'high' registers to second port (OPL3) */
     if ((reg & 0x100) != 0) {
       reg &= 0xff;
@@ -187,6 +194,7 @@ static void write_opl(
     pdelay(port, 6);
     /* write the data to the data register */
     outp(port+1, data);
+#endif
   }
   /* OPL2 requires 23us to pass before writing to the data port. AdLib
    * recommends reading 35 times from the index register to make time pass. */
@@ -278,6 +286,7 @@ int opl_init(unsigned int port, int *gen, int flags) {
   if((flags & OPL_PORT_IS_FD) && !(flags & OPL_ON_LPT)) return -6;
 #endif
 
+#ifdef HAVE_PORT_IO
   if(!(flags & OPL_SKIP_CHECKING) && !(flags & OPL_ON_LPT)) {
     int y;
     /* detect the hardware and return error if not found */
@@ -297,6 +306,7 @@ int opl_init(unsigned int port, int *gen, int flags) {
     if (x != 0) return(-1);    /* 00h, and the result of step 7 should be C0h. If both are     */
     if (y != 0xC0) return(-1); /* ok, an AdLib-compatible board is installed in the computer   */
   }
+#endif
 
   /* is it an OPL3 or just an OPL2? */
   switch(*gen) {
@@ -304,15 +314,21 @@ int opl_init(unsigned int port, int *gen, int flags) {
 #ifdef OPLLPT
       if(flags & OPL_ON_LPT) return -1;
 #endif
+#ifdef HAVE_PORT_IO
       *gen = (inp(port) & 0x06) == 0 ? 3 : 2;
       break;
+#else
+      return -1;
+#endif
     case 2:
       break;
     case 3:
+#ifdef HAVE_PORT_IO
 #ifdef OPLLPT
       if(!(flags & OPL_ON_LPT) && (inp(port) & 0x06)) return -2;
 #else
       if(inp(port) & 0x06) return -2;
+#endif
 #endif
       break;
     default:

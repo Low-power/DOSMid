@@ -5,6 +5,7 @@
  */
 
 #include "defines.h"
+#ifdef HAVE_PORT_IO
 #ifdef MSDOS
 #include <conio.h>  /* inp() and outp() */
 #else
@@ -68,3 +69,4 @@ void dsp_write(unsigned short port, int databyte) {
   while ((inp(IO_WRSTAT) & 128) != 0); /* wait for the 'write' buffer to become available */
   outp(IO_WRITE, databyte);
 }
+#endif	/* HAVE_PORT_IO */

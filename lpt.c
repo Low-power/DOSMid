@@ -41,6 +41,7 @@
 #endif
 #endif
 
+#ifdef HAVE_PORT_IO
 // Copied from CMSLPT project
 void write_lpt(unsigned int port, unsigned int byte, unsigned int ctrl) {
   outp(port, byte);
@@ -57,6 +58,7 @@ void write_lpt(unsigned int port, unsigned int byte, unsigned int ctrl) {
   }
   outp(port, ctrl);
 }
+#endif
 
 #ifdef __FreeBSD_kernel__
 #include <dev/ppbus/ppi.h>

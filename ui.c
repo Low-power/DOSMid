@@ -237,7 +237,10 @@ void ui_draw(const struct trackinfodata *trackinfo, unsigned short int *refreshf
 #ifndef MSDOS
 const char *devname,
 #endif
-unsigned int port, int onlpt, int volume) {
+#ifdef HAVE_PORT_IO
+unsigned int port, int onlpt,
+#endif
+int volume) {
   #include "gm.h"  /* GM instruments names */
   int x, y;
   /* draw ascii graphic frames, etc */
@@ -324,8 +327,12 @@ unsigned int port, int onlpt, int volume) {
 #endif
     } else
 #endif
+#ifdef HAVE_PORT_IO
     if(onlpt) len = sprintf(buffer, "%s port LPT%c", devtypename, onlpt + '0');
     else len = sprintf(buffer, "%s port %03Xh", devtypename, port);
+#else
+    strcpy(buffer, devtypename);
+#endif
     x = 79 - len;
     ui_printstr(18, x, buffer, -1, COLOR_TEMPO[colorflag]);
     ui_printstr(19, x, "Volume", 6, COLOR_TEMPO[colorflag]);

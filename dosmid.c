@@ -28,10 +28,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if defined MSDOS || defined __i386__ || defined __amd64__ || defined __x86_64__ || defined _X86_ || defined __IA32__ || defined _M_IX86 || defined _M_AMD64
-#define HAVE_PORT_IO 1
-#endif
-
 #include "defines.h"
 #ifdef MSDOS
 #include <dos.h>    /* REGS */
@@ -120,10 +116,12 @@ struct clioptions {
   int devfd;
   char *devname;
 #endif
+#ifdef HAVE_PORT_IO
   unsigned short devport;
   unsigned short port_mpu;
   unsigned short port_awe;
   unsigned short port_sb;
+#endif
   enum outdev_type device;
   int devicesubtype;
   char *devtypename;/* the human name of the out device (MPU, AWE..) */
@@ -427,14 +425,16 @@ static void open_device(struct clioptions *config, const char *name, int is_seri
 }
 #endif
 
-#if defined HAVE_PORT_IO && (defined CMSLPT || defined OPLLPT)
+#if defined CMSLPT || defined OPLLPT
 static int try_parse_lpt_name(struct clioptions *config, const char *s) {
   config->onlpt = 0;
+#ifdef HAVE_PORT_IO
   if(stringstartswith(s, "lpt")) {
     char unit = s[3];
     if(unit < '1' || unit > '4' || s[4]) return 0;
     return config->devicesubtype = config->onlpt = unit - '0';
   }
+#endif
 #ifndef MSDOS
 #if defined __FreeBSD_kernel__ || defined __linux__
   const char *devname = s;
@@ -461,6 +461,7 @@ static int try_parse_lpt_name(struct clioptions *config, const char *s) {
   return -1;
 }
 
+#ifdef HAVE_PORT_IO
 static uint16_t get_lpt_port(unsigned int i) {
 #ifdef MSDOS
   return *(uint16_t __far *)MK_FP(0x40, 6 + 2*i);
@@ -481,6 +482,7 @@ static uint16_t get_lpt_port(unsigned int i) {
   }
 #endif
 }
+#endif	/* HAVE_PORT_IO */
 #endif
 
 /* loads the file's extension into ext (limited to limit characters) */
@@ -543,7 +545,15 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
     static char errmsg[128];
 #endif
     char *o = arg + 1;
-    if (strcasecmp(o, "mpu") == 0) {
+    if (stringstartswith(o, "preset=")) {
+      o += 7;
+      if(strcasecmp(o, "gm") == 0) params->gmgspreset = PRESET_GM;
+      else if(strcasecmp(o, "gs") == 0) params->gmgspreset = PRESET_GS;
+      else if(strcasecmp(o, "xg") == 0) params->gmgspreset = PRESET_XG;
+      else if(strcasecmp(o, "none") == 0) params->gmgspreset = PRESET_NONE;
+      else return "Invalid preset setting";
+#ifdef HAVE_PORT_IO
+    } else if (strcasecmp(o, "mpu") == 0) {
 #ifndef MSDOS
       close_device(params);
 #endif
@@ -569,20 +579,15 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       params->devport = hexstr2uint(o + 4);
       if (params->devport < 1) return("Invalid AWE port provided. Example: /awe=620");
 #endif
-    } else if (stringstartswith(o, "preset=")) {
-      o += 7;
-      if(strcasecmp(o, "gm") == 0) params->gmgspreset = PRESET_GM;
-      else if(strcasecmp(o, "gs") == 0) params->gmgspreset = PRESET_GS;
-      else if(strcasecmp(o, "xg") == 0) params->gmgspreset = PRESET_XG;
-      else if(strcasecmp(o, "none") == 0) params->gmgspreset = PRESET_NONE;
-      else return "Invalid preset setting";
 #ifdef MSDOS
     } else if (strcasecmp(o, "gus") == 0) {
       params->device = DEV_GUS;
       params->devport = gus_find();
       if (params->devport < 1) return("GUS error: No ULTRAMID driver found");
 #endif
+#endif	/* HAVE_PORT_IO */
 #ifdef OPL
+#ifdef HAVE_PORT_IO
     } else if (strcasecmp(o, "opl") == 0) {
 #ifndef MSDOS
       close_device(params);
@@ -596,6 +601,7 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       params->device = DEV_OPL;
       params->devport = hexstr2uint(o + 4);
       if (params->devport < 1) return("Invalid OPL port provided. Example: /opl=388");
+#endif	/* HAVE_PORT_IO */
     } else if (stringstartswith(o, "opl") && (o[3] == '2' || o[3] == '3') && (!o[4] || o[4] == '=')) {
 #ifndef MSDOS
       close_device(params);
@@ -620,25 +626,37 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
         } else
 #endif
         {
+#ifdef HAVE_PORT_IO
           params->devport = hexstr2uint(o + 5);
           if (params->devport < 1) {
             return params->device == DEV_OPL3 ?
               "Invalid OPL3 port provided. Example: /opl3=388" :
               "Invalid OPL2 port provided. Example: /opl2=388";
           }
+#else
+          return "Invalid device name provided.";
+#endif
         }
         params->nockdev = 1;
       } else {
+#ifdef HAVE_PORT_IO
         params->devport = 0x388;
-      }
+#else
+        return "Device name must be specified";
 #endif
+      }
+#endif	/* OPL */
 #ifdef CMS
     } else if (strcasecmp(o, "cms") == 0) {
+#ifdef HAVE_PORT_IO
 #ifndef MSDOS
       close_device(params);
 #endif
       params->device = DEV_CMS;
       params->devport = 0x220;
+#else
+      return "Device name must be specified";
+#endif	/* HAVE_PORT_IO */
     } else if (stringstartswith(o, "cms=")) {
 #ifndef MSDOS
       close_device(params);
@@ -659,8 +677,12 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       } else
 #endif
       {
+#ifdef HAVE_PORT_IO
         params->devport = hexstr2uint(o + 4);
         if (params->devport < 1) return("Invalid CMS port provided. Example: /cms=220");
+#else
+        return "Invalid device name provided.";
+#endif
       }
 #endif
     } else if (stringstartswith(o, "sbnk=")) {
@@ -671,8 +693,10 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       close_device(params);
 #endif
       params->device = DEV_RS232;
+#ifdef HAVE_PORT_IO
       params->devport = hexstr2uint(o + 4);
       if (params->devport < 10) {
+#endif
 #ifdef MSDOS
         return("Invalid COM port provided. Example: /com=3f8");
 #else
@@ -691,7 +715,9 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
           return errmsg;
         }
 #endif
+#ifdef HAVE_PORT_IO
       }
+#endif
 #ifdef MSDOS
     } else if (stringstartswith(o, "com")) { /* must be compared AFTER "com=" */
       params->device = DEV_RS232;
@@ -700,6 +726,7 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       params->devport = rs232_getport(params->devicesubtype);
       if (params->devport < 1) return("Failed to autodetect the I/O address of this COM port. Try using the /com=XXX option.");
 #endif
+#ifdef HAVE_PORT_IO
     } else if (strcasecmp(o, "sbmidi") == 0) {
 #ifndef MSDOS
       close_device(params);
@@ -715,6 +742,7 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       params->device = DEV_SBMIDI;
       params->devport = hexstr2uint(o + 7);
       if (params->devport < 1) return("Invalid SBMIDI port provided. Example: /sbmidi=220");
+#endif	/* HAVE_PORT_IO */
 #ifdef DBGFILE
     } else if (stringstartswith(o, "log=")) {
       if (params->logfile) fclose(params->logfile);
@@ -747,7 +775,9 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
       close_device(params);
 #endif
       params->device = DEV_NONE;
+#ifdef HAVE_PORT_IO
       params->devport = 0;
+#endif
     } else if (stringstartswith(o, "volume=")) {
       int v = atoi(o + 7);
       if(v < 1) return "Invalid volume setting.";
@@ -953,6 +983,7 @@ static struct midi_event *getnexteventfromcache(struct midi_event *eventscache, 
 /* reads the BLASTER variable for best guessing of current hardware and port.
  * If nothing found, fallbacks to MPU and 0x330 */
 static void preload_outdev(struct clioptions *params) {
+#ifdef HAVE_PORT_IO
   char *blaster;
 
   params->port_mpu = 0;
@@ -1037,6 +1068,7 @@ static void preload_outdev(struct clioptions *params) {
     params->devport = params->port_awe;
   }
 #endif
+#endif	/* HAVE_PORT_IO */
 }
 
 enum order {
@@ -1440,7 +1472,10 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
 #ifndef MSDOS
     params->devname,
 #endif
-    params->devport, params->onlpt, params->volume);
+#ifdef HAVE_PORT_IO
+    params->devport, params->onlpt,
+#endif
+    params->volume);
   refreshflags = UI_REFRESH_ALL;
 
   /* if running on a playlist, load next song */
@@ -1540,7 +1575,10 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
 #ifndef MSDOS
     params->devname,
 #endif
-    params->devport, params->onlpt, params->volume);
+#ifdef HAVE_PORT_IO
+    params->devport, params->onlpt,
+#endif
+    params->volume);
   memset(trackinfo->title[0], 0, 16);
   refreshflags = UI_REFRESH_ALL;
 
@@ -1568,7 +1606,10 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
 #ifndef MSDOS
     params->devname,
 #endif
-    params->devport, params->onlpt, params->volume);
+#ifdef HAVE_PORT_IO
+    params->devport, params->onlpt,
+#endif
+    params->volume);
   for (;;) {
     timer_read(&midiplaybackstart); /* save start time so we can compute elapsed time later */
     if (midiplaybackstart >= nexteventtime) break; /* wait until the scheduled start time is met */
@@ -1645,7 +1686,10 @@ static enum playaction playfile(struct clioptions *params, struct trackinfodata 
 #ifndef MSDOS
             params->devname,
 #endif
-            params->devport, params->onlpt, params->volume);
+#ifdef HAVE_PORT_IO
+            params->devport, params->onlpt,
+#endif
+            params->volume);
         } else
 #ifdef MSDOS
         if (!params->nopowersave)
@@ -1844,19 +1888,25 @@ int main(int argc, char **argv) {
                " /noxms     use conventional memory instead of XMS (loads small files only)\n"
                " /xmsdelay  wait 2ms before accessing XMS memory (AWEUTIL compatibility)\n"
 #endif
+#ifdef HAVE_PORT_IO
                " /mpu[=<X>] use MPU-401 on I/O port <X>; will read BLASTER for port if omitted\n"
 #ifdef SBAWE
                " /awe[=<X>] use the EMU8K on SB AWE card; will read BLASTER for port if omitted\n"
 #endif
+#endif	/* HAVE_PORT_IO */
 #ifdef OPL
+#ifdef HAVE_PORT_IO
                " /opl[=<X>] use an FM synthesis OPL2/OPL3 chip for sound output\n"
+#endif	/* HAVE_PORT_IO */
                " /opl2[=<X>] use an OPL2-compatible chip for output even it is OPL3-compatible\n"
                " /opl3[=<X>] use an OPL3-compatible chip for output without fallback\n"
 #endif
 #ifdef CMS
                " /cms[=<X>] use Creative Music System / Game Blaster for sound output\n"
 #endif
+#ifdef HAVE_PORT_IO
                " /sbmidi[=<X>] outputs MIDI to the SoundBlaster MIDI port at I/O port <X>\n"
+#endif
                " /com=<X>   output MIDI messages to the RS-232 port at I/O port <X>\n"
 #ifdef MSDOS
                " /com<N>    same as /com=<X>, but takes a COM port instead (example: /com1)\n"
@@ -1951,15 +2001,21 @@ int main(int argc, char **argv) {
 #ifndef MSDOS
       params.devname,
 #endif
-      params.devport, params.onlpt, params.volume);
+#ifdef HAVE_PORT_IO
+      params.devport, params.onlpt,
+#endif
+      params.volume);
   }
 #ifdef DBGFILE
   if (params.logfile) fprintf(params.logfile, "INIT SOUND HARDWARE\n");
 #endif
-#ifndef MSDOS
+#if !defined MSDOS && defined HAVE_PORT_IO
   if(params.devfd == -1 && params.devport) open_port_io_device();
 #endif
-  errstr = dev_init(params.device, params.devport,
+  errstr = dev_init(params.device,
+#ifdef HAVE_PORT_IO
+    params.devport,
+#endif
 #ifndef MSDOS
     params.devfd,
 #endif
@@ -1990,7 +2046,10 @@ int main(int argc, char **argv) {
 #ifndef MSDOS
       params.devname,
 #endif
-      params.devport, params.onlpt, params.volume);
+#ifdef HAVE_PORT_IO
+      params.devport, params.onlpt,
+#endif
+      params.volume);
     action = load_playlist_offsets(params.playlist, params.random, &playlist_offsets, &playlist_len);
   }
 

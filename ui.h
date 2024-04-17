@@ -6,6 +6,8 @@
 #ifndef ui_h_sentinel
 #define ui_h_sentinel
 
+#include "defines.h"
+
 #define UI_REFRESH_TUI        1
 #define UI_REFRESH_NOTES      2
 #define UI_REFRESH_TEMPO      4
@@ -65,8 +67,10 @@ void ui_puterrmsg(const char *title, const char *errmsg);
 /* draws the UI screen */
 #ifdef MSDOS
 void ui_draw(const struct trackinfodata *trackinfo, unsigned short int *refreshflags, unsigned short int *refreshchans, const char *devtypename, unsigned int port, int onlpt, int volume);
-#else
+#elif defined HAVE_PORT_IO
 void ui_draw(const struct trackinfodata *trackinfo, unsigned short int *refreshflags, unsigned short int *refreshchans, const char *devtypename, const char *devname, unsigned int port, int onlpt, int volume);
+#else
+void ui_draw(const struct trackinfodata *trackinfo, unsigned short int *refreshflags, unsigned short int *refreshchans, const char *devtypename, const char *devname, int volume);
 #endif
 
 /* waits for a keypress and return it. Returns 0 for extended keystroke, then

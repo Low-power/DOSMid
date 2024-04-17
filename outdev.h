@@ -30,6 +30,7 @@
 #ifndef outdev_h_sentinel
 #define outdev_h_sentinel
 
+#include "defines.h"
 #include <stdint.h>
 
 enum outdev_type {
@@ -66,8 +67,10 @@ enum outdev_type {
  */
 #ifdef MSDOS
 const char *dev_init(enum outdev_type dev, uint16_t port, int is_on_lpt, int skip_checking, char *sbank);
-#else
+#elif defined HAVE_PORT_IO
 const char *dev_init(enum outdev_type dev, uint16_t port, int fd, int is_on_lpt, int skip_checking, char *sbank);
+#else
+const char *dev_init(enum outdev_type dev, int fd, int is_on_lpt, int skip_checking, char *sbank);
 #endif
 
 /* pre-load a patch (so far needed only for GUS) */

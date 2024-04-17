@@ -36,4 +36,8 @@
 #define inline
 #endif
 
+#if defined MSDOS || defined __i386__ || defined __amd64__ || defined __x86_64__ || defined _X86_ || defined __IA32__ || defined _M_IX86 || defined _M_AMD64
+#define HAVE_PORT_IO 1
+#endif
+
 #endif

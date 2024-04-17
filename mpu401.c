@@ -28,6 +28,7 @@
  */
 
 #include "defines.h"
+#ifdef HAVE_PORT_IO
 #ifdef MSDOS
 #include <conio.h>  /* inp() and outp() */
 #else
@@ -115,3 +116,4 @@ void mpu401_uart(int mpuport) {
   outp(MPU_STAT, 0x3F);      /* Set MPU-401 "Dumb UART" Mode */
   /* I don't read anything back here, because MPU is not supposed to acknowledge the UART command */
 }
+#endif	/* HAVE_PORT_IO */

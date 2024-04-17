@@ -193,15 +193,19 @@ static void write_cms(unsigned char chip_i, unsigned char reg, unsigned char val
 		} else
 #endif
 		{
+#ifdef HAVE_PORT_IO
 			write_lpt(cms_port, reg, ctrl);
 			write_lpt(cms_port, value, ctrl | 1);
+#endif
 		}
 	} else
 #endif
 	{
+#ifdef HAVE_PORT_IO
 		unsigned int port = cms_port + (chip_i ? 2 : 0);
 		outp(port + 1, reg);	/* Select register */
 		outp(port, value);	/* Set value of the register */
+#endif
 	}
 }
 
