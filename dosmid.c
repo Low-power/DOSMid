@@ -668,7 +668,7 @@ static char *feedarg(char *arg, struct clioptions *params, int option_allowed, i
 #ifndef MSDOS
           int e = errno;
           if(e) {
-            snprintf(errmsg, sizeof errmsg, "Failed to open '%s', %s", o + 5, strerror(e));
+            snprintf(errmsg, sizeof errmsg, "Failed to open '%s', %s", o + 4, strerror(e));
             return errmsg;
           }
 #endif
