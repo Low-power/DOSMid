@@ -163,7 +163,7 @@ int is_on_lpt, int skip_checking, char *sbank) {
 #elif HAVE_PORT_IO
   if(fd == -1) outport = port; else out_fd = fd;
 #else
-  if(fd == -1) return "Missing file descriptor";
+  if(fd == -1 && outdev != DEV_NONE) return "Missing file descriptor";
   out_fd = fd;
 #endif
   outport_is_lpt = is_on_lpt;

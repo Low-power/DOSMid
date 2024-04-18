@@ -327,12 +327,17 @@ int volume) {
 #endif
     } else
 #endif
+    {
 #ifdef HAVE_PORT_IO
-    if(onlpt) len = sprintf(buffer, "%s port LPT%c", devtypename, onlpt + '0');
-    else len = sprintf(buffer, "%s port %03Xh", devtypename, port);
+      if(onlpt) len = sprintf(buffer, "%s port LPT%c", devtypename, onlpt + '0');
+      else len = sprintf(buffer, "%s port %03Xh", devtypename, port);
 #else
-    strcpy(buffer, devtypename);
+      len = strlen(devtypename);
+      assert(len < sizeof buffer);
+      memcpy(buffer, devtypename, len + 1);
+      if(len < 12) len = 12;
 #endif
+    }
     x = 79 - len;
     ui_printstr(18, x, buffer, -1, COLOR_TEMPO[colorflag]);
     ui_printstr(19, x, "Volume", 6, COLOR_TEMPO[colorflag]);
