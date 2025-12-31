@@ -1,6 +1,6 @@
 /*
  * x86 port I/O for UNIX
- * Copyright 2015-2024 Rivoreo
+ * Copyright 2015-2025 Rivoreo
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -70,7 +70,7 @@ unsigned int inp(unsigned int port) {
 		if(ioctl(port_io_fd, IODEV_PIO, &req) == 0) return req.val;
 #elif defined __linux__
 		unsigned char b;
-		if(lseek(port_io_fd, port, SEEK_SET) == port && read(port_io_fd, &b, 1) == 1) return b;
+		if(pread(port_io_fd, &b, 1, port) == 1) return b;
 #endif
 	}
 #endif
@@ -92,7 +92,7 @@ unsigned int outp(unsigned int port, unsigned int value) {
 		if(ioctl(port_io_fd, IODEV_PIO, &req) == 0) return req.val;
 #elif defined __linux__
 		unsigned char b = value;
-		if(lseek(port_io_fd, port, SEEK_SET) == port && write(port_io_fd, &b, 1) == 1) return b;
+		if(pwrite(port_io_fd, &b, 1, port) == 1) return b;
 #endif
 	}
 #endif
