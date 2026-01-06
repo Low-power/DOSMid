@@ -13,7 +13,8 @@ DOSMid Copyright (C) 2014-2023 Mateusz Viste
 Creative Music System / Game Blaster output support version (C) Tronix 2021
 CMSLPT, OPL2LPT and OPL3LPT output support by WHR, Copyright 2024 Rivoreo
 
-Used piece of software codes from third-party peoples, eg:
+The CMS implementation used piece of software codes from third-party people,
+eg:
 - DEATHSHADOW'S Paku-Paku game by Jason M. Knight
 - SAATunes v 1.04 lib by Bobcatmodder Jacob Field
 - Arduino YM2149 MIDI Synth by yukimizake
@@ -22,11 +23,54 @@ Another feature in this fork is support for corss-building DOSMid from source
 on a Linux-based operating system; the required software in this case are Open
 Watcom C/C++ 1.8 or later for Linux, basic Unix utilities, sh(1)-compatible
 Unix shell, and GNU Make. The makefile is 'GNUmakefile', while the configuring
-steps are similar to native building using Open Watcom C/C++ for DOS; see the
-BUILDING section below for details.
+steps are similar to native building using Open Watcom C/C++ for DOS.
+
+Lastly, in addition to DOS, this version also runs on a Linux-based or
+kFreeBSD-based operating system.
 
 Please see the man page file 'dosmid.1' for complete descriptions of the new
 features.
+
+
+Building on MS-DOS natively with Open Watcom C
+==============================================
+Prepare the environment of Open Watcom C for DOS, enter DOSMid source
+directory, then run 'wmake'.
+
+Edit file 'Makefile' for build-time configuration. If you don't want the
+produced executable files to be compressed via UPX, remove the upx command
+lines from there.
+
+
+Building on MS-DOS natively with Microsoft QuickC
+=================================================
+Prepare the environment of Microsoft QuickC, enter DOSMid source directory,
+then run 'nmake -f dos-qcl.mk'.
+
+Edit file 'dos-qcl.mk' for build-time configuration.
+
+
+Cross-building on Linux-based OS for MS-DOS with Open Watcom C
+==============================================================
+Prepare the environment of Open Watcom C, enter DOSMid source directory, then
+run 'make', 'gmake', or whatever the GNU Make command is named on your
+building operating system.
+
+Edit file 'GNUmakefile' for build-time configuration. If you don't want the
+produced executable files to be compressed via UPX, remove the upx command
+lines from there.
+
+
+Building for Linux-based or kFreeBSD-based operating system with GNU C
+======================================================================
+Install a curses library such as ncurses, preferably a wide-character-enabled
+one to support the WCHAR feature.
+
+Define 'CC' environment variable if needed. Run 'make -f unix.mk' in DOSMid
+source directory.
+
+Edit file 'unix.mk' for build-time configuration.
+
 
 
 ============================= ORIGINAL DOSMID.TXT
